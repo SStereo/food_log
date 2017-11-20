@@ -1,0 +1,92 @@
+/* Sets overall styles valid for all tags:
+   1. the default font of the website to a google font because
+      it looks cool. As a fallback generic fonts are listed
+   2. Sets the box definition to include the border only so  that
+      width and height attributes include the border an shrinks
+      the content
+*/
+header, nav, footer, section, article, div {
+  box-sizing: border-box;
+  display: block; /* The element generates a block element box */
+}
+
+body {
+  font-family: 'Architects Daughter',Verdana, Times, serif;
+  font-size: 14px;
+  color: rgb(53,127,111);
+}
+
+a {
+  cursor: pointer;
+}
+
+.box {
+  border-color: grey;
+  border-width: 5px;
+
+  width: 500px;
+}
+
+/* TODO add media query later to remove fixed width for smaller screen sizes */
+.welcome {
+  position: relative; /* Necessary so that childs (article) can use position:absolute in reference to the parent */
+  width: 100%;
+  max-width: 800px;
+  /*margin:auto; /* centeres an element by automatically increasing the margin */
+  background-image: url(../images/obstkorb.jpg);
+  background-size: cover;
+  height: 300px;
+}
+
+.welcome article {
+  background-color: rgba(0,0,0,0.7);
+  position: absolute;   /* enables the element the be placed on absolute position to the parent -> see position: relative of parent */
+  bottom:0;             /* places article on the bottom of the parent element */
+  /*height: 40%; Disabled to allow clearfix overflow:auto on the welcome_text to increase the height of parent if necessary*/
+  width: 100%;
+  color:#fff;
+  padding:1em;
+}
+
+.welcome_text {
+  overflow: auto;
+}
+
+.welcome h2 {
+  margin-top: 0px;
+  margin-bottom: 10px;
+}
+
+.items {
+
+}
+
+.item {
+  float:left; /* Important so that elements respect each other */
+  display:inline-block; /*Should avoid stacking of block items */
+  width: 120px;
+  height: 300px;
+  margin:5px;
+  padding:8px;
+  background-color: rgb(190,200,190);
+}
+
+.item div {
+  width: 80px;
+  height: 70px;
+  margin: 5px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top:10px;
+  margin-bottom:10px;
+  padding: 2px;
+  background-color: white;
+}
+
+.item h3 {
+  font-family: Verdana;
+  text-align: center;
+  margin:0px;
+}
+
+.item h4
