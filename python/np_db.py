@@ -44,13 +44,14 @@ class Ingredient(Base):
     __tablename__ = 'ingredients'
     id = Column(Integer, primary_key = True)
     quantity = Column(Float, nullable = False)
-    uom = Column(String(5), ForeignKey('units_of_measure.uom'))
+    uom_id = Column(String(5), ForeignKey('units_of_measure.uom'))
     meal_id = Column(Integer, ForeignKey('meals.id'))
     food_id = Column(Integer, ForeignKey('foods.id'))
     created = Column(DateTime, default = datetime.datetime.utcnow)
 
     food = relationship("Food", back_populates="ingredients")
     meal = relationship("Meal")
+    uom = relationship("UOM")
 
 
 class Food(Base):
