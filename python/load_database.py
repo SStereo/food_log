@@ -16,6 +16,21 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
+
+# Deletes existing records in the tables
+num_rows_deleted = session.query(Ingredient).delete()
+session.commit()
+
+num_rows_deleted = session.query(Food).delete()
+session.commit()
+
+num_rows_deleted = session.query(Meal).delete()
+session.commit()
+
+num_rows_deleted = session.query(UOM).delete()
+session.commit()
+
+
 # Create UOM objects
 # See: https://www.asknumbers.com/CookingConversion.aspx
 
@@ -28,7 +43,8 @@ obj_uoms = [
            UOM(uom="tsp",title="teaspoon"),
            UOM(uom="pn",title="pinch"),
            UOM(uom="cup",title="cup"),
-           UOM(uom="oz",title="shot")
+           UOM(uom="oz",title="shot"),
+           UOM(uom="pc",title="piece")
 ]
 
 obj_foods = [
@@ -47,7 +63,19 @@ obj_foods = [
            Food(title="Salz"),
            Food(title="schwarzer Pfeffer"),
            Food(title="Zucker"),
-           Food(title="Wasser")
+           Food(title="Wasser"),
+           Food(title="Stange Lauch"),
+           Food(title="Karotte"),
+           Food(title="Knollensellerie, mittelgroß"),
+           Food(title="Linsen"),
+           Food(title="Räucherbauch"),
+           Food(title="Gemüsebrühe"),
+           Food(title="Kartoffel"),
+           Food(title="Wienerle"),
+           Food(title="Öl"),
+           Food(title="Muskat"),
+           Food(title="Rotweinessig"),
+           Food(title="Spätzle"),
 ]
 
 obj_meals = [
@@ -58,7 +86,14 @@ obj_meals = [
                 """,
                 portions=2,
                 rating=5,
-                )
+                ),
+            Meal(title="Linsen mit Spätzle und Saitenwürstchen",
+                 description="""\
+                 Leckers schwäbisches Gericht.\
+                 """,
+                 portions=2,
+                 rating=5,
+                 )
 ]
 
 obj_ingredients = [
@@ -71,7 +106,147 @@ obj_ingredients = [
                       uom=obj_uoms[4],
                       meal=obj_meals[0],
                       food=obj_foods[1]
-                      )
+                      ),
+           Ingredient(quantity=100,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[0],
+                      food=obj_foods[2]
+                      ),
+           Ingredient(quantity=200,
+                      uom=obj_uoms[3],
+                      meal=obj_meals[0],
+                      food=obj_foods[3]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[0],
+                      food=obj_foods[4]
+                      ),
+           Ingredient(quantity=400,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[0],
+                      food=obj_foods[5]
+                      ),
+           Ingredient(quantity=2,
+                      uom=obj_uoms[7],
+                      meal=obj_meals[0],
+                      food=obj_foods[6]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[7],
+                      meal=obj_meals[0],
+                      food=obj_foods[7]
+                      ),
+           Ingredient(quantity=2,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[0],
+                      food=obj_foods[8]
+                      ),
+           Ingredient(quantity=5,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[0],
+                      food=obj_foods[9]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[9],
+                      meal=obj_meals[0],
+                      food=obj_foods[10]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[0],
+                      food=obj_foods[11]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[6],
+                      meal=obj_meals[0],
+                      food=obj_foods[12]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[6],
+                      meal=obj_meals[0],
+                      food=obj_foods[13]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[5],
+                      meal=obj_meals[0],
+                      food=obj_foods[14]
+                      ),
+           Ingredient(quantity=200,
+                      uom=obj_uoms[3],
+                      meal=obj_meals[0],
+                      food=obj_foods[15]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[9],
+                      meal=obj_meals[1],
+                      food=obj_foods[0]
+                      ),
+           Ingredient(quantity=0.5,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[16]
+                      ),
+           Ingredient(quantity=50,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[17]
+                      ),
+           Ingredient(quantity=50,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[18]
+                      ),
+           Ingredient(quantity=50,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[19]
+                      ),
+           Ingredient(quantity=50,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[20]
+                      ),
+           Ingredient(quantity=50,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[21]
+                      ),
+           Ingredient(quantity=1,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[22]
+                      ),
+           Ingredient(quantity=4,
+                      uom=obj_uoms[9],
+                      meal=obj_meals[1],
+                      food=obj_foods[23]
+                      ),
+           Ingredient(quantity=2,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[1],
+                      food=obj_foods[24]
+                      ),
+           Ingredient(quantity=2,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[1],
+                      food=obj_foods[12]
+                      ),
+           Ingredient(quantity=2,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[1],
+                      food=obj_foods[13]
+                      ),
+           Ingredient(quantity=2,
+                      uom=obj_uoms[4],
+                      meal=obj_meals[1],
+                      food=obj_foods[25]
+                      ),
+           Ingredient(quantity=250,
+                      uom=obj_uoms[0],
+                      meal=obj_meals[1],
+                      food=obj_foods[26]
+                      ),
 ]
 
 session.add_all(obj_uoms)
