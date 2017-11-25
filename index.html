@@ -9,77 +9,123 @@
     <link href='https://fonts.googleapis.com/css?family=Architects+Daughter|Permanent+Marker' rel='stylesheet'>
     <!-- Stylesheet with style information is stored in a separate file -->
     <link href='styles/main_styles.css' rel='stylesheet'>
-    <title>Portfolio Site of Dr. Zero</title>
+    <title>Food Coach</title>
   </head>
   <body>
-    <!-- TODO: implement CSS and grid based layouting -->
     <header>
-      <H1>Project Portfolio</H1>
+<!--
+      <div class="header">
+        <h1>Food Coach</h1>
+        <p>@SoerenStereo</p>
+      </div>
+      <div class="header_line"></div>
     </header>
-
+-->
     <main>
       <!-- Welcome section of the document -->
       <section class="welcome">
-        <article>
+        <div class="welcome_div">
           <h2>Speiseplan für die ganze Familie</h2>
           <p class="welcome_text">
-            Lege eine Liste alle Rezepte an die deine Famile so gerne mag. Lege fest an welchem Tag welches Gericht gekocht werden soll. Einkaufslisten werden automatisch generiert. Kinderleicht!
+          Lege eine Liste alle Rezepte an die deine Famile so gerne mag. Lege fest an welchem Tag welches Gericht gekocht werden soll. Einkaufslisten werden automatisch generiert. Kinderleicht!
           </p>
-        </article>
+        </div>
       </section>
 
-      <!-- Section with featured projects -->
-      <section class="items">
-        <H2>Items of the Week</H2>
+      <!-- Section with the week plan -->
+      <section class="content">
+        <H2>Speiseplan</H2>
+        <div class="flex_container">
+          <article class="day_item">
+            <h3>Montag</h3>
+              <div>Avocado</div>
+              <div>Salat</div>
+              <div>Käsebrot</div>
+          </article>
 
-        <article class="item">
-          <h3>Montag</h3>
-            <div>Avocado</div>
+          <article class="day_item">
+            <h3>Dienstag</h3>
+            <div>
+            </div>
+            <div>Käsespätzle</div>
+          </article>
+
+          <article class="day_item">
+            <h3>Mittwoch</h3>
             <div>Salat</div>
-            <div>Käsebrot</div>
-        </article>
+          </article>
 
-        <article class="item">
-          <h3>Dienstag</h3>
-          <div>
-          </div>
-          <div>Käsespätzle</div>
-        </article>
+          <article class="day_item">
+            <h3>Donnerstag</h3>
+            <div>Spaghetti</div>
+          </article>
 
-        <article class="item">
-          <h3>Mittwoch</h3>
-          <div>Salat</div>
-        </article>
+          <article class="day_item">
+            <h3>Freitag</h3>
+            <div>Currywurst</div>
+          </article>
 
-        <article class="item">
-          <h3>Donnerstag</h3>
-          <div>Spaghetti</div>
-        </article>
+          <article class="day_item">
+            <h3>Samstag</h3>
+            <div>Dönner</div>
+          </article>
 
-        <article class="item">
-          <h3>Freitag</h3>
-          <div>Currywurst</div>
-        </article>
+          <article class="day_item">
+            <h3>Sonntag</h3>
+            <div>Pizza</div>
+          </article>
+        </div>
+      </section>
 
-        <article class="item">
-          <h3>Samstag</h3>
-          <div>Dönner</div>
-        </article>
+      <!-- Section with meals -->
+      <section class="content">
+        <H2>Gerichte</H2>
+        <div class="flex_container">
 
-        <article class="item">
-          <h3>Sonntag</h3>
-          <div>Pizza</div>
-        </article>
+          <article class="meal">
+            <div class="image_box">
+              <img src="images/linsendhal.jpg" alt="Gericht">
+            </div>
+            <h3>Linsen Dhal</h3>
+            <div>
+              <table class="ingredients">
+                <tr><td><span class="quantity">100g</span> <span class="food">Linsen</span></td></tr>
+                <tr><td><span class="quantity">1 Stück</span> <span class="food">Zwiebel</span></td></tr>
+                <tr><td><span class="quantity">1 EL</span> <span class="food">Salz</span></td></tr>
+              </table>
+            </div>
+          </article>
 
+          <article class="meal">
+            <div class="image_box">
+              <img src="images/linsenmitspaetzle.jpg" alt="Gericht">
+            </div>
+            <h3>Linsen mit Spätzle und Saitenwürstchen</h3>
+            <div>
+              <table class="ingredients">
+                <tr><td><span class="quantity">100g</span> <span class="food">Linsen</span></td></tr>
+                <tr><td><span class="quantity">1 Stück</span> <span class="food">Zwiebel</span></td></tr>
+                <tr><td><span class="quantity">1 EL</span> <span class="food">Salz</span></td></tr>
+              </table>
+            </div>
+          </article>
+
+          <article class="meal">
+            <div class="image_box">
+              <img src="images/geschmelztemaultaschen.jpg" alt="Gericht">
+            </div>
+            <h3>Geschmeltzte Maultaschen</h3>
+            <div>
+              <table class="ingredients">
+                <tr><td><span class="quantity">100g</span> <span class="food">Linsen</span></td></tr>
+                <tr><td><span class="quantity">1 Stück</span> <span class="food">Zwiebel</span></td></tr>
+                <tr><td><span class="quantity">1 EL</span> <span class="food">Salz</span></td></tr>
+              </table>
+            </div>
+          </article>
+        </div>
       </section>
 
     </main>
-
-    <!-- Footer with contact information -->
-    <footer>
-      <div class="box">
-          <a href="https://www.linkedin.com/in/s%C3%B6ren-schmidt-6335444" target="_blank">contact me</a>
-      </div>
-    </footer>
   </body>
 </html>

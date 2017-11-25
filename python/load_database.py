@@ -86,6 +86,7 @@ obj_meals = [
                 """,
                 portions=2,
                 rating=5,
+                image="linsendhal.jpg"
                 ),
             Meal(title="Linsen mit Spätzle und Saitenwürstchen",
                  description="""\
@@ -93,6 +94,15 @@ obj_meals = [
                  """,
                  portions=2,
                  rating=5,
+                 image="linsenmitspaetzle.jpg"
+                 ),
+            Meal(title="Geschmelzte Maultaschen",
+                 description="""\
+                 Leckers schwäbisches Gericht.\
+                 """,
+                 portions=2,
+                 rating=5,
+                 image="geschmelztemaultaschen.jpg"
                  )
 ]
 

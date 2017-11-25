@@ -36,7 +36,7 @@ class Meal(Base):
     description = Column(String(250), nullable = True)
     portions = Column(SmallInteger, nullable = True)
     rating = Column(SmallInteger, nullable = True)
-    image = Column(LargeBinary, nullable = True)
+    image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
 
 
