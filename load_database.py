@@ -1,4 +1,4 @@
-from np_db import (Base,
+from food_database import (Base,
                    UOM,
                    Meal,
                    Ingredient,

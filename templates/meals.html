@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <meta charset="utf-8">
+      <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+      <link rel=stylesheet type=text/css href="{{ url_for('static', filename='main_styles.css') }}">
+      <link href='https://fonts.googleapis.com/css?family=Architects+Daughter|Permanent+Marker' rel='stylesheet'>
+      <title>Food Coach Database Contents</title>
+  </head>
+  <body>
+    <header>
+      <div class="header">
+        <!-- <img class="logo" src="..\images\logo.jpg" alt="Logo"> -->
+        <h1>Food Coach</h1>
+        <p>@SoerenStereo</p>
+      </div>
+      <div class="header_line"></div>
+    </header>
+
+    <!-- For each meal repeat the following section -->
+    {% for m in meals %}
+    <article class="meal">
+      <div class="image_box">
+      <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}">
+      </div>
+      <h3>{{ m.title }}</h3>
+      <div>
+      <table class="ingredients">
+
+      {% for i in getIngredients(m.id) %}
+        <tr><td>
+          <span class="quantity">{{ i.quantity }} {{ i.uom.uom }}</span>
+          <span class="food">{{ i.food.title }}</span>
+        </td></tr>
+      {% endfor %}
+
+
+      </table>
+      </div>
+    </article>
+    {% endfor %}
