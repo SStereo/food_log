@@ -21,6 +21,10 @@ session = DBSession()
 
 
 @app.route('/')
+def ShowWelcome():
+    return render_template("index.html")
+
+
 @app.route('/meals')
 def showMeals():
 
