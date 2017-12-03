@@ -13,7 +13,8 @@ from food_database import (Base,
 app = Flask(__name__)
 app.secret_key = "ABC123"
 
-engine = create_engine('postgresql://vagrant:vagrant@127.0.0.1:5432/np')
+#engine = create_engine('postgresql://vagrant:vagrant@127.0.0.1:5432/np')
+engine = create_engine('postgres://njxqkgsvotldpo:0091ec1051866196d42e608aadc421ef9bb58c37d9fcfe0e7bac4e9ce63929f8@ec2-54-228-182-57.eu-west-1.compute.amazonaws.com:5432/ddjblvctcusagj')
 Base.metadata.bind = engine
 
 DBSession = sessionmaker(bind=engine)
@@ -38,4 +39,4 @@ def getIngredients(meal_id):
 
 if __name__ == '__main__':
     app.debug = True
-    app.run(host='127.0.0.2', port=5000)
+    app.run(host='127.0.0.1', port=8080)
