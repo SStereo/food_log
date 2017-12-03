@@ -1,3 +1,4 @@
+import os  # required to have access to the Port environment variable
 from flask import Flask, render_template, request, url_for, redirect, flash, jsonify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -39,4 +40,5 @@ def getIngredients(meal_id):
 
 if __name__ == '__main__':
     app.debug = True
-    app.run(host='127.0.0.1', port=8080)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='127.0.0.1', port=port)
