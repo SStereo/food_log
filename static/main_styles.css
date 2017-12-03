@@ -68,7 +68,7 @@ a {
 
 .welcome {
   position: relative; /* Necessary so that childs (article) can use position:absolute in reference to the parent */
-  background-image: url(../images/obstkorb.jpg);
+  background-image: url(obstkorb.jpg);
   background-size: cover;
   height: 200px;
 }
