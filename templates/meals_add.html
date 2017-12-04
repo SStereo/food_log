@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <meta charset="utf-8">
+      <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+      <link rel=stylesheet type=text/css href="{{ url_for('static', filename='main_styles.css') }}">
+      <link href='https://fonts.googleapis.com/css?family=Architects+Daughter|Permanent+Marker' rel='stylesheet'>
+      <title>Food Coach Database Contents</title>
+  </head>
+  <body>
+
+
+    <!-- For each meal repeat the following section -->
+
+    <article class="meal">
+      <form action="{{ url_for('addMeals') }}" method="POST">
+      <div class="image_box">
+      TODO: Upload Image
+      </div>
+        <span><label>Name<input type="text" name="name" placeholder="Enter Name of Meal"></label></span>
+        <span><label>Description<input type="text" name="description"></label></span>
+        <span><label>Portions<input type="text" name="name"></label></span>
+
+        <table class="ingredients">
+          <tr>
+            <th>Quantity</th>
+            <th>Unit</th>
+            <th>Ingredient</th>
+          </tr>
+          <tr>
+            <td><input type="text" name="quantity"></td>
+            <td>
+              <select name="uom">
+              {% for u in uoms %}
+              <option value="{{ u.uom }}">{{ u.uom }}</option>
+              {% endfor %}
+              </select>
+            </td>
+            <td><input type="text" name="ingredient"></td>
+          </tr>
+        </table>
+
+      </div>
+      <button type="submit" name="button" value="Save">Save</button>
+      <button type="submit" name="button" value="Cancel">Cancel</button>
+      </form>
+    </article>

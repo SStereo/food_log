@@ -29,9 +29,15 @@ def ShowWelcome():
 
 @app.route('/meals')
 def showMeals():
-
     meals = session.query(Meal)
     return render_template("meals.html",meals=meals,getIngredients=getIngredients)
+
+
+@app.route('/meals/add')
+def addMeals():
+    uoms = session.query(UOM)
+    foods = session.query(Food)
+    return render_template("meals_add.html",uoms=uoms,foods=foods)
 
 
 def getIngredients(meal_id):
