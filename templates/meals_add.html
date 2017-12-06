@@ -17,18 +17,19 @@
       <div class="image_box">
       TODO: Upload Image
       </div>
-        <span><label>Name<input type="text" name="name" placeholder="Enter Name of Meal"></label></span>
-        <span><label>Description<input type="text" name="description"></label></span>
-        <span><label>Portions<input type="text" name="name"></label></span>
-
-        <table class="ingredients">
+      <div class="data_entry">
+        <label>Name<br><input type="text" name="name" size="36" placeholder="Enter Name of Meal"><br></label>
+        <label>Description<br><textarea rows="3" cols="36" name="description"></textarea><br></label>
+        <label>Portions<br><input type="text" name="name" size="2"><br></label>
+      </div>
+        <table class="data_entry">
           <tr>
             <th>Quantity</th>
             <th>Unit</th>
             <th>Ingredient</th>
           </tr>
           <tr>
-            <td><input type="text" name="quantity"></td>
+            <td><input type="text" name="quantity" size="4"></td>
             <td>
               <select name="uom">
               {% for u in uoms %}
