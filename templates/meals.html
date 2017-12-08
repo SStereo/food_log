@@ -21,6 +21,7 @@
     {% for m in meals %}
     <article class="meal">
       <div class="image_box">
+      <!-- <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}"> -->
       <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}">
       </div>
       <h3>{{ m.title }}</h3>
@@ -34,8 +35,10 @@
         </td></tr>
       {% endfor %}
 
-
       </table>
+      </div>
+      <div>
+        <a class="meal_footer_link" href="{{ url_for('deleteMeal', meal_id=m.id)}}">delete</a>
       </div>
     </article>
     {% endfor %}
