@@ -71,11 +71,25 @@ def addMeals():
             file.save(filepath)
 
         # ---- FORM DATA HANDLER -----
-        newItem = Meal(title=request.form['title'],
+        newMeal = Meal(title=request.form['title'],
                        description=request.form['description'],
                        portions=request.form['portions'],
                        image=filename)
-        session.add(newItem)
+        session.add(newMeal)
+
+
+        newFood = session.query(Food).filter_by(title=request.form['ingredient1']).first()
+        if not newFood:
+            newFood = Food(title=request.form['ingredient1'])
+            session.add(newFood)
+            #  session.commit()
+
+        newIngredient = Ingredient(quantity=request.form['quantity1'],
+                                   uom_id=request.form['uom1'],
+                                   meal_id=newMeal.id,
+                                   food_id=newFood.id)
+
+        session.add(newIngredient)
         session.commit()
 
         return redirect(url_for("showMeals"))
@@ -97,6 +111,7 @@ def deleteMeal(meal_id):
         session.delete(o)
         session.commit()
         #TODO: flash("Meal deleted")
+        #TODO: Delete image file from folder
         return redirect(url_for('showMeals'))
     elif request.method == 'GET':
         return render_template("meals_delete.html",meal=o)
