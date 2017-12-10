@@ -39,7 +39,7 @@
 
       {% for i in getIngredients(m.id) %}
         <tr><td>
-          <span class="quantity">{{ i.quantity }} {{ i.uom.uom }}</span>
+          <span class="quantity">{{ i.quantity }} {{ i.uom.shortDE }}</span>
           <span class="food">{{ i.food.title }}</span>
         </td></tr>
       {% endfor %}

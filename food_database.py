@@ -26,7 +26,9 @@ Base = declarative_base()
 class UOM(Base):
     __tablename__ = 'units_of_measure'
     uom = Column(String(5), primary_key = True)
-    title = Column(String(80), nullable = False)
+    longEN = Column(String(80), nullable = True)
+    shortDE = Column(String(5), nullable = True)
+    longDE = Column(String(80), nullable = True)
 
 
 class Meal(Base):
@@ -39,18 +41,20 @@ class Meal(Base):
     image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
 
+    ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
+
 
 class Ingredient(Base):
     __tablename__ = 'ingredients'
     id = Column(Integer, primary_key = True)
     quantity = Column(Float, nullable = False)
-    uom_id = Column(String(5), ForeignKey('units_of_measure.uom'))
-    meal_id = Column(Integer, ForeignKey('meals.id'))
-    food_id = Column(Integer, ForeignKey('foods.id'))
+    uom_id = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = False)
+    meal_id = Column(Integer, ForeignKey('meals.id'), nullable = False)
+    food_id = Column(Integer, ForeignKey('foods.id'), nullable = False)
     created = Column(DateTime, default = datetime.datetime.utcnow)
 
-    food = relationship("Food", back_populates="ingredients")
-    meal = relationship("Meal")
+    food = relationship("Food", back_populates="referencedIn")
+    meal = relationship("Meal", back_populates="ingredients")
     uom = relationship("UOM")
 
 
@@ -61,7 +65,9 @@ class Food(Base):
     description = Column(String(250), nullable = True)
     image = Column(LargeBinary, nullable = True)
 
-    ingredients = relationship("Ingredient", back_populates="food")
+    referencedIn = relationship("Ingredient",
+            back_populates="food",
+            cascade="save-update, merge, delete")  #Backpopulate is required because Ingredient to Food is a Many to One relationship
 
 
 class FoodComposition(Base):

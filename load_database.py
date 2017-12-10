@@ -36,16 +36,16 @@ session.commit()
 # See: https://www.asknumbers.com/CookingConversion.aspx
 
 obj_uoms = [
-           UOM(uom="g",title="gram"),
-           UOM(uom="kg",title="kilogram"),
-           UOM(uom="l",title="liter"),
-           UOM(uom="ml",title="milliliter"),
-           UOM(uom="tbsp",title="tablespoon"),
-           UOM(uom="tsp",title="teaspoon"),
-           UOM(uom="pn",title="pinch"),
-           UOM(uom="cup",title="cup"),
-           UOM(uom="oz",title="shot"),
-           UOM(uom="pc",title="piece")
+           UOM(uom="g",longEN="gram",shortDE="g"),
+           UOM(uom="kg",longEN="kilogram",shortDE="kg"),
+           UOM(uom="l",longEN="liter",shortDE="l"),
+           UOM(uom="ml",longEN="milliliter",shortDE="ml"),
+           UOM(uom="tbsp",longEN="tablespoon",shortDE="El"),
+           UOM(uom="tsp",longEN="teaspoon",shortDE="Tl"),
+           UOM(uom="pn",longEN="pinch",shortDE="Prise"),
+           UOM(uom="cup",longEN="cup",shortDE="Tasse"),
+           UOM(uom="oz",longEN="shot",shortDE="Unze"),
+           UOM(uom="pc",longEN="piece",shortDE="")
 ]
 
 obj_foods = [

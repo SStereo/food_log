@@ -70,27 +70,35 @@ def addMeals():
             print("filename = " + filename)
             file.save(filepath)
 
-        # ---- FORM DATA HANDLER -----
+        # MEAL creation
         newMeal = Meal(title=request.form['title'],
                        description=request.form['description'],
                        portions=request.form['portions'],
                        image=filename)
         session.add(newMeal)
 
+        # FOOD & INGREDIENT creation
+        # TODO: Optimize the creation of food and ingredient objects
+        #      by avoiding too many commits
 
-        newFood = session.query(Food).filter_by(title=request.form['ingredient1']).first()
-        if not newFood:
-            newFood = Food(title=request.form['ingredient1'])
-            session.add(newFood)
-            #  session.commit()
+        x = 1
+        while request.form['ingredient'+str(x)]:
+            row = str(x)
+            newFood = session.query(Food).filter_by(title=request.form['ingredient'+row]).first()
+            if not newFood:
+                newFood = Food(title=request.form['ingredient'+row])
+                session.add(newFood)
+                session.commit()
 
-        newIngredient = Ingredient(quantity=request.form['quantity1'],
-                                   uom_id=request.form['uom1'],
-                                   meal_id=newMeal.id,
-                                   food_id=newFood.id)
+            newIngredient = Ingredient(quantity=request.form['quantity'+row],
+                                       uom_id=request.form['uom'+row],
+                                       meal_id=newMeal.id,
+                                       food_id=newFood.id)
+            
+            session.add(newIngredient)
+            session.commit()
 
-        session.add(newIngredient)
-        session.commit()
+            x += 1
 
         return redirect(url_for("showMeals"))
 
@@ -103,6 +111,7 @@ def addMeals():
         uoms = session.query(UOM)
         foods = session.query(Food)
         return render_template("meals_add.html",uoms=uoms,foods=foods)
+
 
 @app.route('/meals/delete/<int:meal_id>', methods=['GET','POST'])
 def deleteMeal(meal_id):
@@ -117,6 +126,7 @@ def deleteMeal(meal_id):
         return render_template("meals_delete.html",meal=o)
     else:
         return redirect(url_for("showMeals"))
+
 
 def getIngredients(meal_id):
     items = session.query(Ingredient).filter_by(meal_id=meal_id)
