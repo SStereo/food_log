@@ -29,10 +29,12 @@
     <!-- For each meal repeat the following section -->
     {% for m in meals %}
     <article class="meal">
+      <a href="{{ url_for('showMeal', meal_id=m.id) }}">
       <div class="image_box">
       <!-- <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}"> -->
       <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}">
       </div>
+      </a>
       <h3>{{ m.title }}</h3>
       <div>
       <table class="ingredients">

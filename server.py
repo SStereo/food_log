@@ -94,7 +94,7 @@ def addMeals():
                                        uom_id=request.form['uom'+row],
                                        meal_id=newMeal.id,
                                        food_id=newFood.id)
-            
+
             session.add(newIngredient)
             session.commit()
 
@@ -128,9 +128,18 @@ def deleteMeal(meal_id):
         return redirect(url_for("showMeals"))
 
 
+@app.route('/meals/view/<int:meal_id>')
+def showMeal(meal_id):
+    o = session.query(Meal).filter_by(id=meal_id).one()
+    return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
+
+
 def getIngredients(meal_id):
-    items = session.query(Ingredient).filter_by(meal_id=meal_id)
-    return items
+    if meal_id:
+        items = session.query(Ingredient).filter_by(meal_id=meal_id)
+        return items
+    else:
+        return false
 
 
 def allowed_file(filename):

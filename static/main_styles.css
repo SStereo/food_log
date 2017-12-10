@@ -10,7 +10,7 @@ header, nav, footer, section, article, div {
   display: block; /* The element generates a block element box */
 }
 
-body {
+.main_page_body {
   font-family: 'Architects Daughter',Verdana, Times, serif;
   font-size: 14px;
   color: rgb(53,127,111);
