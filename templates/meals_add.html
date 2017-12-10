@@ -1,57 +1,70 @@
 <!DOCTYPE html>
 <html>
   <head>
-      <meta charset="utf-8">
-      <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-      <!-- <link rel=stylesheet type=text/css href="{{ url_for('static', filename='main_styles.css') }}">
-      <link href='https://fonts.googleapis.com/css?family=Architects+Daughter|Permanent+Marker' rel='stylesheet'> -->
-      <link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css" />
-      <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
-      <script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
-      <title>Add Meal</title>
+    <title>Add Meal</title>
+    <meta charset="utf-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+
   </head>
+
 
   <body>
     <!-- For each meal repeat the following section -->
-    <h3 class="ui-bar ui-bar-a ui-corner-all">Add Meal</h3>
-    <div class="ui-body">
-      <!-- form decorated with data-ajax="false" because multipart form data not supported with ajax
-           which seems to get used in the mobile version of JQuery
-           More info: http://demos.jquerymobile.com/1.4.3/forms/
-      -->
-      <form data-ajax="false" action="{{ url_for('addMeals') }}" method="POST" enctype="multipart/form-data">
-        <label for="file">Image</label>
-        <input type="file" name="file" id="file" value="">
-      <!-- TODO: It seems that JQuery mobile requires form fields with id -->
-        <label for="title">Title</label>
-        <input type="text" id="title" name="title">
-        <label for="desc">Description</label>
-        <textarea rows="3" id="desc" name="description"></textarea>
-        <label for="portions">Portions</label>
-        <input type="range" name="portions" id="portions" min="1" max="20" value="2">
-        <table>
-          <tr>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Ingredient</th>
-          </tr>
-          {% for x in range(1, 10) %}
-          <tr>
-            <td><input type="text" name="quantity{{x}}" size="2"></td>
-            <td>
-              <select name="uom{{x}}">
-              {% for u in uoms %}
-              <option value="{{ u.uom }}">{{ u.uom }}</option>
-              {% endfor %}
-              </select>
-            </td>
-            <td><input type="text" name="ingredient{{x}}"></td>
-          </tr>
-          {% endfor %}
-        </table>
-        <button type="submit" name="button" value="Save">Save</button>
-        <button type="submit" name="button" value="Cancel">Cancel</button>
+
+    <div>
+      <div>
+        <h2>Add meal</h2>
+      </div>
+      <form action="{{ url_for('addMeals') }}" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+          <label for="file">Image</label>
+          <input class="form-control-file" type="file" name="file" id="file" value="">
+        </div>
+        <div class="form-group">
+          <!--<label for="title">Title</label>-->
+          <input class="form-control" type="text" id="title" name="title" placeholder="Title">
+          <textarea class="form-control" rows="2" id="desc" name="description" placeholder="Description"></textarea>
+          <label for="portions">Portions</label>
+          <p style="width:300px">
+            <input class="form-control" name="portions" type="range" id="portions" min="1" max="20" value="2" step="1">
+          </p>
+        </div>
+        <div class="form-group">
+          <table>
+            <tr>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Ingredient</th>
+            </tr>
+            {% for x in range(1, 10) %}
+            <tr>
+              <td><input class="form-control" type="text" name="quantity{{x}}" size="1"></td>
+              <td>
+                <select class="form-control" name="uom{{x}}">
+                {% for u in uoms %}
+                <option value="{{ u.uom }}">{{ u.uom }}</option>
+                {% endfor %}
+                </select>
+              </td>
+              <td><input class="form-control" type="text" name="ingredient{{x}}"></td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
+        <div class="form-group">
+          <button class="btn btn-primary" type="submit" name="button" value="Save">Save</button>
+          <button class="btn btn-secondary" type="submit" name="button" value="Cancel">Cancel</button>
+        </div>
       </form>
     </div>
+  <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
   </body>
 </html>
