@@ -13,7 +13,7 @@ from food_database import (Base,
                    Nutrient,
                    ShoppingListItem)
 
-UPLOAD_FOLDER = 'static'
+UPLOAD_FOLDER = 'upload'
 ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
 app = Flask(__name__)
@@ -29,7 +29,7 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
-# Custom Static folders for Material design for Bootstrap css, js, etc.
+# Custom Static folders
 @app.route('/css/<path:filename>')
 def css_static(filename):
     return send_from_directory('css', filename)
@@ -49,6 +49,10 @@ def img_static(filename):
 @app.route('/sass/<path:filename>')
 def sass_static(filename):
     return send_from_directory('sass', filename)
+
+@app.route('/upload/<path:filename>')
+def upload_static(filename):
+    return send_from_directory('upload', filename)
 
 # Application Routes
 @app.route('/')

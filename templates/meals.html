@@ -1,42 +1,50 @@
+{% set activeMenuItem = 2 %}
 {% extends "layout.html" %}
 {% block body %}
-<main class="text-center py-5">
-  <div style="height: 35px">
+<main>
+  <div style="height: 70px">
 
   </div>
   {% for m in meals %}
-  <article class="meal">
-    <a href="{{ url_for('showMeal', meal_id=m.id) }}">
-    <div class="image_box">
-    <!-- <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}"> -->
-    <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}">
-    </div>
-    </a>
-    <h3>{{ m.title }}</h3>
-    <div>
-    <table class="ingredients">
 
-    {% for i in getIngredients(m.id) %}
-      <tr><td>
-        <span class="quantity">{{ i.quantity }} {{ i.uom.shortDE }}</span>
-        <span class="food">{{ i.food.title }}</span>
-      </td></tr>
-    {% endfor %}
+  <!--Card Regular-->
+  <div class="card mx-lg-1 my-2">
 
-    </table>
+      <!--Card image-->
+      <div class="view overlay hm-white-slight">
+          <img src="{{url_for('upload_static', filename=m.image)}}" class="img-fluid" alt="">
+          <a href="{{ url_for('showMeal', meal_id=m.id) }}">
+              <div class="mask"></div>
+          </a>
+      </div>
+      <!--/.Card image-->
+
+      <!--Card content-->
+      <div class="card-body">
+          <!--Title-->
+          <!--Social shares button-->
+        <a class="activator"><i class="fa fa-share-alt"></i></a>
+        <!--Title-->
+        <h4 class="card-title">{{ m.title }}</h4>
+        <hr>
+
+        <!--Text-->
+        <p class="card-text">{{ m.description }}</p>
+        <a href="{{ url_for('showMeal', meal_id=m.id) }}" class="black-text d-flex flex-row-reverse">
+            <h5 class="waves-effect p-2">more <i class="fa fa-chevron-right"></i></h5>
+        </a>
+      </div>
+      <!--/.Card content-->
     </div>
-    <div>
-      <a class="meal_footer_link" href="{{ url_for('deleteMeal', meal_id=m.id)}}">delete</a>
-    </div>
-  </article>
+    <!--/.Card Regular-->
+
   {% endfor %}
 
-  <div class="fixed-action-btn" style="bottom: 45px; right: 24px;" style="postion:fixed;">
+  <div class="fixed-action-btn" style="bottom: 45px; right: 24px;">
       <a href="{{ url_for('addMeals') }}" class="btn-floating btn-lg red">
           <i class="fa fa-pencil"></i>
       </a>
   </div>
 
-  {{ __name__ }}
 </main>
 {% endblock %}

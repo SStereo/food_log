@@ -35,16 +35,30 @@
           /*background: url("{{ url_for('static', filename='obstkorb.jpg') }}")no-repeat center center; */
           background: url("static/obstkorb.jpg")no-repeat center center;
           background-size: cover;
-          height: 1000px;
+          /*height: 1000px; */
       }
 
       .navbar {
-        background-color: rgba(51,105,30,0.6);
+        background-color: rgba(51,105,30,1);
       }
 
       .top-nav-collapse {
         background-color: #4285F4;
       }
+
+      .card.card-cascade {
+        width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .card {
+        width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+        display: inline-block;
+      }
+
     </Style>
 
     <script>
@@ -64,13 +78,24 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav mr-auto">
-                <li class="nav-item active">
+              {% set suffix1 = "" %}
+              {% set suffix2 = "" %}
+              {% set suffix3 = "" %}
+              {% if activeMenuItem == 1 %}
+                {% set suffix1 = " active" %}
+              {% elif activeMenuItem == 2 %}
+                {% set suffix2 = " active" %}
+              {% elif activeMenuItem == 3 %}
+                {% set suffix3 = " active" %}
+              {% endif %}
+
+                <li id="nav-1" class="nav-item{{ suffix1 }}">
                     <a class="nav-link" href="{{ url_for('showHome') }}">Home <span class="sr-only">(current)</span></a>
                 </li>
-                <li class="nav-item">
+                <li id="nav-2" class="nav-item{{ suffix2 }}">
                     <a class="nav-link" href="{{ url_for('showMeals') }}">Meals</a>
                 </li>
-                <li class="nav-item">
+                <li id="nav-3" class="nav-item{{ suffix3 }}">
                     <a class="nav-link" href="#">Food Database</a>
                 </li>
             </ul>
@@ -93,6 +118,14 @@
     <script type=text/javascript src="{{ url_for('static', filename='js/popper.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/mdb.min.js') }}"></script>
+
+    <!-- Modification of fixed floating button to allow standard click event instead of opening the child items
+        https://mdbootstrap.com/support/bug-button-floating/ -->
+    <script>
+    $(document).ready(function(){
+        $('.fixed-action-btn').unbind('click');
+    });
+    </script>
 
 </body>
 
