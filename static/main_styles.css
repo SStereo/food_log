@@ -5,10 +5,40 @@
       width and height attributes include the border an shrinks
       the content
 */
-header, nav, footer, section, article, div {
-  box-sizing: border-box;
-  display: block; /* The element generates a block element box */
+
+/*NEW STYLING */
+
+/* source bootstrap */
+.index_view {
+    background: url("obstkorb.jpg")no-repeat center center;
+    background-size: cover;
 }
+
+/*OLD STYLING */
+
+/* disabled
+/header, nav, footer, section, article, div {
+  box-sizing: border-box;
+  display: block;
+}
+
+@media screen and (min-width:1000px) {
+  body {
+    margin:auto;
+  }
+}
+
+@media screen and (min-width:480px) {
+  .welcome {
+    height: 300px;
+  }
+
+  .welcome_div {
+    padding:1em;
+  }
+}
+
+*/
 
 .main_page_body {
   font-family: 'Architects Daughter',Verdana, Times, serif;
@@ -21,11 +51,12 @@ header, nav, footer, section, article, div {
   margin: 0px;
 }
 
-@media screen and (min-width:1000px) {
-  body {
-    margin:auto;
-  }
+.index_view {
+    background: url("static/Others/img (50).jpg")no-repeat center center;
+    background-size: cover;
 }
+
+
 
 
 .logo {
@@ -80,15 +111,7 @@ header, nav, footer, section, article, div {
   padding:2px;
 }
 
-@media screen and (min-width:480px) {  /* Adds a background image to the welcome article when screen width is larger 480 pixels */
-  .welcome {
-    height: 300px;
-  }
 
-  .welcome_div {
-    padding:1em;
-  }
-}
 
 .welcome_text {
   overflow: auto;

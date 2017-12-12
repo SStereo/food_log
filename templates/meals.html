@@ -1,70 +1,42 @@
-<!DOCTYPE html>
-<html>
-  <head>
-      <meta charset="utf-8">
-      <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-      <link rel=stylesheet type=text/css href="{{ url_for('static', filename='main_styles.css') }}">
-      <link href='https://fonts.googleapis.com/css?family=Architects+Daughter|Permanent+Marker' rel='stylesheet'>
+{% extends "layout.html" %}
+{% block body %}
+<main class="text-center py-5">
+  <div style="height: 35px">
 
-      <!-- MDL: Add Googles Material Lite
-           https://getmdl.io/started/ -->
-      <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-      <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.green-light_green.min.css">
-      <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+  </div>
+  {% for m in meals %}
+  <article class="meal">
+    <a href="{{ url_for('showMeal', meal_id=m.id) }}">
+    <div class="image_box">
+    <!-- <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}"> -->
+    <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}">
+    </div>
+    </a>
+    <h3>{{ m.title }}</h3>
+    <div>
+    <table class="ingredients">
 
-      <title>Food Coach Database Contents</title>
-  </head>
-  <body>
-    <header>
-      <div class="header">
-        <!-- <img class="logo" src="..\images\logo.jpg" alt="Logo"> -->
-        <h1>Food Coach</h1>
-        <p>@SoerenStereo</p>
-      </div>
-      <div class="header_line"></div>
-    </header>
-
-
-
-    <!-- For each meal repeat the following section -->
-    {% for m in meals %}
-    <article class="meal">
-      <a href="{{ url_for('showMeal', meal_id=m.id) }}">
-      <div class="image_box">
-      <!-- <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}"> -->
-      <img src="{{ url_for('static', filename=m.image) }}" alt="{{m.title}}">
-      </div>
-      </a>
-      <h3>{{ m.title }}</h3>
-      <div>
-      <table class="ingredients">
-
-      {% for i in getIngredients(m.id) %}
-        <tr><td>
-          <span class="quantity">{{ i.quantity }} {{ i.uom.shortDE }}</span>
-          <span class="food">{{ i.food.title }}</span>
-        </td></tr>
-      {% endfor %}
-
-      </table>
-      </div>
-      <div>
-        <a class="meal_footer_link" href="{{ url_for('deleteMeal', meal_id=m.id)}}">delete</a>
-      </div>
-    </article>
+    {% for i in getIngredients(m.id) %}
+      <tr><td>
+        <span class="quantity">{{ i.quantity }} {{ i.uom.shortDE }}</span>
+        <span class="food">{{ i.food.title }}</span>
+      </td></tr>
     {% endfor %}
 
-  <footer>
-    <!-- MDL: Colored FAB button -->
+    </table>
+    </div>
+    <div>
+      <a class="meal_footer_link" href="{{ url_for('deleteMeal', meal_id=m.id)}}">delete</a>
+    </div>
+  </article>
+  {% endfor %}
 
-    <span class="footer">
-      <a href="{{ url_for('addMeals') }}">
-      <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--colored">
-        <i class="material-icons">add</i>
-      </button>
+  <div class="fixed-action-btn" style="bottom: 45px; right: 24px;" style="postion:fixed;">
+      <a href="{{ url_for('addMeals') }}" class="btn-floating btn-lg red">
+          <i class="fa fa-pencil"></i>
       </a>
-    </span>
+  </div>
 
-  </footer>
-</body>
-</html>
+  {{ __name__ }}
+</main>
+{% endblock %}

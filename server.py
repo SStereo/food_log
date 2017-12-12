@@ -1,6 +1,6 @@
 import os  # required to have access to the Port environment variable
 from datetime import datetime  #required for method "now" for file name change
-from flask import Flask, render_template, request, url_for, redirect, flash, jsonify
+from flask import Flask, render_template, request, url_for, redirect, flash, jsonify, send_from_directory
 from werkzeug.utils import secure_filename  #required for file upload
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -29,9 +29,30 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
+# Custom Static folders for Material design for Bootstrap css, js, etc.
+@app.route('/css/<path:filename>')
+def css_static(filename):
+    return send_from_directory('css', filename)
 
+@app.route('/js/<path:filename>')
+def js_static(filename):
+    return send_from_directory('js', filename)
+
+@app.route('/font/<path:filename>')
+def font_static(filename):
+    return send_from_directory('font', filename)
+
+@app.route('/img/<path:filename>')
+def img_static(filename):
+    return send_from_directory('img', filename)
+
+@app.route('/sass/<path:filename>')
+def sass_static(filename):
+    return send_from_directory('sass', filename)
+
+# Application Routes
 @app.route('/')
-def ShowWelcome():
+def showHome():
     return render_template("index.html")
 
 
@@ -132,6 +153,13 @@ def deleteMeal(meal_id):
 def showMeal(meal_id):
     o = session.query(Meal).filter_by(id=meal_id).one()
     return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
+
+
+# API endpoint
+@app.route('/meals/JSON')
+def jsonMeals():
+    items = session.query(Meal).all()
+    return jsonify(Meals=[m.serialize for m in items])
 
 
 def getIngredients(meal_id):

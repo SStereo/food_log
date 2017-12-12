@@ -1,131 +1,154 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <!-- Set the character encoding to unicode to allow special characters -->
+<html lang="en">
+
+<head>
     <meta charset="utf-8">
-    <!-- Set the viewport with to match the device-width by keeping device to CSS pixel ratio at 1 -->
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <!-- External stylesheet from google to include special fonts -->
-    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter|Permanent+Marker' rel='stylesheet'>
-    <!-- Stylesheet with style information is stored in a separate file -->
-    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='main_styles.css') }}">
-    <title>Food Coach</title>
-  </head>
-  <body class="main_page_body">
-    <header>
-<!--
-      <div class="header">
-        <h1>Food Coach</h1>
-        <p>@SoerenStereo</p>
-      </div>
-      <div class="header_line"></div>
-    </header>
--->
-    <main>
-      <!-- Welcome section of the document -->
-      <section class="welcome">
-        <div class="welcome_div">
-          <h2>Speiseplan für die ganze Familie</h2>
-          <p class="welcome_text">
-          Lege eine Liste alle Rezepte an die deine Famile so gerne mag. Lege fest an welchem Tag welches Gericht gekocht werden soll. Einkaufslisten werden automatisch generiert. Kinderleicht!
-          </p>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Hunting Food</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <!-- CDN Version -->
+    <!--
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.4.3/js/mdb.min.js"></script>
+    -->
+
+    <!-- STATIC folder version -->
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/mdb.min.css') }}" rel="stylesheet">
+
+    <Style>
+      .view {
+          /*background: url("{{ url_for('static', filename='obstkorb.jpg') }}")no-repeat center center; */
+          background: url("static/obstkorb.jpg")no-repeat center center;
+          background-size: cover;
+          height: 1000px;
+      }
+
+      .navbar {
+        background-color: rgba(51,105,30,0.6);
+      }
+
+      .top-nav-collapse {
+        background-color: #4285F4;
+      }
+    </Style>
+
+    <script>
+
+
+    </script>
+</head>
+
+<body>
+
+  <!--Main Navigation-->
+  <header>
+    <nav class="navbar fixed-top navbar-expand-lg navbar-dark">
+        <a class="navbar-brand" href="#"><strong>Navbar</strong></a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="{{ url_for('showHome') }}">Home <span class="sr-only">(current)</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('showMeals') }}">Meals</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">Food Database</a>
+                </li>
+            </ul>
         </div>
-      </section>
+    </nav>
 
-      <!-- Section with the week plan -->
-      <section class="content">
-        <H2>Speiseplan</H2>
-        <div class="flex_container">
-          <article class="day_item">
-            <h3>Montag</h3>
-              <div>Avocado</div>
-              <div>Salat</div>
-              <div>Käsebrot</div>
-          </article>
-
-          <article class="day_item">
-            <h3>Dienstag</h3>
-            <div>
+    <div class="view hm-black-light">
+        <div class="full-bg-img flex-center">
+            <div class="container text-center white-text">
+                <div class="white-text text-center wow fadeInUp">
+                    <h2>HUNTING FOOD</h2>
+                    <h5>Solves the daily struggle in an healty and convenient way</h5>
+                    <br>
+                    <p>Check out what other people hunt for when they are hungry and join the community ... </p>
+                </div>
             </div>
-            <div>Käsespätzle</div>
-          </article>
-
-          <article class="day_item">
-            <h3>Mittwoch</h3>
-            <div>Salat</div>
-          </article>
-
-          <article class="day_item">
-            <h3>Donnerstag</h3>
-            <div>Spaghetti</div>
-          </article>
-
-          <article class="day_item">
-            <h3>Freitag</h3>
-            <div>Currywurst</div>
-          </article>
-
-          <article class="day_item">
-            <h3>Samstag</h3>
-            <div>Dönner</div>
-          </article>
-
-          <article class="day_item">
-            <h3>Sonntag</h3>
-            <div>Pizza</div>
-          </article>
         </div>
-      </section>
+    </div>
 
-      <!-- Section with meals -->
-      <section class="content">
-        <H2>Gerichte</H2>
-        <div class="flex_container">
+  </header>
+  <!--Main Navigation-->
 
-          <article class="meal">
-            <div class="image_box">
-              <img src="{{ url_for('static', filename='linsendhal.jpg') }}" alt="Gericht">
-            </div>
-            <h3>Linsen Dhal</h3>
-            <div>
-              <table class="ingredients">
-                <tr><td><span class="quantity">100g</span> <span class="food">Linsen</span></td></tr>
-                <tr><td><span class="quantity">1 Stück</span> <span class="food">Zwiebel</span></td></tr>
-                <tr><td><span class="quantity">1 EL</span> <span class="food">Salz</span></td></tr>
-              </table>
-            </div>
-          </article>
+  <!--Main Layout-->
+  <main class="text-center py-5">
 
-          <article class="meal">
-            <div class="image_box">
-              <img src="{{ url_for('static', filename='linsenmitspaetzle.jpg') }}" alt="Gericht">
-            </div>
-            <h3>Linsen mit Spätzle und Saitenwürstchen</h3>
-            <div>
-              <table class="ingredients">
-                <tr><td><span class="quantity">100g</span> <span class="food">Linsen</span></td></tr>
-                <tr><td><span class="quantity">1 Stück</span> <span class="food">Zwiebel</span></td></tr>
-                <tr><td><span class="quantity">1 EL</span> <span class="food">Salz</span></td></tr>
-              </table>
-            </div>
-          </article>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
 
-          <article class="meal">
-            <div class="image_box">
-              <img src="{{ url_for('static', filename='geschmelztemaultaschen.jpg') }}" alt="Gericht">
+                <p align="justify">quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
             </div>
-            <h3>Geschmeltzte Maultaschen</h3>
-            <div>
-              <table class="ingredients">
-                <tr><td><span class="quantity">100g</span> <span class="food">Linsen</span></td></tr>
-                <tr><td><span class="quantity">1 Stück</span> <span class="food">Zwiebel</span></td></tr>
-                <tr><td><span class="quantity">1 EL</span> <span class="food">Salz</span></td></tr>
-              </table>
-            </div>
-          </article>
         </div>
-      </section>
+    </div>
 
-    </main>
-  </body>
+  </main>
+
+  <footer class="page-footer light-green darken-4 center-on-small-only">
+
+    <!--Footer Links-->
+    <div class="container-fluid">
+        <div class="row">
+
+            <!--First column-->
+            <div class="col-md-6">
+                <h5 class="title">Footer Content</h5>
+                <p>Here you can use rows and columns here to organize your footer content.</p>
+            </div>
+            <!--/.First column-->
+
+            <!--Second column-->
+            <div class="col-md-6">
+                <h5 class="title">Links</h5>
+                <ul>
+                    <li><a href="#!">Link 1</a></li>
+                    <li><a href="#!">Link 2</a></li>
+                    <li><a href="#!">Link 3</a></li>
+                    <li><a href="#!">Link 4</a></li>
+                </ul>
+            </div>
+            <!--/.Second column-->
+        </div>
+    </div>
+    <!--/.Footer Links-->
+
+    <!--Copyright-->
+    <div class="footer-copyright">
+        <div class="container-fluid">
+            © 2017 Copyright: <a href="https://www.HuntingFood.com"> HuntingFood.com </a>
+
+        </div>
+    </div>
+    <!--/.Copyright-->
+
+  </footer>
+  <!--Main Layout-->
+
+    <!-- SCRIPTS -->
+
+    <script type=text/javascript src="{{ url_for('static', filename='js/jquery-3.2.1.min.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='js/popper.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='js/mdb.min.js') }}"></script>
+
+
+</body>
+
 </html>

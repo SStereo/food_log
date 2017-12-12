@@ -43,6 +43,18 @@ class Meal(Base):
 
     ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
 
+    @property
+    def serialize(self):
+        #Returns object data in easily serializable format
+        return {
+            'id' : self.id,
+            'title' : self.title,
+            'description' : self.description,
+            'portions' : self.portions,
+            'rating' : self.rating,
+            'image' : self.image,
+            'created' : self.created,
+        }
 
 class Ingredient(Base):
     __tablename__ = 'ingredients'
