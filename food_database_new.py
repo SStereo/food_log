@@ -41,7 +41,7 @@ class Meal(Base):
     image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
 
-    ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
+    recipe_items = relationship("Recipe", cascade="save-update, merge, delete")
 
     @property
     def serialize(self):
@@ -56,22 +56,22 @@ class Meal(Base):
             'created' : self.created,
         }
 
-class Ingredient(Base):
-    __tablename__ = 'ingredients'
+class Recipe(Base):
+    __tablename__ = 'recipe'
     id = Column(Integer, primary_key = True)
     quantity = Column(Float, nullable = False)
     uom_id = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = False)
     meal_id = Column(Integer, ForeignKey('meals.id'), nullable = False)
-    food_id = Column(Integer, ForeignKey('foods.id'), nullable = False)
+    ingredient_id = Column(Integer, ForeignKey('ingredients.id'), nullable = False)
     created = Column(DateTime, default = datetime.datetime.utcnow)
 
-    food = relationship("Food", back_populates="referencedIn")
-    meal = relationship("Meal", back_populates="ingredients")
+    ingredient = relationship("Ingredient", back_populates="referencedIn")
+    meal = relationship("Meal", back_populates="recipe_items")
     uom = relationship("UOM")
 
 
-class Food(Base):
-    __tablename__ = 'foods'
+class Ingredient(Base):
+    __tablename__ = 'ingredients'
     id = Column(Integer, primary_key = True)
     title = Column(String(80), nullable = False) #gehackte Dosentomaten
     titleEN = Column(String(80), nullable = True) #chopped canned tomatoes
@@ -80,10 +80,10 @@ class Food(Base):
     base_food_part = Column(String(80), nullable = True) # Tomatoe
     description = Column(String(250), nullable = True)
     image = Column(LargeBinary, nullable = True)
-    food_ref_id = Column(Integer, ForeignKey('food_reference.id'), nullable = True)
+    food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
 
-    referencedIn = relationship("Ingredient",
-            back_populates="food",
+    referencedIn = relationship("Recipe",
+            back_populates="ingredient",
             cascade="save-update, merge, delete")  #Backpopulate is required because Ingredient to Food is a Many to One relationship
 
 # based on german classification system BLS (Bundeslebensmittelschlüssel)
@@ -105,15 +105,15 @@ class FoodSubGroup(Base):
     food_maingroup_id = Column(Integer, ForeignKey('food_maingroup.id'), nullable = False)
     bls_code_part = Column(String(2), nullable = True)
 
-class FoodRef(Base):
-    __tablename__ = 'food_reference'
+class Food(Base):
+    __tablename__ = 'foods'
     id = Column(Integer, primary_key = True)
     titleEN = Column(String(80), nullable = False)
     titleDE = Column(String(80), nullable = True)
     bls_code = Column(String(7), nullable = True)
 
     isBaseFood = Column(Boolean, unique=False, default=False)
-    parentBaseFood = Column(Integer, ForeignKey('food_reference.id'), nullable = True)
+    parentBaseFood = Column(Integer, ForeignKey('foods.id'), nullable = True)
     # Standard values
     uom_nutrient_value = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = True)
     # Classification
@@ -128,16 +128,16 @@ class FoodProcessingType(Base):
     id = Column(Integer, primary_key = True)
     bls_code_part = Column(String(1), nullable = True)
     food_subgroup_id = Column(Integer, ForeignKey('food_subgroup.id'), nullable = True) # Some foods to have specific processing types
-    titleDE = Column(String(80), nullable = False)
     titleEN = Column(String(80), nullable = False)
+    titleDE = Column(String(80), nullable = False)
 
 class FoodPreparationType(Base):
     __tablename__ = 'food_preparation_type'
     id = Column(Integer, primary_key = True)
     bls_code_part = Column(String(1), nullable = True)
     food_maingroup_id = Column(Integer, ForeignKey('food_maingroup.id'), nullable = True)
-    titleDE = Column(String(80), nullable = False)
     titleEN = Column(String(80), nullable = False)
+    titleDE = Column(String(80), nullable = False)
 
 class FoodEdibleWeight(Base):
     __tablename__ = 'food_weight_reference'
