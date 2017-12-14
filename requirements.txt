@@ -2,3 +2,5 @@ Flask>=0.12
 sqlalchemy==1.1.15
 psycopg2>=2.7
 google>=1.9.3
+google.oauth2
+google.cloud
