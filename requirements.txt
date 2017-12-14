@@ -4,3 +4,5 @@ psycopg2>=2.7
 google>=1.9.3
 google-api-python-client
 google-oauth
+google-auth-oauthlib
+google-auth-httplib2
