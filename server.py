@@ -101,6 +101,34 @@ def addMeals():
                        portions=request.form['portions'],
                        image=filename)
         session.add(newMeal)
+        session.commit()
+
+        #---- INGREDIENTS CREATION ----
+        #TODO: Find a better solution to this by using a JSON file hosted on the server environment
+
+        PK = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
+
+        print(PK)
+
+        d = {
+            'type': "service_account",
+            'project_id': "long-memory-188919",
+            'private_key_id': "297eb489437de03581d672f11b14883bd23db3cf",
+            'private_key': PK,
+            'client_email': "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
+            'client_id': "106478515271128625146",
+            'auth_uri': "https://accounts.google.com/o/oauth2/auth",
+            'token_uri': "https://accounts.google.com/o/oauth2/token",
+            'auth_provider_x509_cert_url': "https://www.googleapis.com/oauth2/v1/certs",
+            'client_x509_cert_url': "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
+        }
+
+        jsonString = json.dumps(d)
+        service_account_info = json.loads(jsonString)
+        credentials = service_account.Credentials.from_service_account_info(
+            service_account_info)
+        #client = Client(credentials=credentials)
+        client = translate.Client(target_language='en',credentials=credentials)
 
         # FOOD & INGREDIENT creation
         # TODO: Optimize the creation of food and ingredient objects
