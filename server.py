@@ -1,4 +1,9 @@
 import os  # required to have access to the Port environment variable
+import json
+from google.oauth2 import service_account
+from google.cloud import translate
+from oauth2client.client import GoogleCredentials #for google cloud authentication
+
 from datetime import datetime  #required for method "now" for file name change
 from flask import Flask, render_template, request, url_for, redirect, flash, jsonify, send_from_directory
 from werkzeug.utils import secure_filename  #required for file upload
@@ -28,6 +33,7 @@ Base.metadata.bind = engine
 
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
+
 
 # Custom Static folders
 @app.route('/css/<path:filename>')
@@ -69,8 +75,8 @@ def showMeals():
 @app.route('/meals/add', methods=['GET','POST'])
 def addMeals():
     if request.method == 'POST' and request.form['button'] == "Save":
-        # ---- IMAGE UPLOAD HANDLER -----
-        print("POST button = Save")
+
+        # ---- FILE HANDLING -----
         filename = ""
         if 'file' not in request.files:
             print("file not in request.files")
@@ -95,58 +101,62 @@ def addMeals():
             print("filename = " + filename)
             file.save(filepath)
 
-        # MEAL creation
+        # ---- MEAL CREATION -----
         newMeal = Meal(title=request.form['title'],
                        description=request.form['description'],
                        portions=request.form['portions'],
+                       calories="410 - 780",
                        image=filename)
         session.add(newMeal)
         session.commit()
 
         #---- INGREDIENTS CREATION ----
-        #TODO: Find a better solution to this by using a JSON file hosted on the server environment
 
         PK = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
 
-        print(PK)
+        #jsonString = json.dumps(d)
 
-        d = {
-            'type': "service_account",
-            'project_id': "long-memory-188919",
-            'private_key_id': "297eb489437de03581d672f11b14883bd23db3cf",
-            'private_key': PK,
-            'client_email': "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
-            'client_id': "106478515271128625146",
-            'auth_uri': "https://accounts.google.com/o/oauth2/auth",
-            'token_uri': "https://accounts.google.com/o/oauth2/token",
-            'auth_provider_x509_cert_url': "https://www.googleapis.com/oauth2/v1/certs",
-            'client_x509_cert_url': "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
-        }
+        jsonString = """{
+          "type": "service_account",
+          "project_id": "long-memory-188919",
+          "private_key_id": "b26b39e14a2375751b5064b77e426243b4625de4",
+          "private_key": \""""+PK+"""",
+          "client_email": "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
+          "client_id": "106478515271128625146",
+          "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+          "token_uri": "https://accounts.google.com/o/oauth2/token",
+          "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+          "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
+        }"""
 
-        jsonString = json.dumps(d)
         service_account_info = json.loads(jsonString)
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info)
+
         #client = Client(credentials=credentials)
         client = translate.Client(target_language='en',credentials=credentials)
 
-        # FOOD & INGREDIENT creation
         # TODO: Optimize the creation of food and ingredient objects
         #      by avoiding too many commits
 
         x = 1
         while request.form['ingredient'+str(x)]:
             row = str(x)
-            newFood = session.query(Food).filter_by(title=request.form['ingredient'+row]).first()
-            if not newFood:
-                newFood = Food(title=request.form['ingredient'+row])
-                session.add(newFood)
-                session.commit()
+
+            #TODO: add new logic to determine Food
+            #newFood = session.query(Food).filter_by(title=request.form['ingredient'+row]).first()
+            #if not newFood:
+            #    newFood = Food(title=request.form['ingredient'+row])
+            #    session.add(newFood)
+            #    session.commit()
+
+            translation =  client.translate(request.form['ingredient'+row])['translatedText']
 
             newIngredient = Ingredient(quantity=request.form['quantity'+row],
                                        uom_id=request.form['uom'+row],
                                        meal_id=newMeal.id,
-                                       food_id=newFood.id)
+                                       title=request.form['ingredient'+row],
+                                       titleEN=translation)
 
             session.add(newIngredient)
             session.commit()

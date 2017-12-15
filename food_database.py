@@ -37,6 +37,7 @@ class Meal(Base):
     title = Column(String(80), nullable = False)
     description = Column(String(250), nullable = True)
     portions = Column(SmallInteger, nullable = True)
+    calories = Column(String(20), nullable = True)
     rating = Column(SmallInteger, nullable = True)
     image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
@@ -62,29 +63,19 @@ class Ingredient(Base):
     quantity = Column(Float, nullable = False)
     uom_id = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = False)
     meal_id = Column(Integer, ForeignKey('meals.id'), nullable = False)
-    food_id = Column(Integer, ForeignKey('foods.id'), nullable = False)
-    created = Column(DateTime, default = datetime.datetime.utcnow)
-
-    food = relationship("Food", back_populates="referencedIn")
-    meal = relationship("Meal", back_populates="ingredients")
-    uom = relationship("UOM")
-
-
-class Food(Base):
-    __tablename__ = 'foods'
-    id = Column(Integer, primary_key = True)
     title = Column(String(80), nullable = False) #gehackte Dosentomaten
     titleEN = Column(String(80), nullable = True) #chopped canned tomatoes
     processing_part = Column(String(80), nullable = True) # chopped canned
     preparation_part = Column(String(80), nullable = True) # empty
     base_food_part = Column(String(80), nullable = True) # Tomatoe
-    description = Column(String(250), nullable = True)
-    image = Column(LargeBinary, nullable = True)
-    food_ref_id = Column(Integer, ForeignKey('food_reference.id'), nullable = True)
 
-    referencedIn = relationship("Ingredient",
-            back_populates="food",
-            cascade="save-update, merge, delete")  #Backpopulate is required because Ingredient to Food is a Many to One relationship
+    food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
+    created = Column(DateTime, default = datetime.datetime.utcnow)
+
+    food = relationship("Food")
+    meal = relationship("Meal", back_populates="ingredients")
+    uom = relationship("UOM")
+
 
 # based on german classification system BLS (Bundeslebensmittelschlüssel)
 # consider integrating directly using a server license https://www.blsdb.de/license
@@ -105,15 +96,15 @@ class FoodSubGroup(Base):
     food_maingroup_id = Column(Integer, ForeignKey('food_maingroup.id'), nullable = False)
     bls_code_part = Column(String(2), nullable = True)
 
-class FoodRef(Base):
-    __tablename__ = 'food_reference'
+class Food(Base):
+    __tablename__ = 'foods'
     id = Column(Integer, primary_key = True)
-    titleEN = Column(String(80), nullable = False)
+    titleEN = Column(String(80), nullable = True)
     titleDE = Column(String(80), nullable = True)
     bls_code = Column(String(7), nullable = True)
 
     isBaseFood = Column(Boolean, unique=False, default=False)
-    parentBaseFood = Column(Integer, ForeignKey('food_reference.id'), nullable = True)
+    parentBaseFood = Column(Integer, ForeignKey('foods.id'), nullable = True)
     # Standard values
     uom_nutrient_value = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = True)
     # Classification
@@ -123,21 +114,23 @@ class FoodRef(Base):
     food_preparation_type_id = Column(Integer, ForeignKey('food_preparation_type.id'), nullable = True)
     food_edible_weight_id = Column(Integer, ForeignKey('food_weight_reference.id'), nullable = True)
 
+    referencedIn = relationship("Ingredient")
+
 class FoodProcessingType(Base):
     __tablename__ = 'food_processing_type'
     id = Column(Integer, primary_key = True)
     bls_code_part = Column(String(1), nullable = True)
     food_subgroup_id = Column(Integer, ForeignKey('food_subgroup.id'), nullable = True) # Some foods to have specific processing types
-    titleDE = Column(String(80), nullable = False)
     titleEN = Column(String(80), nullable = False)
+    titleDE = Column(String(80), nullable = False)
 
 class FoodPreparationType(Base):
     __tablename__ = 'food_preparation_type'
     id = Column(Integer, primary_key = True)
     bls_code_part = Column(String(1), nullable = True)
     food_maingroup_id = Column(Integer, ForeignKey('food_maingroup.id'), nullable = True)
-    titleDE = Column(String(80), nullable = False)
     titleEN = Column(String(80), nullable = False)
+    titleDE = Column(String(80), nullable = False)
 
 class FoodEdibleWeight(Base):
     __tablename__ = 'food_weight_reference'

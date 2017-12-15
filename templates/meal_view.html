@@ -22,8 +22,10 @@
           <!--Title-->
           <h4 class="card-title"><strong>{{ meal.title }}</strong></h4>
 
-          <p class="card-text">{{ meal.description }}
-          </p>
+          <p class="card-text">{{ meal.description }}</p>
+          {% if meal.calories: %}
+            <p class='card-text'>{{ meal.calories }} kcal</p>
+          {% endif %}
 
           <!--Facebook-->
           <a type="button" class="btn-floating btn-small btn-fb"><i class="fa fa-facebook"></i></a>
@@ -45,7 +47,7 @@
               {% if items: %}
                 {% for i in items %}
               <tr>
-                <td>{{ i.food.title }}</td>
+                <td>{{ i.title }}</td>
                 <td>{{ i.quantity }}</td>
                 <td>{{ i.uom.shortDE }}</td>
               </tr>

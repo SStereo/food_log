@@ -1,5 +1,6 @@
 import ndb
-from googletrans import Translator
+# Imports the Google Cloud client library
+from google.cloud import translate
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -19,15 +20,24 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
-def translateFoodtoEN(food_id):
 
-# check if food item has already an english translation stored in the db
+def translateIngredientToEN(ingredient_id):
 
-# detect Language
+    # Instantiates a client
+    translate_client = translate.Client(target_language='en')
 
-# if language not EN then translateFood
-
-# Store translated title in food table
+    o = session.query(Ingredient).filter_by(id=ingredient_id).one()
+    # check if food item has already an english translation stored in the db
+    if not o.titleEN:
+        result = translate_client.translate(o.title)
+        source_lang = result['detectedSourceLanguage']
+        translation = result['translatedText']
+        o.titleEN = translation
+        session.add(o)
+        session.commit()
+        return True
+    else:
+        return False
 
 
 def analyzeFood(food_id):

@@ -30,7 +30,10 @@
 
         <!--Text-->
         <p class="card-text">{{ m.description }}</p>
-        <a href="{{ url_for('showMeal', meal_id=m.id) }}" class="black-text d-flex flex-row-reverse">
+        <a href="{{ url_for('deleteMeal', meal_id=m.id) }}" class="black-text d-inline-flex flex-row-reverse">
+            <h5 class="waves-effect p-2"><i class="fa fa-trash" aria-hidden="true"></i></h5>
+        </a>
+        <a href="{{ url_for('showMeal', meal_id=m.id) }}" class="black-text d-inline-flex flex-row-reverse">
             <h5 class="waves-effect p-2">more <i class="fa fa-chevron-right"></i></h5>
         </a>
       </div>
