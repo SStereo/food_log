@@ -25,10 +25,11 @@ Base = declarative_base()
 
 class UOM(Base):
     __tablename__ = 'units_of_measure'
-    uom = Column(String(5), primary_key = True)
+    uom = Column(String(length=5, convert_unicode=True), primary_key = True)
     longEN = Column(String(80), nullable = True)
     shortDE = Column(String(5), nullable = True)
     longDE = Column(String(80), nullable = True)
+    type = Column(String(1), nullable = True) # 1 = ingredients only, 2 = both, 3 = nutrients only
 
 
 class Meal(Base):
@@ -86,7 +87,7 @@ class FoodMainGroup(Base):
     id = Column(Integer, primary_key = True)
     titleEN = Column(String(80), nullable = False)
     titleDE = Column(String(80), nullable = True)
-    bls_code_part = Column(String(1), nullable = False)
+    bls_code_part = Column(String(1), nullable = True)
 
 class FoodSubGroup(Base):
     __tablename__ = 'food_subgroup'
@@ -99,9 +100,11 @@ class FoodSubGroup(Base):
 class Food(Base):
     __tablename__ = 'foods'
     id = Column(Integer, primary_key = True)
-    titleEN = Column(String(80), nullable = True)
-    titleDE = Column(String(80), nullable = True)
+    titleEN = Column(String(160), nullable = True)
+    titleDE = Column(String(160), nullable = True)
     bls_code = Column(String(7), nullable = True)
+    ndb_code = Column(String(7), nullable = True)
+
 
     isBaseFood = Column(Boolean, unique=False, default=False)
     parentBaseFood = Column(Integer, ForeignKey('foods.id'), nullable = True)
@@ -144,17 +147,20 @@ class FoodComposition(Base):
     __tablename__ = 'food_composition'
     food_id = Column(Integer, ForeignKey('foods.id'), primary_key = True)
     nutrient_id = Column(Integer, ForeignKey('nutrients.id'), primary_key = True)
-    value_uom = Column(String(5), ForeignKey('units_of_measure.uom'))  # example calories, or milligrams
-    per_qty_uom = Column(String(5), ForeignKey('units_of_measure.uom')) # example per grams of quantity
+    per_qty_uom = Column(String(length=5, convert_unicode=True), ForeignKey('units_of_measure.uom')) # example per grams of quantity
     per_qty = Column(Float)  # example per 100 of uom (grams)
     value = Column(Float)
 
+    uom = relationship("UOM")
 
 class Nutrient(Base):
     __tablename__ = 'nutrients'
     id = Column(Integer, primary_key = True)
-    title = Column(String(80), nullable = False)
+    value_uom = Column(String(5), ForeignKey('units_of_measure.uom'))  # example calories, or milligrams
+    titleEN = Column(String(80), nullable = False)
+    titleDE = Column(String(80), nullable = True)
 
+    uom = relationship("UOM")
 
 class ShoppingListItem(Base):
     __tablename__ = 'shopping_list_items'
@@ -163,6 +169,8 @@ class ShoppingListItem(Base):
     quantity = Column(Float, nullable = True)
     quantity_uom = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = True)
     checkOff = Column(Boolean, default = False)
+
+    food = relationship("Food")
 
 ####### insert at end of file #######
 

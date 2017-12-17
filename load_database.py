@@ -22,6 +22,12 @@ session = DBSession()
 num_rows_deleted = session.query(Ingredient).delete()
 session.commit()
 
+num_rows_deleted = session.query(FoodComposition).delete()
+session.commit()
+
+num_rows_deleted = session.query(Nutrient).delete()
+session.commit()
+
 num_rows_deleted = session.query(Food).delete()
 session.commit()
 
@@ -36,16 +42,57 @@ session.commit()
 # See: https://www.asknumbers.com/CookingConversion.aspx
 
 obj_uoms = [
-           UOM(uom="g",longEN="gram",shortDE="g"),
-           UOM(uom="kg",longEN="kilogram",shortDE="kg"),
-           UOM(uom="l",longEN="liter",shortDE="l"),
-           UOM(uom="ml",longEN="milliliter",shortDE="ml"),
-           UOM(uom="tbsp",longEN="tablespoon",shortDE="El"),
-           UOM(uom="tsp",longEN="teaspoon",shortDE="Tl"),
-           UOM(uom="pn",longEN="pinch",shortDE="Prise"),
-           UOM(uom="cup",longEN="cup",shortDE="Tasse"),
-           UOM(uom="oz",longEN="shot",shortDE="Unze"),
-           UOM(uom="pc",longEN="piece",shortDE="")
+           UOM(uom="g",longEN="gram",shortDE="g",type="2"),
+           UOM(uom="mg",longEN="milligram",shortDE="mg",type="3"),
+           UOM(uom="µg",longEN="micrograms",shortDE="µg",type="3"),
+           UOM(uom="IU",longEN="international unit",shortDE="IE",type="3"),
+           UOM(uom="kg",longEN="kilogram",shortDE="kg",type="1"),
+           UOM(uom="l",longEN="liter",shortDE="l",type="1"),
+           UOM(uom="ml",longEN="milliliter",shortDE="ml",type="1"),
+           UOM(uom="tbsp",longEN="tablespoon",shortDE="El",type="1"),
+           UOM(uom="tsp",longEN="teaspoon",shortDE="Tl",type="1"),
+           UOM(uom="pn",longEN="pinch",shortDE="Prise",type="1"),
+           UOM(uom="cup",longEN="cup",shortDE="Tasse",type="1"),
+           UOM(uom="oz",longEN="shot",shortDE="Unze",type="1"),
+           UOM(uom="pc",longEN="piece",shortDE="St",type="1"),
+           UOM(uom="kcal",longEN="kilocalories",shortDE="kcal",type="3"),
+           UOM(uom="x",longEN="unknown",shortDE="x",type="3")
+]
+
+# TODO: change field to say ndb nutrient mapping or so because other database have other terms for lookup
+obj_nutrients = [
+           Nutrient(value_uom="g",titleEN="Water",titleDE="Wasser"),
+           Nutrient(value_uom="kcal",titleEN="Energy",titleDE="Energie"),
+           Nutrient(value_uom="g",titleEN="Protein",titleDE="Eiweis"),
+           Nutrient(value_uom="g",titleEN="Total lipid (fat)",titleDE="Fett"),
+           Nutrient(value_uom="g",titleEN="Carbohydrate, by difference",titleDE="Kohlenhydrate"),
+           Nutrient(value_uom="g",titleEN="Fiber, total dietary",titleDE="Ballaststoff"),
+           Nutrient(value_uom="g",titleEN="Sugars, total",titleDE="Zucker"),
+           Nutrient(value_uom="mg",titleEN="Calcium, Ca",titleDE="Kalzium"),
+           Nutrient(value_uom="mg",titleEN="Iron, Fe",titleDE="Eisen"),
+           Nutrient(value_uom="mg",titleEN="Magnesium, Mg",titleDE="Magnesium"),
+           Nutrient(value_uom="mg",titleEN="Phosphorus, P",titleDE="Phosphor"),
+           Nutrient(value_uom="mg",titleEN="Potassium, K",titleDE="Potassium"),
+           Nutrient(value_uom="mg",titleEN="Sodium, Na",titleDE="Sodium"),
+           Nutrient(value_uom="mg",titleEN="Zinc, Zn",titleDE="Zink"),
+           Nutrient(value_uom="mg",titleEN="Vitamin C, total ascorbic acid",titleDE="Vitamin C"),
+           Nutrient(value_uom="mg",titleEN="Thiamin",titleDE="Thiamin"),
+           Nutrient(value_uom="mg",titleEN="Riboflavin",titleDE="Riboflavin"),
+           Nutrient(value_uom="mg",titleEN="Vitamin B-6",titleDE="Vitamin B-6"),
+           Nutrient(value_uom="µg",titleEN="Folate, DFE",titleDE="Folsäure"),
+           Nutrient(value_uom="µg",titleEN="Vitamin B-12",titleDE="Vitamin B-12"),
+           Nutrient(value_uom="µg",titleEN="Vitamin A, RAE",titleDE="Vitamin A, RAE"),
+           Nutrient(value_uom="IU",titleEN="Vitamin A, IU",titleDE="Vitamin A, IU"),
+           Nutrient(value_uom="mg",titleEN="Vitamin E (alpha-tocopherol)",titleDE="Vitamin E"),
+           Nutrient(value_uom="µg",titleEN="Vitamin D (D2 + D3)",titleDE="Vitamin D (D2 + D3)"),
+           Nutrient(value_uom="IU",titleEN="Vitamin D",titleDE="Vitamin D"),
+           Nutrient(value_uom="µg",titleEN="Vitamin K (phylloquinone)",titleDE="Vitamin K"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total saturated",titleDE="gesättigte Fettsäuren"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total monounsaturated",titleDE="einfach ungesättigte Fettsäure"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total polyunsaturated",titleDE="mehrfach ungesättigte Fettsäure"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total trans",titleDE="trans-Fettsäuren"),
+           Nutrient(value_uom="mg",titleEN="Cholesterol",titleDE="Cholesterin"),
+           Nutrient(value_uom="mg",titleEN="Caffeine",titleDE="Koffein")
 ]
 
 obj_foods = [
@@ -290,6 +337,7 @@ obj_ingredients = [
 ]
 
 session.add_all(obj_uoms)
+session.add_all(obj_nutrients)
 session.add_all(obj_foods)
 session.add_all(obj_meals)
 session.add_all(obj_ingredients)

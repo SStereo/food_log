@@ -27,7 +27,10 @@ class NDB(object):
 
     def __init__(self, key):
         self._key = key
-        self._base_url = "http://api.nal.usda.gov/ndb/{}/?format=json"
+        self._base_url = "http://api.nal.usda.gov/ndb/{}/?format=json" #&ds=Standard%20Reference"
+        # Example get request:
+        # Search: http://api.nal.usda.gov/ndb/search/?format=json&q=onion&api_key=ZQfrfyBrTTa3uEt8ooC9yZzmv5WNzgoJOlj6roBz&ds=Standard%20Reference&fg=Vegetables%20and%20Vegetable%20Products
+        # Report: http://api.nal.usda.gov/ndb/reports/?format=json&ndbno=02030&api_key=ZQfrfyBrTTa3uEt8ooC9yZzmv5WNzgoJOlj6roBz
 
     def search_keyword(self, q, **kwargs):
         """
@@ -54,17 +57,21 @@ class NDB(object):
         """
         kwargs['q'] = q
         kwargs['api_key'] = self._key
+        kwargs['ds'] = "Standard Reference"  # added by soeren
         res = requests.get(self._base_url.format("search"),
                            params=kwargs).json()
-        items = (SearchResult.from_dict(r) for r in res['list']['item'])
-        return {"items": items,
-                "start": res['list']['start'],
-                "q": res['list']['q'],
-                "end": res['list']['end'],
-                "total": res['list']['total'],
-                "sr": res['list']['sr'],
-                "sort": res['list']['sort'],
-                "group": res['list']['group']}
+        if 'list' in res: # added by soeren to handle zero search results
+            items = (SearchResult.from_dict(r) for r in res['list']['item'])
+            return {"items": items,
+                        "start": res['list']['start'],
+                        "q": res['list']['q'],
+                        "end": res['list']['end'],
+                        "total": res['list']['total'],
+                        "sr": res['list']['sr'],
+                        "sort": res['list']['sort'],
+                        "group": res['list']['group']}
+        else:
+            return False
 
     def search_nutrient_report():
         pass
@@ -248,7 +255,7 @@ class Nutrient(object):
         self._group = group
         self._sourcecode = sourcecode
         # to handle micrograms
-        self._unit = unit.encode('utf8')
+        self._unit = unit #.encode('utf8') changed by soeren, not needed
         self._value = value
         self._dp = dp
         self._se = se

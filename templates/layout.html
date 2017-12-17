@@ -52,12 +52,22 @@
         margin-right: auto;
       }
 
+      /*TODO: Create behaviour that for mobile devices the display is block in order to center the items */
+
+      @include media-breakpoint-up(md) {
+        display: block;
+      }
+
       .card {
         width: 350px;
         margin-left: auto;
         margin-right: auto;
         display: inline-block;
+        @include media-breakpoint-up(md);
       }
+
+
+
 
     </Style>
 

@@ -3,6 +3,7 @@ import json
 from google.oauth2 import service_account
 from google.cloud import translate
 from oauth2client.client import GoogleCredentials #for google cloud authentication
+import ndb #National Nutrient Database - United States Department of Agriculture
 
 from datetime import datetime  #required for method "now" for file name change
 from flask import Flask, render_template, request, url_for, redirect, flash, jsonify, send_from_directory
@@ -16,24 +17,60 @@ from food_database import (Base,
                    Food,
                    FoodComposition,
                    Nutrient,
-                   ShoppingListItem)
+                   ShoppingListItem,
+                   FoodMainGroup)
 
+# Application Settings
 UPLOAD_FOLDER = 'upload'
 ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
 app = Flask(__name__)
 app.secret_key = "ABC123"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-#app.add_url_rule('/uploads/<path:filename>', endpoint='uploads',
-                 #view_func=app.send_static_file)
 
-#engine = create_engine('postgresql://vagrant:vagrant@127.0.0.1:5432/np')
+# Database connection
 engine = create_engine('postgres://njxqkgsvotldpo:0091ec1051866196d42e608aadc421ef9bb58c37d9fcfe0e7bac4e9ce63929f8@ec2-54-228-182-57.eu-west-1.compute.amazonaws.com:5432/ddjblvctcusagj')
 Base.metadata.bind = engine
-
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
+# Google Cloud Connection
+PK = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
+jsonString = """{
+  "type": "service_account",
+  "project_id": "long-memory-188919",
+  "private_key_id": "b26b39e14a2375751b5064b77e426243b4625de4",
+  "private_key": \""""+PK+"""\",
+  "client_email": "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
+  "client_id": "106478515271128625146",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://accounts.google.com/o/oauth2/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
+}"""
+# d = { dictionary ...}
+#jsonString = json.dumps(d)
+service_account_info = json.loads(jsonString)
+credentials = service_account.Credentials.from_service_account_info(
+    service_account_info)
+
+# Google translate client
+translateClient = translate.Client(target_language='en',credentials=credentials)
+
+# NDB connection
+NDB_KEY = os.environ.get('NDB_KEY')
+
+# TODO: Validate if there is a better way in sqlAlchemy ot achieve that
+# TODO: Ensure reload of dictionary when uom table changes
+nutrientDict = {}
+items = session.query(Nutrient)
+for i in items:
+    nutrientDict.update({i.titleEN:i.id})
+
+uomDict = {}
+items = session.query(UOM)
+for i in items:
+    uomDict.update({i.uom:i.type})
 
 # Custom Static folders
 @app.route('/css/<path:filename>')
@@ -112,29 +149,7 @@ def addMeals():
 
         #---- INGREDIENTS CREATION ----
 
-        PK = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
 
-        #jsonString = json.dumps(d)
-
-        jsonString = """{
-          "type": "service_account",
-          "project_id": "long-memory-188919",
-          "private_key_id": "b26b39e14a2375751b5064b77e426243b4625de4",
-          "private_key": \""""+PK+"""",
-          "client_email": "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
-          "client_id": "106478515271128625146",
-          "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-          "token_uri": "https://accounts.google.com/o/oauth2/token",
-          "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-          "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
-        }"""
-
-        service_account_info = json.loads(jsonString)
-        credentials = service_account.Credentials.from_service_account_info(
-            service_account_info)
-
-        #client = Client(credentials=credentials)
-        client = translate.Client(target_language='en',credentials=credentials)
 
         # TODO: Optimize the creation of food and ingredient objects
         #      by avoiding too many commits
@@ -143,20 +158,21 @@ def addMeals():
         while request.form['ingredient'+str(x)]:
             row = str(x)
 
-            #TODO: add new logic to determine Food
-            #newFood = session.query(Food).filter_by(title=request.form['ingredient'+row]).first()
-            #if not newFood:
-            #    newFood = Food(title=request.form['ingredient'+row])
-            #    session.add(newFood)
-            #    session.commit()
+            # Translate local language to EN
+            translation =  translateClient.translate(request.form['ingredient'+row])
 
-            translation =  client.translate(request.form['ingredient'+row])['translatedText']
-
+            # Query NDB using EN term
+            print("newIngredient.titleEN = " + translation['translatedText'])
+            print("detected source language = " + translation['detectedSourceLanguage'])
+            foodID = getFood(translation['translatedText'])
+            if not foodID:
+                foodID = ""
             newIngredient = Ingredient(quantity=request.form['quantity'+row],
                                        uom_id=request.form['uom'+row],
                                        meal_id=newMeal.id,
                                        title=request.form['ingredient'+row],
-                                       titleEN=translation)
+                                       titleEN=translation['translatedText'],
+                                       food_id=foodID)
 
             session.add(newIngredient)
             session.commit()
@@ -202,6 +218,78 @@ def showMeal(meal_id):
 def jsonMeals():
     items = session.query(Meal).all()
     return jsonify(Meals=[m.serialize for m in items])
+
+
+def getFood(keyword):
+    # Account Email: mailboxsoeren@gmail.com
+    # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
+
+    if NDB_KEY:
+        n = ndb.NDB(NDB_KEY)
+        results = n.search_keyword(keyword)
+        if results:
+
+            i = list(results['items'])[0] #TODO: identify relevant item, for now take the first one
+            print("Found NDB item: "+i.get_name())
+
+            # Create Food Main Group
+            foodMainGroup = session.query(FoodMainGroup).filter_by(titleEN=i.get_group()).first()
+            if not foodMainGroup:
+                print("Create new group: "+i.get_group())
+                foodMainGroup = FoodMainGroup(titleEN=i.get_group())
+                session.add(foodMainGroup)
+                session.commit()
+
+            # Create Food
+            food = session.query(Food).filter_by(titleEN=i.get_name()).first()
+            if not food:
+                print("Create new food: "+i.get_name())
+                food = Food(titleEN=i.get_name(),ndb_code=i.get_ndbno(),food_maingroup_id=foodMainGroup.id)
+                session.add(food)
+                session.commit()
+
+                # Create Nutrients
+                report = n.food_report(i.get_ndbno())
+                #print(report)
+
+                nutrients = report['food'].get_nutrients()
+                for n in nutrients:
+                    # use existing nutrient object if exists
+                    if n.get_name() in nutrientDict:
+                        nutriendID = nutrientDict[n.get_name()] # retreive internal id based on the titleEN
+                    # create new nutrient object
+                    else:
+                        print("Create new nutrient: "+n.get_name())
+                        translated_text = translateClient.translate(n.get_name(),
+                                                                    target_language='de')['translatedText']
+                        newNutrient = Nutrient(value_uom=n.get_unit(),
+                                            titleEN=n.get_name(),
+                                            titleDE=translated_text)
+                        session.add(newNutrient)
+                        session.commit()
+                        nutriendID = newNutrient.id
+
+                        # TODO: all get into unknown atm
+                    print(n.get_unit())
+                    if n.get_unit() in uomDict:
+                        uomID = n.get_unit()
+                    else:
+                        print("unknown unit of measure")
+                        uomID = "x" #TODO: improve later
+
+                    print("Create new food composition")
+                    fc = FoodComposition(food_id=food.id,
+                                        nutrient_id=nutriendID,
+                                        per_qty_uom=uomID,
+                                        per_qty=100,
+                                        value=n.get_value())
+                    session.add(fc)
+                    session.commit()
+            return food.id
+        else:
+            print("No results in NDB found")
+    else:
+        print("Missing API Key in Environment Variable")
 
 
 def getIngredients(meal_id):
