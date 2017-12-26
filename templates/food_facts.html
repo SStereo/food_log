@@ -1,0 +1,52 @@
+{% set activeMenuItem = 3 %}
+{% extends "layout.html" %}
+{% block body %}
+<main>
+  <div style="height: 68px">
+
+  </div>
+
+  <div>
+  <!-- <form id="product-facts-form"> -->
+    <label>Enter a barcode number of a product</label>
+    <input type="text" id="barcode" name="barcode" value=""/>
+    <button id="submit-btn" onclick="loadProductFacts()">Submit</button>
+  <!-- </form> -->
+  </div>
+
+  <!--Card Regular-->
+  <div class="card mx-auto mt-1 card-cascade">
+
+      <!--Card image-->
+      <div id="img-box" class="view overlay hm-white-slight">
+        <!-- Data will be loaded using ajax call -->
+      </div>
+      <!--/.Card image-->
+
+      <!--Card content-->
+      <div id="product-box" class="card-body">
+        <!-- Data will be loaded using ajax call -->
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+          </tr>
+        </thead>
+        <tbody id="ingredient-tbl-body">
+          <!-- Data will be loaded using ajax call -->
+        </tbody>
+      </table>
+      <!--/.Card content-->
+    </div>
+    <!--/.Card Regular-->
+
+
+</main>
+<script>
+
+</script>
+{% endblock %}

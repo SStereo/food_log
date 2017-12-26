@@ -108,6 +108,10 @@ def showMeals():
     meals = session.query(Meal)
     return render_template("meals.html",meals=meals,getIngredients=getIngredients)
 
+@app.route('/food_facts')
+def showFoodFacts():
+    return render_template("food_facts.html")
+
 
 @app.route('/meals/add', methods=['GET','POST'])
 def addMeals():
