@@ -263,7 +263,7 @@ def fbconnect():
     h = httplib2.Http()
     result = h.request(url, 'GET')[1].decode("utf-8") # .decode("utf-8") added by soeren
 
-
+    print("Exchange token result: %s" % result)
     # Use token to get user info from API
     userinfo_url = "https://graph.facebook.com/v2.8/me"
     '''
