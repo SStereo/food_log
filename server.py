@@ -257,7 +257,7 @@ def fbconnect():
         response.headers['Content-Type'] = 'application/json'
         return response
     access_token = request.data.decode("utf-8") # .decode("utf-8") added by soeren
-
+    print("access token: %s" % access_token)
     url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' % (
         FACEBOOK_APP_ID, FACEBOOK_SECRET_KEY, access_token)
     h = httplib2.Http()
