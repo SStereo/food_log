@@ -22,6 +22,14 @@ from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = 'user'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(250), nullable=False)
+    email = Column(String(250), nullable=False)
+    picture = Column(String(250), nullable=False)
+
 
 class UOM(Base):
     __tablename__ = 'units_of_measure'
@@ -42,7 +50,9 @@ class Meal(Base):
     rating = Column(SmallInteger, nullable = True)
     image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
+    user_id = Column(Integer,ForeignKey('user.id'))
 
+    user = relationship(User)
     ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
 
     @property
