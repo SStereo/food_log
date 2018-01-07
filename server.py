@@ -1,17 +1,21 @@
 import os  # required to have access to the Port environment variable
 import json
+
+# Google cloud authentication & configuration
+from oauth2client.client import GoogleCredentials
 from google.oauth2 import service_account
-from google.cloud import translate
-from oauth2client.client import GoogleCredentials #for google cloud authentication
+
+from google.cloud import translate  # for google translator api
+from google.cloud import language  # for google natural language api
 
 # added due to google oauth login feature
-from oauth2client.client import OAuth2WebServerFlow #flow_from_clientsecrets
+from oauth2client.client import OAuth2WebServerFlow  # flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 import httplib2
 from flask import make_response
 import requests
 import random, string
-from flask import session as login_session # a dictionary to store information
+from flask import session as login_session  # a dictionary to store information
 
 # National Nutrient Database - United States Department of Agriculture
 import ndb
@@ -41,7 +45,8 @@ app.secret_key = "ABC123"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Database connection
-engine = create_engine('postgres://njxqkgsvotldpo:0091ec1051866196d42e608aadc421ef9bb58c37d9fcfe0e7bac4e9ce63929f8@ec2-54-228-182-57.eu-west-1.compute.amazonaws.com:5432/ddjblvctcusagj')
+DB_CONNECTION = os.environ.get('DB_CONNECTION')
+engine = create_engine(DB_CONNECTION)
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
@@ -61,11 +66,14 @@ jsonString = """{
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
 }"""
 service_account_info = json.loads(jsonString)
-credentials = service_account.Credentials.from_service_account_info(
+google_cloud_credentials = service_account.Credentials.from_service_account_info(
     service_account_info)
 
 # Google translate client
-translateClient = translate.Client(target_language='en',credentials=credentials)
+translate_client = translate.Client(target_language='en',credentials=google_cloud_credentials)
+
+# Google natural language client
+language_client = language.LanguageServiceClient(credentials=google_cloud_credentials)
 
 # Google oauth credentials
 GOOGLE_WEB_CLIENT_ID = os.environ.get('GOOGLE_WEB_CLIENT_ID')
@@ -361,6 +369,7 @@ def showMeals():
     #user = getUserInfo(login_session['user_id'])
     return render_template("meals.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
 
+
 @app.route('/food_facts')
 def showFoodFacts():
     return render_template("food_facts.html")
@@ -424,21 +433,32 @@ def addMeals():
         x = 1
         while request.form['ingredient'+str(x)]:
             row = str(x)
+            ingredient_text = request.form['ingredient'+row]
 
             # Translate local language to EN
-            translation =  translateClient.translate(request.form['ingredient'+row])
-
-            # Query NDB using EN term
+            translation =  translate_client.translate(ingredient_text)
             print("newIngredient.titleEN = " + translation['translatedText'])
             print("detected source language = " + translation['detectedSourceLanguage'])
+
+            # Identify food entity from entered text using language processing
+            # use en language to improve results since en splits combined german words
+            food_entity = analyze_ingredient(translation['translatedText'], language='en')
+            print("Food entity: %s" % food_entity)
+
+            # Query a food database (e.g. NDB) to retrieve nutrient information
+            # and to create a food master data record. The id of such a record
+            # is returned if a match in the food database was found.
             foodID = getFood(translation['translatedText'])
             if not foodID:
                 foodID = None
+
+            # Add new ingredient into database
             newIngredient = Ingredient(quantity=request.form['quantity'+row],
                                        uom_id=request.form['uom'+row],
                                        meal_id=newMeal.id,
                                        title=request.form['ingredient'+row],
                                        titleEN=translation['translatedText'],
+                                       base_food_part=food_entity,
                                        food_id=foodID)
 
             session.add(newIngredient)
@@ -492,7 +512,6 @@ def jsonMeals():
     return jsonify(Meals=[m.serialize for m in items])
 
 # ---------------- User Helper Functions ---------------------------
-
 # Creates a new user in the database
 def createUser(login_session):
     newUser = User(name=login_session['username'], email=login_session[
@@ -516,7 +535,7 @@ def getUserID(email):
         return None
 
 
-
+# Food database helper functions
 def getFood(keyword):
     # Account Email: mailboxsoeren@gmail.com
     # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
@@ -532,7 +551,7 @@ def getFood(keyword):
             # Create Food Main Group
             foodMainGroup = session.query(FoodMainGroup).filter_by(titleEN=i.get_group()).first()
             if not foodMainGroup:
-                print("Create new group: "+i.get_group())
+                #print("Create new group: "+i.get_group())
                 foodMainGroup = FoodMainGroup(titleEN=i.get_group())
                 session.add(foodMainGroup)
                 session.commit()
@@ -540,7 +559,7 @@ def getFood(keyword):
             # Create Food
             food = session.query(Food).filter_by(titleEN=i.get_name()).first()
             if not food:
-                print("Create new food: "+i.get_name())
+                #print("Create new food: "+i.get_name())
                 food = Food(titleEN=i.get_name(),ndb_code=i.get_ndbno(),food_maingroup_id=foodMainGroup.id)
                 session.add(food)
                 session.commit()
@@ -556,8 +575,8 @@ def getFood(keyword):
                         nutriendID = nutrientDict[n.get_name()] # retreive internal id based on the titleEN
                     # create new nutrient object
                     else:
-                        print("Create new nutrient: "+n.get_name())
-                        translated_text = translateClient.translate(n.get_name(),
+                        #print("Create new nutrient: "+n.get_name())
+                        translated_text = translate_client.translate(n.get_name(),
                                                                     target_language='de')['translatedText']
                         newNutrient = Nutrient(value_uom=n.get_unit(),
                                             titleEN=n.get_name(),
@@ -567,14 +586,14 @@ def getFood(keyword):
                         nutriendID = newNutrient.id
 
                         # TODO: all get into unknown atm
-                    print(n.get_unit())
+                    #print(n.get_unit())
                     if n.get_unit() in uomDict:
                         uomID = n.get_unit()
                     else:
                         print("unknown unit of measure")
                         uomID = "x" #TODO: improve later
 
-                    print("Create new food composition")
+                    #print("Create new food composition")
                     fc = FoodComposition(food_id=food.id,
                                         nutrient_id=nutriendID,
                                         per_qty_uom=uomID,
@@ -590,6 +609,51 @@ def getFood(keyword):
         print("Missing API Key in Environment Variable")
         return None
 
+
+def analyze_ingredient(ingredient_text, **kwargs):
+
+    target_language = kwargs['language']
+
+    # Create a whole sentence so the language api understands the context
+    # and provides better results
+    intro_text = {
+        'de':'Die Speise besteht aus',
+        'en':'The meal consists of'
+        }
+
+    # Using google language api to identify
+    # adjectives = processing (pre or at home)
+    # nouns = custom UOM and ingredients/food
+    # conjunctions = "and", "or", etc. for alternatives
+    # Reference: https://cloud.google.com/natural-language/docs/reference/rest/v1/Token
+    content = ' '.join([intro_text[target_language],ingredient_text])
+    print("content: %s" % content)
+    document = language.types.Document(
+        content=content,
+        type=language.enums.Document.Type.PLAIN_TEXT,
+        language=target_language)
+    response = language_client.analyze_syntax(
+        document=document,
+        encoding_type='UTF32')
+    tokens = response.tokens
+
+    # part-of-speech tags from enums.PartOfSpeech.Tag
+    # reference: https://cloud.google.com/natural-language/docs/reference/rest/v1/Token#partofspeech
+    pos_tag = ('UNKNOWN', 'ADJ', 'ADP', 'ADV', 'CONJ', 'DET', 'NOUN', 'NUM',
+           'PRON', 'PRT', 'PUNCT', 'VERB', 'X', 'AFFIX')
+
+    counter = 0
+    skip_intro_words = 4
+    for token in tokens:
+        counter += 1
+        print(u'{}: {}'.format(pos_tag[token.part_of_speech.tag],token.text.content))
+        # TODO: Handle multiple nouns
+        # for example 'clove of garlic' should return garlic and not clove
+        # wheat flour should return wheat flour
+        # noun + "of" could be understood as a component of the whole as custom uom
+        if (counter > skip_intro_words) and (pos_tag[token.part_of_speech.tag] == 'NOUN'):
+            return token.lemma  # lemma is the word stem of the word
+    return None
 
 def getIngredients(meal_id):
     if meal_id:
