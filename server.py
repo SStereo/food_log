@@ -27,13 +27,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from food_database import (Base,
                    User,
+                   UserGroup,
                    UOM,
                    Meal,
                    Ingredient,
                    Food,
                    FoodComposition,
                    Nutrient,
-                   ShoppingListItem,
+                   ShoppingOrder,
+                   ShoppingOrderItem,
                    FoodMainGroup)
 
 # Application Settings
@@ -219,6 +221,7 @@ def gconnect():
         createUser(login_session)
 
     login_session['user_id'] = getUserID(login_session['email'])
+    login_session['user_group_id'] = getUserGroupID(login_session['user_id'])
 
     output = ''
     output += '<h1>Welcome, '
@@ -310,6 +313,7 @@ def fbconnect():
     if not user_id:
         user_id = createUser(login_session)
     login_session['user_id'] = user_id
+    login_session['user_group_id'] = getUserGroupID(login_session['user_id'])
 
     output = ''
     output += '<h1>Welcome, '
@@ -351,6 +355,7 @@ def disconnect():
         del login_session['picture']
         del login_session['user_id']
         del login_session['provider']
+        del login_session['user_group_id']
         print("You have successfully been logged out.")
         return redirect('/')
     else:
@@ -365,7 +370,7 @@ def showHome():
 
 @app.route('/meals')
 def showMeals():
-    meals = session.query(Meal).outerjoin(Meal.user)
+    meals = session.query(Meal).outerjoin(Meal.user_group)
     #user = getUserInfo(login_session['user_id'])
     return render_template("meals.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
 
@@ -419,7 +424,7 @@ def addMeals():
                        portions=request.form['portions'],
                        calories="410 - 780",
                        image=filename,
-                       user_id=login_session['user_id'])
+                       user_group_id=login_session['user_group_id'])
         session.add(newMeal)
         session.commit()
 
@@ -519,6 +524,18 @@ def createUser(login_session):
     session.add(newUser)
     session.commit()
     user = session.query(User).filter_by(email=login_session['email']).one()
+
+    # automatically create a group to allow easier sharing and access
+    # with other users like family later
+    # TODO: Optimize sqlalechmy object creation to reduce to one commit
+    newUserGroup = UserGroup(name=user.name,owner_id=user.id)
+    session.add(newUserGroup)
+    session.commit()
+
+    newUser.group_id = newUserGroup.id
+    session.add(newUser)
+    session.commit()
+
     return user.id
 
 # Retrieves the user object
@@ -534,6 +551,13 @@ def getUserID(email):
     except:
         return None
 
+# Retrieves the user id based on an email
+def getUserGroupID(user_id):
+    try:
+        user_group = session.query(UserGroup).filter_by(owner=user_id).one()
+        return user_group.id
+    except:
+        return None
 
 # Food database helper functions
 def getFood(keyword):
@@ -642,18 +666,66 @@ def analyze_ingredient(ingredient_text, **kwargs):
     pos_tag = ('UNKNOWN', 'ADJ', 'ADP', 'ADV', 'CONJ', 'DET', 'NOUN', 'NUM',
            'PRON', 'PRT', 'PUNCT', 'VERB', 'X', 'AFFIX')
 
-    counter = 0
+    parse_label = ('UNKNOWN', 'ABBREV', 'ACOMP', 'ADVCL', 'ADVMOD', 'AMOD',
+           'APPOS', 'ATTR', 'AUX', 'AUXPASS', 'CC', 'CCOMP', 'CONJ', 'CSUBJ',
+           'CSUBJPASS', 'DEP', 'DET', 'DISCOURSE', 'DOBJ', 'EXPL', 'GOESWITH',
+           'IOBJ', 'MARK', 'MWE', 'MWV', 'NEG', 'NN', 'NPADVMOD', 'NSUBJ',
+           'NSUBJPASS', 'NUM', 'NUMBER', 'P', 'PARATAXIS', 'PARTMOD', 'PCOMP',
+           'POBJ', 'POSS', 'POSTNEG', 'PRECOMP', 'PRECONJ', 'PREDET', 'PREF',
+           'PREP', 'PRONL', 'PRT', 'PS', 'QUANTMOD', 'RCMOD', 'RCMODREL',
+           'RDROP', 'REF', 'REMNANT', 'REPARANDUM', 'ROOT', 'SNUM', 'SUFF',
+           'TMOD', 'TOPIC', 'VMOD', 'VOCATIVE', 'XCOMP', 'SUFFIX', 'TITLE',
+           'ADVPHMOD', 'AUXCAUS', 'AUXVV', 'DTMOD', 'FOREIGN', 'KW', 'LIST',
+           'NOMC', 'NOMCSUBJ', 'NOMCSUBJPASS', 'NUMC', 'COP', 'DISLOCATED',
+           'ASP', 'GMOD', 'GOBJ', 'INFMOD', 'MES', 'NCOMP')
+
+    #counter = 0
     skip_intro_words = 4
-    for token in tokens:
-        counter += 1
-        print(u'{}: {}'.format(pos_tag[token.part_of_speech.tag],token.text.content))
-        # TODO: Handle multiple nouns
-        # for example 'clove of garlic' should return garlic and not clove
-        # wheat flour should return wheat flour
-        # noun + "of" could be understood as a component of the whole as custom uom
-        if (counter > skip_intro_words) and (pos_tag[token.part_of_speech.tag] == 'NOUN'):
-            return token.lemma  # lemma is the word stem of the word
-    return None
+    return_value = None
+
+    # TODO: Implement natural language semantic relationship identification between entities in order to understand the base food entity
+    # for example 'clove of garlic' should return garlic and not clove
+    # wheat flour should return wheat flour
+    # noun + "of" could be understood as a component of the whole as custom uom
+    # current workaround case to identify the base food entity:
+    # 1) Take all entities (nouns) that are noun compound notifiers (label = nn)
+    # 2) Take the last entity that is a object of a preposition (label = pobj)
+    # 3) Take all nouns
+
+    # Alternative loop for testing
+    index = 0
+    for sentence in response.sentences:
+        content  = sentence.text.content  # sentence['text']['content']
+        sentence_begin = sentence.text.begin_offset  #['text']['beginOffset']
+        sentence_end = sentence_begin + len(content) - 1
+        case = 0  # ensures that once a matching case is found it locks it
+        while index < len(response.tokens) and response.tokens[index].text.begin_offset <= sentence_end:
+            token = tokens[index]
+            token_parse_label = parse_label[token.dependency_edge.label]
+            token_pos_tag = pos_tag[token.part_of_speech.tag]
+            print(u'{} - {}: {} - {} - {}'.format(index,pos_tag[token.part_of_speech.tag],token.text.content,token.dependency_edge.head_token_index,parse_label[token.dependency_edge.label]))
+            #TODO: Skip intro sentence part
+
+            if ((index + 1) > skip_intro_words):
+                if token_parse_label == 'NN':
+                    case = 3
+                    if return_value == None:
+                        return_value = token.lemma
+                    else:
+                        return_value = return_value + ' ' + token.lemma
+                elif (case < 3) and (token_parse_label == 'POBJ'):
+                    case = 2
+                    return_value = token.lemma
+                elif (case < 2) and (token_pos_tag == 'NOUN'):
+                    case = 1
+                    if return_value == None:
+                        return_value = token.lemma
+                    else:
+                        return_value = return_value + ' ' + token.lemma
+
+            index += 1
+
+    return return_value
 
 def getIngredients(meal_id):
     if meal_id:

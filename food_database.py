@@ -23,16 +23,31 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 class User(Base):
-    __tablename__ = 'user'
-
+    __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
     email = Column(String(250), nullable=False)
-    picture = Column(String(250), nullable=False)
+    picture = Column(String(250), nullable=True)
+    group_id = Column(Integer, ForeignKey('user_groups.id'), nullable=True)
+
+    group = relationship("UserGroup", foreign_keys=[group_id])
+
+
+# Required to provide access for the whole family on shopping lists
+# Every user gets their own group unless their are added to another Group
+# For now a user can only be in one group/family
+class UserGroup(Base):
+    __tablename__ = 'user_groups'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(250), nullable=False)
+    owner_id = Column(Integer, ForeignKey('users.id'))
+    picture = Column(String(250), nullable=True)
+
+    owner = relationship("User", foreign_keys=[owner_id])
 
 
 class UOM(Base):
-    __tablename__ = 'units_of_measure'
+    __tablename__ = 'units_of_measures'
     uom = Column(String(length=5, convert_unicode=True), primary_key = True)
     longEN = Column(String(80), nullable = True)
     shortDE = Column(String(5), nullable = True)
@@ -50,9 +65,9 @@ class Meal(Base):
     rating = Column(SmallInteger, nullable = True)
     image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
-    user_id = Column(Integer,ForeignKey('user.id'))
+    user_group_id = Column(Integer, ForeignKey('user_groups.id'))
 
-    user = relationship(User)
+    user_group = relationship("UserGroup")
     ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
 
     @property
@@ -72,7 +87,7 @@ class Ingredient(Base):
     __tablename__ = 'ingredients'
     id = Column(Integer, primary_key = True)
     quantity = Column(Float, nullable = False)
-    uom_id = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = False)
+    uom_id = Column(String(5), ForeignKey('units_of_measures.uom'), nullable = False)
     meal_id = Column(Integer, ForeignKey('meals.id'), nullable = False)
     title = Column(String(80), nullable = False) #gehackte Dosentomaten
     titleEN = Column(String(80), nullable = True) #chopped canned tomatoes
@@ -110,16 +125,16 @@ class FoodSubGroup(Base):
 class Food(Base):
     __tablename__ = 'foods'
     id = Column(Integer, primary_key = True)
+    private = Column(Boolean, unique = False, default = False)  # user specific food that is not refered to a NDB or similar
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)  # only required for private food items, for example home made foods
     titleEN = Column(String(160), nullable = True)
     titleDE = Column(String(160), nullable = True)
     bls_code = Column(String(7), nullable = True)
     ndb_code = Column(String(7), nullable = True)
-
-
-    isBaseFood = Column(Boolean, unique=False, default=False)
+    isBaseFood = Column(Boolean, unique = False, default = False)
     parentBaseFood = Column(Integer, ForeignKey('foods.id'), nullable = True)
     # Standard values
-    uom_nutrient_value = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = True)
+    uom_nutrient_value = Column(String(5), ForeignKey('units_of_measures.uom'), nullable = True)
     # Classification
     food_maingroup_id = Column(Integer, ForeignKey('food_maingroup.id'), nullable = True)
     food_subgroup_id = Column(Integer, ForeignKey('food_subgroup.id'), nullable = True)
@@ -127,7 +142,24 @@ class Food(Base):
     food_preparation_type_id = Column(Integer, ForeignKey('food_preparation_type.id'), nullable = True)
     food_edible_weight_id = Column(Integer, ForeignKey('food_weight_reference.id'), nullable = True)
 
+    user_group = relationship("UserGroup")
+    food_main_group = relationship("FoodMainGroup")
+    food_subgroup = relationship("FoodSubGroup")
+    food_processing_type = relationship("FoodProcessingType")
+    food_preparation_type = relationship("FoodPreparationType")
     referencedIn = relationship("Ingredient")
+
+
+class Goods(Base):
+    __tablename__ = 'goods'
+    id = Column(Integer, primary_key = True)
+    private = Column(Boolean, unique = False, default = False)  # user specific food that is not refered to a NDB or similar
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)
+    titleEN = Column(String(160), nullable = True)
+    titleDE = Column(String(160), nullable = True)
+
+    user_group = relationship("UserGroup")
+
 
 class FoodProcessingType(Base):
     __tablename__ = 'food_processing_type'
@@ -137,6 +169,7 @@ class FoodProcessingType(Base):
     titleEN = Column(String(80), nullable = False)
     titleDE = Column(String(80), nullable = False)
 
+
 class FoodPreparationType(Base):
     __tablename__ = 'food_preparation_type'
     id = Column(Integer, primary_key = True)
@@ -144,6 +177,7 @@ class FoodPreparationType(Base):
     food_maingroup_id = Column(Integer, ForeignKey('food_maingroup.id'), nullable = True)
     titleEN = Column(String(80), nullable = False)
     titleDE = Column(String(80), nullable = False)
+
 
 class FoodEdibleWeight(Base):
     __tablename__ = 'food_weight_reference'
@@ -157,30 +191,88 @@ class FoodComposition(Base):
     __tablename__ = 'food_composition'
     food_id = Column(Integer, ForeignKey('foods.id'), primary_key = True)
     nutrient_id = Column(Integer, ForeignKey('nutrients.id'), primary_key = True)
-    per_qty_uom = Column(String(length=5, convert_unicode=True), ForeignKey('units_of_measure.uom')) # example per grams of quantity
+    per_qty_uom = Column(String(length=5, convert_unicode=True), ForeignKey('units_of_measures.uom')) # example per grams of quantity
     per_qty = Column(Float)  # example per 100 of uom (grams)
     value = Column(Float)
 
     uom = relationship("UOM")
 
+
 class Nutrient(Base):
     __tablename__ = 'nutrients'
     id = Column(Integer, primary_key = True)
-    value_uom = Column(String(5), ForeignKey('units_of_measure.uom'))  # example calories, or milligrams
+    value_uom = Column(String(5), ForeignKey('units_of_measures.uom'))  # example calories, or milligrams
     titleEN = Column(String(80), nullable = False)
     titleDE = Column(String(80), nullable = True)
 
     uom = relationship("UOM")
 
-class ShoppingListItem(Base):
-    __tablename__ = 'shopping_list_items'
+
+class Inventory(Base):
+    __tablename__ = 'inventories'
     id = Column(Integer, primary_key = True)
-    food_id = Column(Integer, ForeignKey('foods.id'))
+    creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = False)
+
+    creator = relationship("User", foreign_keys=[creator_id])
+    user_group = relationship("UserGroup", foreign_keys=[user_group_id])
+
+
+class InventoryItem(Base):
+    __tablename__ = 'inventory_items'
+    id = Column(Integer, primary_key = True)
+    inventory_id = Column(Integer, ForeignKey('inventories.id'))
+    food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
+    good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
+    level = Column(Integer, nullable = True)
+    re_order_level = Column(Integer, nullable = True)
+    re_order_quantity = Column(Integer, nullable = True)
+
+    inventory = relationship("Inventory")
+    food = relationship("Food")
+    good = relationship("Goods")
+
+# The shopping list or order with access to a group
+class ShoppingOrder(Base):
+    __tablename__ = 'shopping_orders'
+    id = Column(Integer, primary_key = True)
+    creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = False)
+
+    creator = relationship("User")
+    user_group = relationship("UserGroup")
+
+
+# Items on a shopping list that must be bought / ordered
+class ShoppingOrderItem(Base):
+    __tablename__ = 'shopping_order_items'
+    id = Column(Integer, primary_key = True)
+    shopping_order_id = Column(Integer, ForeignKey('shopping_orders.id'))
+    food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
+    good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
     quantity = Column(Float, nullable = True)
-    quantity_uom = Column(String(5), ForeignKey('units_of_measure.uom'), nullable = True)
+    quantity_uom = Column(String(5), ForeignKey('units_of_measures.uom'), nullable = True)
     checkOff = Column(Boolean, default = False)
+    item_photo = Column(String, nullable = True)
+    barcode_photo = Column(String, nullable = True)
+    ingredients_photo = Column(String, nullable = True)
+    trade_item_id = Column(Integer, ForeignKey('trade_items.id'), nullable = True)
 
     food = relationship("Food")
+    good = relationship("Goods")
+    shopping_order = relationship("ShoppingOrder")
+    trade_item = relationship("TradeItem")
+
+
+# Items that relate to real products bought in the retail / grocery stores
+class TradeItem(Base):
+    __tablename__ = 'trade_items'
+    id = Column(Integer, primary_key = True)
+    ean = Column(String(13), nullable = True)
+    upc = Column(String(13), nullable = True)
+    gtin = Column(String(14), nullable = True)
+    titleEN = Column(String(80), nullable = False)
+    titleDE = Column(String(80), nullable = True)
 
 ####### insert at end of file #######
 

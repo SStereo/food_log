@@ -5,7 +5,7 @@ from food_database import (Base,
                    Food,
                    FoodComposition,
                    Nutrient,
-                   ShoppingListItem)
+                   ShoppingOrderItem)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

@@ -37,19 +37,23 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Ingredient</th>
                 <th>Quantity</th>
-                <th>Unit</th>
+                <th>Ingredient</th>
               </tr>
             </thead>
             <tbody>
               {% set items = getIngredients(meal.id) %}
-              {% if items: %}
+              {% if items %}
                 {% for i in items %}
               <tr>
-                <td>{{ i.title }}</td>
-                <td>{{ i.quantity }}</td>
-                <td>{{ i.uom.shortDE }}</td>
+                <td>
+                  {{ '%g'%i.quantity }} {{ i.uom.shortDE }}
+                </td>
+                <td>
+                  <p>{{ i.title }}</p>
+                  <small class="text-muted">{{ i.food.titleEN }}</small>
+                  <small class="text-muted">{{ i.food.titleEN }}</small>
+                </td>
               </tr>
                 {% endfor %}
               {% endif %}
