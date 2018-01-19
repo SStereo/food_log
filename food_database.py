@@ -17,6 +17,8 @@ from sqlalchemy import (Column,
                         Boolean)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+# Required for user password
+from passlib.apps import custom_app_context as pwd_context
 
 # Declarative Mapping
 
@@ -28,9 +30,17 @@ class User(Base):
     name = Column(String(250), nullable=False)
     email = Column(String(250), nullable=False)
     picture = Column(String(250), nullable=True)
+    username = Column(String(32), index=True)
+    password_hash = Column(String(64))
     group_id = Column(Integer, ForeignKey('user_groups.id'), nullable=True)
 
     group = relationship("UserGroup", foreign_keys=[group_id])
+
+    def hash_password(self, password):
+        self.password_hash = pwd_context.encrypt(password)
+
+    def verify_password(self, password):
+        return pwd_context.verify(password, self.password_hash)
 
 
 # Required to provide access for the whole family on shopping lists

@@ -68,13 +68,17 @@ jsonString = """{
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
 }"""
 service_account_info = json.loads(jsonString)
+# TODO: Solve scope bug on heroko environment looking at: https://developers.google.com/identity/protocols/googlescopes#languagev1
+# https://developers.google.com/identity/protocols/OAuth2ServiceAccount
+SCOPES = ['https://www.googleapis.com/auth/cloud-language', 'https://www.googleapis.com/auth/cloud-translation']
 google_cloud_credentials = service_account.Credentials.from_service_account_info(
-    service_account_info)
+    service_account_info, scopes=SCOPES)
 
 # Google translate client
 translate_client = translate.Client(target_language='en',credentials=google_cloud_credentials)
 
 # Google natural language client
+# TODO: Solve scope bug on heroko environment looking at: https://developers.google.com/identity/protocols/googlescopes#languagev1
 language_client = language.LanguageServiceClient(credentials=google_cloud_credentials)
 
 # Google oauth credentials
