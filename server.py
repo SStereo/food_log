@@ -221,10 +221,13 @@ def gconnect():
 
     # Validates if user already exists in the database
     # if not it creates a new account in the Database
-    if not getUserID(login_session['email']):
-        createUser(login_session)
 
-    login_session['user_id'] = getUserID(login_session['email'])
+    user_id = getUserID(login_session['email'])
+
+    if not user_id:
+        login_session['user_id'] = createUser(login_session)
+    else:
+        login_session['user_id'] = user_id
 
     output = ''
     output += '<h1>Welcome, '
@@ -371,7 +374,7 @@ def showHome():
 
 @app.route('/meals')
 def showMeals():
-    meals = session.query(Meal).outerjoin(Meal.user_group)
+    meals = session.query(Meal).all()
     #user = getUserInfo(login_session['user_id'])
     return render_template("meals.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
 
@@ -425,8 +428,7 @@ def addMeals():
                        portions=request.form['portions'],
                        calories="410 - 780",
                        image=filename,
-                       owner_id=login_session('user_id'),
-                       user_group_id=login_session['user_group_id'])
+                       owner_id=login_session['user_id'])
         session.add(newMeal)
         session.commit()
 
@@ -525,9 +527,9 @@ def createUser(login_session):
                    'email'], picture=login_session['picture'])
     session.add(newUser)
     session.commit()
-    user = session.query(User).filter_by(email=login_session['email']).one()
+    #user = session.query(User).filter_by(email=login_session['email']).one()
 
-    return user.id
+    return newUser.id
 
 
 def createUserGroup(user_id):
