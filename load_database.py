@@ -5,7 +5,8 @@ from food_database import (Base,
                    Food,
                    FoodComposition,
                    Nutrient,
-                   ShoppingOrderItem)
+                   ShoppingOrderItem,
+                   User)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -36,6 +37,15 @@ session.commit()
 
 num_rows_deleted = session.query(UOM).delete()
 session.commit()
+
+num_rows_deleted = session.query(User).delete()
+session.commit()
+
+# Create default user
+
+obj_users = [
+            User(name="admin",email="admin@huntingfood.com")
+]
 
 
 # Create UOM objects
@@ -133,7 +143,8 @@ obj_meals = [
                 """,
                 portions=2,
                 rating=5,
-                image="linsendhal.jpg"
+                image="linsendhal.jpg",
+                owner=obj_users[0]
                 ),
             Meal(title="Linsen mit Spätzle und Saitenwürstchen",
                  description="""\
@@ -141,7 +152,8 @@ obj_meals = [
                  """,
                  portions=2,
                  rating=5,
-                 image="linsenmitspaetzle.jpg"
+                 image="linsenmitspaetzle.jpg",
+                 owner=obj_users[0]
                  ),
             Meal(title="Geschmelzte Maultaschen",
                  description="""\
@@ -149,7 +161,8 @@ obj_meals = [
                  """,
                  portions=2,
                  rating=5,
-                 image="geschmelztemaultaschen.jpg"
+                 image="geschmelztemaultaschen.jpg",
+                 owner=obj_users[0]
                  )
 ]
 
@@ -336,6 +349,7 @@ obj_ingredients = [
                       ),
 ]
 
+session.add_all(obj_users)
 session.add_all(obj_uoms)
 session.add_all(obj_nutrients)
 session.add_all(obj_foods)

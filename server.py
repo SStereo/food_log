@@ -225,7 +225,6 @@ def gconnect():
         createUser(login_session)
 
     login_session['user_id'] = getUserID(login_session['email'])
-    login_session['user_group_id'] = getUserGroupID(login_session['user_id'])
 
     output = ''
     output += '<h1>Welcome, '
@@ -317,7 +316,6 @@ def fbconnect():
     if not user_id:
         user_id = createUser(login_session)
     login_session['user_id'] = user_id
-    login_session['user_group_id'] = getUserGroupID(login_session['user_id'])
 
     output = ''
     output += '<h1>Welcome, '
@@ -359,7 +357,6 @@ def disconnect():
         del login_session['picture']
         del login_session['user_id']
         del login_session['provider']
-        del login_session['user_group_id']
         print("You have successfully been logged out.")
         return redirect('/')
     else:
@@ -428,6 +425,7 @@ def addMeals():
                        portions=request.form['portions'],
                        calories="410 - 780",
                        image=filename,
+                       owner_id=login_session('user_id'),
                        user_group_id=login_session['user_group_id'])
         session.add(newMeal)
         session.commit()
@@ -529,18 +527,27 @@ def createUser(login_session):
     session.commit()
     user = session.query(User).filter_by(email=login_session['email']).one()
 
-    # automatically create a group to allow easier sharing and access
-    # with other users like family later
-    # TODO: Optimize sqlalechmy object creation to reduce to one commit
-    newUserGroup = UserGroup(name=user.name,owner_id=user.id)
+    return user.id
+
+
+def createUserGroup(user_id):
+
+    newUserGroup = UserGroup(name="Group1")
+    a = UserGroupAssociation(is_owner=True)
+    a.user = session.query(User).filter_by(id=user_id).one()
+    newUserGroup.users.append(a)
+
     session.add(newUserGroup)
     session.commit()
 
-    newUser.group_id = newUserGroup.id
-    session.add(newUser)
-    session.commit()
+    return newUserGroup.id
 
-    return user.id
+def listUsersInGroup(group_id):
+
+    g = session.query(UserGroup).filter_by(id=group_id).one()
+
+    for assoc in g.users:
+        print(assoc.user.name)
 
 # Retrieves the user object
 def getUserInfo(user_id):

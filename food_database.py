@@ -14,7 +14,8 @@ from sqlalchemy import (Column,
                         DateTime,
                         LargeBinary,
                         Float,
-                        Boolean)
+                        Boolean,
+                        ForeignKeyConstraint)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 # Required for user password
@@ -32,9 +33,11 @@ class User(Base):
     picture = Column(String(250), nullable=True)
     username = Column(String(32), index=True)
     password_hash = Column(String(64))
-    group_id = Column(Integer, ForeignKey('user_groups.id'), nullable=True)
+    #group_id = Column(Integer, ForeignKey('user_groups.id'), nullable=True)
+    #fk_user_group = ForeignKeyConstraint(['user_groups.id'], ['group_id'])
 
-    group = relationship("UserGroup", foreign_keys=[group_id])
+    groups = relationship("UserGroupAssociation", back_populates="user")
+    meals = relationship("Meal", cascade="save-update, merge, delete")
 
     def hash_password(self, password):
         self.password_hash = pwd_context.encrypt(password)
@@ -43,6 +46,15 @@ class User(Base):
         return pwd_context.verify(password, self.password_hash)
 
 
+class UserGroupAssociation(Base):
+    __tablename__ = 'user_group_association'
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_group_id = Column(Integer, ForeignKey('user_groups.id'), primary_key=True)
+    is_owner = Column(Boolean, unique = False, default = False)
+
+    group = relationship("UserGroup", back_populates="users")
+    user = relationship("User", back_populates="groups")
+
 # Required to provide access for the whole family on shopping lists
 # Every user gets their own group unless their are added to another Group
 # For now a user can only be in one group/family
@@ -50,10 +62,14 @@ class UserGroup(Base):
     __tablename__ = 'user_groups'
     id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
-    owner_id = Column(Integer, ForeignKey('users.id'))
+    # owner_id = Column(Integer, ForeignKey('users.id'))
+    # owner_id = Column(Integer, nullable=False)
+    # fk_owner = ForeignKeyConstraint(['users.id'], ['owner_id'])
     picture = Column(String(250), nullable=True)
 
-    owner = relationship("User", foreign_keys=[owner_id])
+    users = relationship("UserGroupAssociation", back_populates="group")
+
+    # owner = relationship("User", foreign_keys=[owner_id], post_update=True)
 
 
 class UOM(Base):
@@ -75,8 +91,10 @@ class Meal(Base):
     rating = Column(SmallInteger, nullable = True)
     image = Column(String, nullable = True)
     created = Column(DateTime, default = datetime.datetime.utcnow)
+    owner_id = Column(Integer, ForeignKey('users.id'), nullable = False)
     user_group_id = Column(Integer, ForeignKey('user_groups.id'))
 
+    owner = relationship("User", back_populates="meals", foreign_keys=[owner_id])
     user_group = relationship("UserGroup")
     ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
 
@@ -288,4 +306,7 @@ class TradeItem(Base):
 
 #engine = create_engine('postgresql://vagrant:vagrant@127.0.0.1:5432/np')
 engine = create_engine('postgres://njxqkgsvotldpo:0091ec1051866196d42e608aadc421ef9bb58c37d9fcfe0e7bac4e9ce63929f8@ec2-54-228-182-57.eu-west-1.compute.amazonaws.com:5432/ddjblvctcusagj')
+
+# TODO: Ensure that drop cascade works or try to use SQLAlchemy-Migrate
+Base.metadata.drop_all(engine)
 Base.metadata.create_all(engine)
