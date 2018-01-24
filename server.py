@@ -20,6 +20,9 @@ from flask import session as login_session  # a dictionary to store information
 # National Nutrient Database - United States Department of Agriculture
 import ndb
 
+# Required to identify the path within an URL, for referrer after login
+from urllib.parse import urlparse
+
 from datetime import datetime  #required for method "now" for file name change
 from flask import Flask, render_template, request, url_for, redirect, flash, jsonify, send_from_directory
 from werkzeug.utils import secure_filename  #required for file upload
@@ -107,23 +110,23 @@ for i in items:
 # Custom Static folders
 @app.route('/css/<path:filename>')
 def css_static(filename):
-    return send_from_directory('css', filename)
+    return send_from_directory('static/css', filename)
 
 @app.route('/js/<path:filename>')
 def js_static(filename):
-    return send_from_directory('js', filename)
+    return send_from_directory('static/js', filename)
 
 @app.route('/font/<path:filename>')
 def font_static(filename):
-    return send_from_directory('font', filename)
+    return send_from_directory('static/font', filename)
 
 @app.route('/img/<path:filename>')
 def img_static(filename):
-    return send_from_directory('img', filename)
+    return send_from_directory('static/img', filename)
 
 @app.route('/sass/<path:filename>')
 def sass_static(filename):
-    return send_from_directory('sass', filename)
+    return send_from_directory('static/sass', filename)
 
 @app.route('/upload/<path:filename>')
 def upload_static(filename):
@@ -134,9 +137,13 @@ def upload_static(filename):
 @app.route('/login')
 def showLogin():
     # Generate a random session id and pass it to the login template
+    redirect_next = urlparse(request.referrer)[2]
+    print("Previous page was %s" % redirect_next)
+    if redirect_next == '':
+        redirect_next ='/'
     state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(32))
     login_session['state'] = state
-    return render_template("login.html", STATE=state, CLIENT_ID=GOOGLE_WEB_CLIENT_ID)
+    return render_template("login.html", STATE=state, CLIENT_ID=GOOGLE_WEB_CLIENT_ID, redirect_next=redirect_next)
 
 
 @app.route('/gconnect', methods=['POST'])
@@ -384,11 +391,19 @@ def showFoodFacts():
     return render_template("food_facts.html")
 
 
+@app.route('/shoppinglist')
+def showShoppingList():
+    if 'username' not in login_session:
+        return redirect ('/login')
+        # TODO: return to the intendet page after login or redirect to original URL using request.referrer
+    else:
+        # TODO: If member of a group filter by group and not by creator
+        meals = session.query(Meal).filter_by(owner_id=login_session['user_id']).all()
+        return render_template("shoppinglist.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
+
+
 @app.route('/meals/add', methods=['GET','POST'])
 def addMeals():
-
-    #del login_session['username']
-
     # required if no user has yet loged in so the dictionary does not have the key
     if 'username' not in login_session:
         return redirect ('/login')

@@ -50,6 +50,34 @@
         @include media-breakpoint-up(md);
       }
 
+      /* Styles for the shopping list form */
+
+      #sl-card1 {
+        width: 375px;
+      }
+
+      input[type="text"].sl-item {
+        width: 250px;
+        margin-right: 0px;
+        margin-bottom: 0px;
+        margin-top: 0px;
+        padding: 0px;
+      }
+
+      .sl-form {
+        position: relative;
+      }
+
+      .sl-btn {
+        position: absolute;
+        top: 0;
+        right: 5px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        padding-left: 15px;
+        padding-right: 15px;
+      }
+
     </Style>
 
     <script>
@@ -73,6 +101,7 @@
               {% set suffix2 = "" %}
               {% set suffix3 = "" %}
               {% set suffix4 = "" %}
+              {% set suffix5 = "" %}
               {% if activeMenuItem == 1 %}
                 {% set suffix1 = " active" %}
               {% elif activeMenuItem == 2 %}
@@ -80,6 +109,8 @@
               {% elif activeMenuItem == 3 %}
                 {% set suffix3 = " active" %}
               {% elif activeMenuItem == 4 %}
+                {% set suffix4 = " active" %}
+              {% elif activeMenuItem == 5 %}
                 {% set suffix4 = " active" %}
               {% endif %}
 
@@ -92,7 +123,10 @@
                 <li id="nav-3" class="nav-item{{ suffix3 }}">
                     <a class="nav-link" href="{{ url_for('showFoodFacts') }}">Food Facts</a>
                 </li>
-                <li id="nav-4" class="nav-item{{ suffix4 }}">
+                <li id="nav-3" class="nav-item{{ suffix4 }}">
+                    <a class="nav-link" href="{{ url_for('showShoppingList') }}">Shopping List</a>
+                </li>
+                <li id="nav-4" class="nav-item{{ suffix5 }}">
                   {% if 'username' in loginSession %}
                     <a class="nav-link" href="{{ url_for('disconnect') }}">Logout</a>
                   {% else %}

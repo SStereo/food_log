@@ -1,0 +1,130 @@
+{% set activeMenuItem = 4 %}
+{% extends "layout.html" %}
+{% block body %}
+<main class="text-center py-5">
+
+
+
+  <!-- Nav tabs -->
+  <div class="tabs-wrapper">
+      <ul class="nav classic-tabs tabs-orange" role="tablist">
+          <li class="nav-item">
+              <a class="nav-link waves-light active" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-plus fa-2x" aria-hidden="true"></i><br> Einzeln</a>
+          </li>
+          <li class="nav-item">
+              <a class="nav-link waves-light" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-heart fa-2x" aria-hidden="true"></i><br> Gerichte</a>
+          </li>
+          <li class="nav-item">
+              <a class="nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-2x" aria-hidden="true"></i><br> Liste</a>
+          </li>
+      </ul>
+  </div>
+
+  <!-- Tab panels -->
+  <div class="tab-content card" id="sl-card1">
+
+      <!--Panel 1-->
+      <div class="tab-pane fade in show active" id="panel61" role="tabpanel">
+        <div class="sl-form">
+          <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
+          <button onclick="newElement()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
+        </div>
+        <div id="sl-items">
+          <div class="sl-form">
+            <input type="text" class="form-control sl-item" value="Test">
+            <button class="btn btn-default sl-btn"><i class="fa fa-trash mr-1"></i></button>
+          </div>
+          <div class="sl-form">
+            <input type="text" class="form-control sl-item" value="Test2">
+            <button class="btn btn-default sl-btn"><i class="fa fa-trash mr-1"></i></button>
+          </div>
+        </div>
+
+      </div>
+      <!--/.Panel 1-->
+
+      <!--Panel 2-->
+      <div class="tab-pane fade" id="panel62" role="tabpanel">
+        {% for m in meals %}
+          <div class="form-group">
+            <input type="checkbox" class="filled-in" id="checkbox{{ loop.index }}">
+            <label for="checkbox{{ loop.index }}">{{ m.title }}</label>
+          </div>
+        {% endfor %}
+      </div>
+      <!--/.Panel 2-->
+
+      <!--Panel 3-->
+      <div class="tab-pane fade" id="panel63" role="tabpanel">
+          <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nihil odit magnam minima, soluta doloribus reiciendis molestiae placeat unde eos molestias. Quisquam aperiam, pariatur. Tempora, placeat ratione porro voluptate odit minima.</p>
+
+      </div>
+      <!--/.Panel 3-->
+
+      <!--Panel 4-->
+      <div class="tab-pane fade" id="panel64" role="tabpanel">
+          <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nihil odit magnam minima, soluta doloribus reiciendis molestiae placeat unde eos molestias. Quisquam aperiam, pariatur. Tempora, placeat ratione porro voluptate odit minima.</p>
+
+      </div>
+      <!--/.Panel 4-->
+
+  </div>
+
+  <script>
+    $(function () {
+      $('#myTab a:last').tab('show')
+    })
+
+
+    function addActionToButtons() {
+      var btn_del = document.getElementsByClassName("btn btn-default sl-btn");
+      var i;
+
+      for (i = 0; i < btn_del.length; i++) {
+        btn_del[i].onclick = function() {
+          var div = this.parentElement;
+          div.style.display = "none";
+        }
+      }
+    }
+
+
+    // Create a new list item when clicking on the "Add" button
+    function newElement() {
+
+      var inputValue = document.getElementById("sl-new-item").value;
+
+      if (inputValue === '') {
+        alert("You must write something!");
+      } else {
+
+        var items = document.getElementById("sl-items");
+        var itemrow = document.createElement("DIV");
+        itemrow.className = "sl-form";
+
+        var i = document.createElement("INPUT");
+        i.value = inputValue;
+        i.type = "text"
+        i.className = "form-control sl-item";
+
+        var btn = document.createElement("BUTTON");
+        btn.className = "btn btn-default sl-btn";
+
+        var icon = document.createElement("i");
+        icon.className = "fa fa-trash mr-1";
+
+        btn.appendChild(icon);
+        itemrow.appendChild(i);
+        itemrow.appendChild(btn);
+        items.appendChild(itemrow);
+
+        addActionToButtons();
+      }
+      document.getElementById("sl-new-item").value = "";
+
+    }
+
+  </script>
+
+</main>
+{% endblock %}

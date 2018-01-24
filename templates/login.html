@@ -1,4 +1,4 @@
-{% set activeMenuItem = 4 %}
+{% set activeMenuItem = 5 %}
 {% extends "layout.html" %}
 {% block body %}
 <!--LOAD PRE-REQUISITES FOR GOOGLE SIGN IN -->
@@ -49,7 +49,7 @@
 				if (result) {
 					$('#result').html('Login Successful!</br>'+ result + '</br>Redirecting...')
 				 setTimeout(function() {
-					window.location.href = "/";
+					window.location.href = "{{redirect_next}}";
 				 }, 4000);
 
 			} else {
@@ -102,7 +102,7 @@
 		        if (result) {
 		          $('#result').html('Login Successful!</br>'+ result + '</br>Redirecting...')
 		         setTimeout(function() {
-		          window.location.href = "/";
+		          window.location.href = "{{redirect_next}}";
 		         }, 4000);
 
 		      } else if (authResult['error']) {
