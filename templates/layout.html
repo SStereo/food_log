@@ -158,13 +158,10 @@
     <!-- Modification of fixed floating button to allow standard click event instead of opening the child items
         https://mdbootstrap.com/support/bug-button-floating/
       TODO: Not required in Layout? Re-think better place for this -->
-    <script>
-    $(document).ready(function(){
-        $('.fixed-action-btn').unbind('click');
-        // $('#product-facts-form').submit(loadProductFacts);
-    });
 
-    </script>
+  {% block script %}
+  {% endblock %}
+
 
 </body>
 

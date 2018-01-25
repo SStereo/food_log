@@ -52,3 +52,12 @@
 
 </main>
 {% endblock %}
+
+{% block script %}
+<script>
+$(document).ready(function(){
+    $('.fixed-action-btn').unbind('click');
+    // $('#product-facts-form').submit(loadProductFacts);
+});
+</script>
+{% endblock %}

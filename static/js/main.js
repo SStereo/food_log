@@ -40,3 +40,5 @@ function loadProductFacts() {
   });
 
 };
+
+// Functions for the SHOPPING LIST (sl)
