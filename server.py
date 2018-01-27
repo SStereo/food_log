@@ -39,7 +39,9 @@ from food_database import (Base,
                    Nutrient,
                    ShoppingOrder,
                    ShoppingOrderItem,
-                   FoodMainGroup)
+                   FoodMainGroup,
+                   InventoryItem,
+                   Inventory)
 
 # Application Settings
 UPLOAD_FOLDER = 'upload'
@@ -402,6 +404,56 @@ def showShoppingList():
         return render_template("shoppinglist.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
 
 
+@app.route('/shoppinglist/items', methods = ['GET','POST'])
+def all_shopping_items_handler():
+
+    inventory_items = []
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        inventory_item = InventoryItem(titleDE = title, level = 0)
+        session.add(inventory_item)
+        session.commit()
+        inventory_items.append(inventory_item)
+        return jsonify(inventory_items = [i.serialize for i in inventory_items])
+
+    elif request.method == 'GET':
+        inventory_items = session.query(InventoryItem).all()
+        # TODO: return nested structures including inventory header and user information
+        # with https://flask-marshmallow.readthedocs.io/en/latest/
+        return jsonify(inventory_items = [i.serialize for i in inventory_items])
+
+
+# TODO: Think of combining both endpoints into one
+@app.route('/shoppinglist/item', methods = ['GET','DELETE','PUT'])
+def shopping_item_handler():
+
+    inventory_items = []
+
+    id = request.form.get('id')
+    inventory_item = session.query(InventoryItem).filter_by(id = id).one()
+
+    if request.method == 'GET':
+        inventory_items.append(inventory_item)
+        return jsonify(inventory_items = [i.serialize for i in inventory_items])
+
+    elif request.method == 'DELETE':
+        session.delete(inventory_item)
+        session.commit()
+        return "item deleted"
+
+    elif request.method == 'PUT':
+        titleDE = request.args.get('title')
+        level = request.args.get('level')
+        if titleDE:
+            inventory_item.titleDE = titleDE
+        if level:
+            inventory_item.level = level
+        session.commit()
+        inventory_items.append(inventory_item)
+        return jsonify(inventory_items = [i.serialize for i in inventory_items])
+
+
 @app.route('/meals/add', methods=['GET','POST'])
 def addMeals():
     # required if no user has yet loged in so the dictionary does not have the key
@@ -534,6 +586,7 @@ def showMeal(meal_id):
 def jsonMeals():
     items = session.query(Meal).all()
     return jsonify(Meals=[m.serialize for m in items])
+
 
 # ---------------- User Helper Functions ---------------------------
 # Creates a new user in the database

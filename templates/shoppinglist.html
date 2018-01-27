@@ -9,10 +9,10 @@
   <div class="tabs-wrapper">
       <ul class="nav classic-tabs tabs-orange" role="tablist">
           <li class="nav-item">
-              <a class="nav-link waves-light active" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-plus fa-2x" aria-hidden="true"></i><br> Einzeln</a>
+              <a class="nav-link waves-light" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-heart fa-2x" aria-hidden="true"></i><br> Gerichte</a>
           </li>
           <li class="nav-item">
-              <a class="nav-link waves-light" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-heart fa-2x" aria-hidden="true"></i><br> Gerichte</a>
+              <a class="nav-link waves-light active" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-plus fa-2x" aria-hidden="true"></i><br> Einzeln</a>
           </li>
           <li class="nav-item">
               <a class="nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-2x" aria-hidden="true"></i><br> Liste</a>
@@ -24,35 +24,28 @@
   <div class="tab-content card" id="sl-card1">
 
       <!--Panel 1-->
-      <div class="tab-pane fade in show active" id="panel61" role="tabpanel">
-        <div id="sl-messages"></div>
-
-        <div class="sl-form">
-          <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
-          <button onclick="slNewElement()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
-        </div>
-        <div id="sl-items">
-          <div class="sl-form">
-            <input type="text" class="form-control sl-item" value="Test">
-            <button class="btn btn-default sl-btn"><i class="fa fa-trash mr-1"></i></button>
-          </div>
-          <div class="sl-form">
-            <input type="text" class="form-control sl-item" value="Test2">
-            <button class="btn btn-default sl-btn"><i class="fa fa-trash mr-1"></i></button>
-          </div>
-        </div>
-
-      </div>
-      <!--/.Panel 1-->
-
-      <!--Panel 2-->
-      <div class="tab-pane fade" id="panel62" role="tabpanel">
+      <div class="tab-pane fade" id="panel61" role="tabpanel">
         {% for m in meals %}
           <div class="form-group">
             <input type="checkbox" class="filled-in" id="checkbox{{ loop.index }}">
             <label for="checkbox{{ loop.index }}">{{ m.title }}</label>
           </div>
         {% endfor %}
+      </div>
+      <!--/.Panel 1-->
+
+      <!--Panel 2-->
+      <div class="tab-pane fade in show active" id="panel62" role="tabpanel">
+        <div id="sl-messages"></div>
+
+        <div class="sl-form">
+          <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
+          <button onclick="slSaveData()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
+        </div>
+        <div id="sl-items">
+
+        </div>
+
       </div>
       <!--/.Panel 2-->
 
@@ -81,59 +74,88 @@
 
     $('#myTab a:last').tab('show')
 
-    slAddActionToButtons();
+    slLoadItems();
 
   })
 
-  function slAddActionToButtons() {
-    var btn_del = document.getElementsByClassName("btn btn-default sl-btn");
-    var i;
 
-    for (i = 0; i < btn_del.length; i++) {
-      btn_del[i].onclick = function() {
-        var div = this.parentElement;
-        div.style.display = "none";
+  function slDeleteItem() {
+    var itemrow = this.parentElement;
+    elId = itemrow.id;
+
+    $.ajax({
+      type: 'DELETE',
+      url: '{{ url_for('shopping_item_handler') }}',
+      dataType: 'text',
+      data: {'id' : elId},
+      success: function() {
+        itemrow.style.display = "none";
       }
-    }
+    });
+  }
+
+
+  function slLoadItems() {
+    $.ajax({
+      type: 'GET',
+      url: '{{ url_for('all_shopping_items_handler') }}',
+      dataType: 'json',
+      success: slCreateElements // name of function that processes the response
+    });
   }
 
 
   function slSaveData() {
     var messageDiv = $('#sl-messages');
-    // TODO: follow guide http://blog.teamtreehouse.com/create-ajax-contact-form
-  }
+    var inputData = $('#sl-new-item').val();
 
-  // Create a new list item when clicking on the "Add" button
-  function slNewElement() {
-
-    var inputValue = document.getElementById("sl-new-item").value;
-
-    if (inputValue === '') {
+    if (inputData === '') {
       alert("You must write something!");
     } else {
 
-      var items = document.getElementById("sl-items");
+      $.ajax({
+        type: 'POST',
+        url: '{{ url_for('all_shopping_items_handler') }}',
+        dataType: 'json',
+        data: {'title' : inputData},
+        success: slCreateElements // name of function that processes the response
+      });
+    }
+  }
+
+
+  function slCreateElements(response) {
+    var items = document.getElementById("sl-items");
+    var n;
+    n = response['inventory_items'].length;
+
+    for (var i = 0; i < n; i++) {
+      itemValue = response['inventory_items'][i]['titleDE'];
+      itemId = response['inventory_items'][i]['id'];
+      // Create new Item HTML
       var itemrow = document.createElement("DIV");
       itemrow.className = "sl-form";
+      itemrow.id = itemId;
 
-      var i = document.createElement("INPUT");
-      i.value = inputValue;
-      i.type = "text"
-      i.className = "form-control sl-item";
+      var elInput = document.createElement("INPUT");
+      elInput.value = itemValue;
+      elInput.type = "text"
+      elInput.className = "form-control sl-item";
 
-      var btn = document.createElement("BUTTON");
-      btn.className = "btn btn-default sl-btn";
+      var elButton = document.createElement("BUTTON");
+      elButton.className = "btn btn-default sl-btn";
+      elButton.onclick = slDeleteItem;
 
-      var icon = document.createElement("i");
-      icon.className = "fa fa-trash mr-1";
+      var elIcon = document.createElement("i");
+      elIcon.className = "fa fa-trash mr-1";
 
-      btn.appendChild(icon);
-      itemrow.appendChild(i);
-      itemrow.appendChild(btn);
+      elButton.appendChild(elIcon);
+      itemrow.appendChild(elInput);
+      itemrow.appendChild(elButton);
       items.appendChild(itemrow);
+    };
 
-      slAddActionToButtons();
-    }
+    // TODO: wrong place should not apply for page load
     document.getElementById("sl-new-item").value = "";
 
   }

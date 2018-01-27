@@ -244,11 +244,13 @@ class Inventory(Base):
 
     creator = relationship("User", foreign_keys=[creator_id])
     user_group = relationship("UserGroup", foreign_keys=[user_group_id])
-
+    items = relationship("InventoryItem", back_populates="inventory")
 
 class InventoryItem(Base):
     __tablename__ = 'inventory_items'
     id = Column(Integer, primary_key = True)
+    titleEN = Column(String(80), nullable = True)  # TODO: remove those fields later and replace with good/food_id
+    titleDE = Column(String(80), nullable = True)
     inventory_id = Column(Integer, ForeignKey('inventories.id'))
     food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
     good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
@@ -256,9 +258,24 @@ class InventoryItem(Base):
     re_order_level = Column(Integer, nullable = True)
     re_order_quantity = Column(Integer, nullable = True)
 
-    inventory = relationship("Inventory")
+    inventory = relationship("Inventory", foreign_keys=[inventory_id], back_populates="items")
     food = relationship("Food")
     good = relationship("Goods")
+
+    @property
+    def serialize(self):
+        #Returns object data in easily serializable format
+        return {
+            'id' : self.id,
+            'titleEN' : self.titleEN,
+            'titleDE' : self.titleDE,
+            'inventory_id' : self.inventory_id,
+            'food_id' : self.food_id,
+            'good_id' : self.good_id,
+            'level' : self.level,
+            're_order_level' : self.re_order_level,
+            're_order_quantity' : self.re_order_quantity
+        }
 
 # The shopping list or order with access to a group
 class ShoppingOrder(Base):
