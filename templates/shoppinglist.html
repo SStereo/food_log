@@ -1,34 +1,187 @@
 {% set activeMenuItem = 4 %}
 {% extends "layout.html" %}
+
+
+{% block style %}
+<style>
+
+  /* Styles for the shopping list form */
+
+  #sl-card1 {
+    width: 375px;
+  }
+
+  input[type="text"].sl-item {
+    width: 250px;
+    margin-right: 0px;
+    margin-bottom: 0px;
+    margin-top: 0px;
+    padding: 0px;
+  }
+
+  .sl-form {
+    position: relative;
+  }
+
+  .sl-btn {
+    position: absolute;
+    top: 0;
+    right: 5px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+
+  .dp-meal-image {
+    width: 100px;
+    height: 100px;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    display: inline-block;
+  }
+
+  .sl-success {
+    padding: 1em;
+    margin-bottom: 0.75rem;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+    color: #468847;
+    background-color: #dff0d8;
+    border: 1px solid #d6e9c6;
+    -webkit-border-radius: 4px;
+       -moz-border-radius: 4px;
+            border-radius: 4px;
+  }
+
+  .sl-error {
+    padding: 1em;
+    margin-bottom: 0.75rem;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+    color: #b94a48;
+    background-color: #f2dede;
+    border: 1px solid rgba(185, 74, 72, 0.3);
+    -webkit-border-radius: 4px;
+       -moz-border-radius: 4px;
+            border-radius: 4px;
+  }
+</style>
+{% endblock %}
+
+
 {% block body %}
 <main class="text-center py-5">
-
-
 
   <!-- Nav tabs -->
   <div class="tabs-wrapper">
       <ul class="nav classic-tabs tabs-orange" role="tablist">
           <li class="nav-item">
-              <a class="nav-link waves-light" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-heart fa-2x" aria-hidden="true"></i><br> Gerichte</a>
+              <a class="nav-link waves-light" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-heart fa-2x" aria-hidden="true"></i><br> Speiseplan</a>
           </li>
           <li class="nav-item">
-              <a class="nav-link waves-light active" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-plus fa-2x" aria-hidden="true"></i><br> Einzeln</a>
+              <a class="nav-link waves-light active" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-plus fa-2x" aria-hidden="true"></i><br> Bestand</a>
           </li>
           <li class="nav-item">
-              <a class="nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-2x" aria-hidden="true"></i><br> Liste</a>
+              <a class="nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-2x" aria-hidden="true"></i><br> Einkaufsliste</a>
           </li>
       </ul>
   </div>
 
   <!-- Tab panels -->
-  <div class="tab-content card" id="sl-card1">
-
+  <div class="tab-content" id="sl-card1">
       <!--Panel 1-->
       <div class="tab-pane fade" id="panel61" role="tabpanel">
+
+        <!--Pagination dark grey-->
+        <nav>
+            <ul class="pagination pg-darkgrey">
+                <!--Arrow left-->
+                <li class="page-item">
+                    <a class="page-link" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                        <span class="sr-only">Previous</span>
+                    </a>
+                </li>
+
+                <!--Numbers-->
+                <li class="page-item active"><a class="page-link">Woche {{ diet_plan.week_no }}</a></li>
+                <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 1 }}</a></li>
+                <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 2 }}</a></li>
+
+                <!--Arrow right-->
+                <li class="page-item">
+                    <a class="page-link" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                        <span class="sr-only">Next</span>
+                    </a>
+                </li>
+            </ul>
+            <p><small>{{ diet_plan.start_date }} - {{ diet_plan.end_date}}</small></p>
+        </nav>
+        <!--/Pagination dark grey-->
+
         {% for m in meals %}
-          <div class="form-group">
-            <input type="checkbox" class="filled-in" id="checkbox{{ loop.index }}">
-            <label for="checkbox{{ loop.index }}">{{ m.title }}</label>
+          <div class="card mx-md-1 my-2">
+            <!--Card content-->
+            <div class="card-body">
+
+              <div class="form-group">
+                <div class="view overlay hm-white-slight">
+                  <table>
+                    <tr>
+                      <td><a href="{{ url_for('showMeal', meal_id=m.id) }}">
+                        <div class="dp-meal-image" style="background-image: url('{{url_for('upload_static', filename=m.image)}}');"></div>
+                        </a>
+                      </td>
+                      <td>
+                        <h4 class="card-title">{{ m.title }}</h4>
+                      </td>
+                    </tr>
+                  </table>
+                  <input type="hidden" class="dp-meal-id" value="{{ m.id }}">
+                  <input type="checkbox" data-object="dpitem" data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="planned" name="dp-planned" class="filled-in" id="dp-chkbox{{ loop.index }}">
+                  <label for="dp-chkbox{{ loop.index }}">einplanen</label>
+
+                  <div class="md-form">
+                  <select data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="portions" name="dp-portions" class="mdb-select">
+                      <option value="1">1 Portion</option>
+                      <option value="2">2 Portionen</option>
+                      <option value="3">3 Portionen</option>
+                      <option value="4">4 Portionen</option>
+                      <option value="5">5 Portionen</option>
+                      <option value="6">6 Portionen</option>
+                      <option value="7">7 Portionen</option>
+                      <option value="8">8 Portionen</option>
+                      <option value="9">9 Portionen</option>
+                      <option value="10">10 Portionen</option>
+                      <option value="11">11 Portionen</option>
+                      <option value="12">12 Portionen</option>
+                      <option value="13">13 Portionen</option>
+                      <option value="14">14 Portionen</option>
+                      <option value="15">15 Portionen</option>
+                  </select>
+                  </div>
+                  <div class="md-form">
+                    <input placeholder="Selected date" data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="plan_date" type="text" name="dp-date" class="form-control datepicker">
+                  </div>
+
+
+                    <label for="sl-menu-consumed">konsumiert</label>
+                    <div id="sl-menu-consumed" class="switch">
+                      <label>
+                        nein
+                        <input data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="consumed" name="dp-consumed" type="checkbox">
+                        <span class="lever"></span>
+                        ja
+                      </label>
+
+                </div>
+
+                </div>
+
+              </div>
+            </div>
           </div>
         {% endfor %}
       </div>
@@ -70,29 +223,30 @@
 {% block script %}
 <script>
   // This is a shortform of $(document).ready(function () { ... });
+
   $(function () {
+
+    // Material Select Initialization
+    $('.mdb-select').material_select();
+
+    // Data Picker Initialization
+    $('.datepicker').pickadate();
 
     $('#myTab a:last').tab('show')
 
     slLoadItems();
 
+    dpLoadItems();
+
+    $('input[name=dp-planned]').change(dpSaveItem);
+    $('select[name=dp-portions]').change(dpSaveItem);
+    $('input[name=dp-date]').change(dpSaveItem);
+    $('input[name=dp-consumed]').change(dpSaveItem);
+
   })
 
 
-  function slDeleteItem() {
-    var itemrow = this.parentElement;
-    elId = itemrow.id;
 
-    $.ajax({
-      type: 'DELETE',
-      url: '{{ url_for('shopping_item_handler') }}',
-      dataType: 'text',
-      data: {'id' : elId},
-      success: function() {
-        itemrow.style.display = "none";
-      }
-    });
-  }
 
 
   function slLoadItems() {
@@ -102,6 +256,108 @@
       dataType: 'json',
       success: slCreateElements // name of function that processes the response
     });
+  }
+
+
+  function dpLoadItems() {
+    $.ajax({
+      type: 'GET',
+      url: '{{ url_for('dietplan_handler') }}',
+      dataType: 'json',
+      data: {'diet_plan_id' : {{ diet_plan.id }}},
+      success: dpUpdateElements // name of function that processes the response
+    });
+  }
+
+
+  function dpUpdateElements(response) {
+
+    var n;
+    var elSelector;
+
+    var obj = "diet_plan_items";
+    var key_names = ["diet_plan_id", "meal_id"];
+    var key_values = [];
+    var data_fields = ["planned", "consumed", "plan_date", "portions"]; // "plan_date", "portions",
+    var data_element;
+
+    // Determine number or records
+    n = response['diet_plan_items'].length;
+
+    for (var i = 0; i < n; i++) {
+      // Get Keys
+      meal_id = response['diet_plan_items'][i]['meal_id'];
+      diet_plan_id = response['diet_plan_items'][i]['diet_plan_id'];
+
+      key_values = [];
+      for (var x = 0; x < key_names.length; x++) {
+        key_values.push(response[obj][i][key_names[x]]);
+      }
+
+      for (var y = 0; y < data_fields.length; y++) {
+        data_value = response[obj][i][data_fields[y]];
+        elSelector = "[data-key1='".concat(key_values[0],"'][data-key2='",key_values[1],"'][data-field='",data_fields[y],"']");
+        console.log(elSelector);
+        data_element = $(elSelector);
+
+        SetElementValue(data_element, data_value);
+      }
+
+    }
+    console.log("Update successful");
+  }
+
+
+  function SetElementValue (data_element, data_value) {
+    if (data_element.attr("type") == "checkbox") {
+      data_element.attr("checked", data_value);;
+    }
+    else if (data_element.attr("type") == "text"){
+      data_element.val(data_value);
+    }
+    else if (data_element.prop("tagName") == "SELECT"){
+      var elOption = data_element.find("option[value="+ data_value + "]");
+      elOption.attr('selected',true);
+      // console.log(elOption.attr('selected'));
+      data_element.val(data_value.toString());
+    }
+
+  }
+
+
+  function dpSaveItem() {
+
+    var data_field = $(this).attr("name");
+    if ($(this).attr("type") == "checkbox") {
+      var data_value = $(this).prop("checked");
+    }
+    else {
+      var data_value = $(this).val();
+    }
+
+    var diet_plan_id = parseInt($(this).attr("data-key1"));
+    var meal_id = parseInt($(this).attr("data-key2"));
+
+    console.log(meal_id);
+    console.log(data_field);
+    console.log(data_value);
+    method = 'POST'
+    dataObj = {
+      'diet_plan_id' : diet_plan_id,
+      'meal_id' : meal_id,
+      'FIELD' : data_field,
+      'VALUE' : data_value
+    };
+    $.ajax({
+      type: method,
+      url: '{{ url_for('dietplan_handler') }}',
+      dataType: 'json',
+      data: dataObj,
+      success: function() {
+        console.log("Field saved successfullly.");
+      } // name of function that processes the response
+    });
+
   }
 
 
@@ -121,6 +377,22 @@
         success: slCreateElements // name of function that processes the response
       });
     }
+  }
+
+
+  function slDeleteItem() {
+    var itemrow = this.parentElement;
+    elId = itemrow.id;
+
+    $.ajax({
+      type: 'DELETE',
+      url: '{{ url_for('shopping_item_handler') }}',
+      dataType: 'text',
+      data: {'id' : elId},
+      success: function() {
+        itemrow.style.display = "none";
+      }
+    });
   }
 
 

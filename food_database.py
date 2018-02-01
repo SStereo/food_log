@@ -1,8 +1,7 @@
 # This module uses Object Relational Mapping via sqlalchemy
 # in order to declare the mapping between object classes and
 # database tables. The script creates those database tables.
-import os
-import sys
+
 import datetime
 
 from sqlalchemy import create_engine
@@ -12,18 +11,28 @@ from sqlalchemy import (Column,
                         SmallInteger,
                         String,
                         DateTime,
-                        LargeBinary,
+                        Date,
                         Float,
-                        Boolean,
-                        ForeignKeyConstraint)
+                        Boolean)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-# Required for user password
+# password encryption into hash
 from passlib.apps import custom_app_context as pwd_context
 
-# Declarative Mapping
+# libraries for token generation
+import random
+import string
+from itsdangerous import (TimedJSONWebSignatureSerializer as Serializer,
+                          BadSignature,
+                          SignatureExpired)
+
+# secret key required for encrypting a token
+secret_key = ''.join(
+    random.choice(
+        string.ascii_uppercase + string.digits) for x in range(32))
 
 Base = declarative_base()
+
 
 class User(Base):
     __tablename__ = 'users'
@@ -32,9 +41,7 @@ class User(Base):
     email = Column(String(250), nullable=False)
     picture = Column(String(250), nullable=True)
     username = Column(String(32), index=True)
-    password_hash = Column(String(64))
-    #group_id = Column(Integer, ForeignKey('user_groups.id'), nullable=True)
-    #fk_user_group = ForeignKeyConstraint(['user_groups.id'], ['group_id'])
+    password_hash = Column(String(250))
 
     groups = relationship("UserGroupAssociation", back_populates="user")
     meals = relationship("Meal", cascade="save-update, merge, delete")
@@ -44,6 +51,25 @@ class User(Base):
 
     def verify_password(self, password):
         return pwd_context.verify(password, self.password_hash)
+
+    def generate_auth_token(self, expiration=600):
+        s = Serializer(secret_key, expires_in=expiration)
+        return s.dumps({'id': self.id})
+
+    @staticmethod
+    def verify_auth_token(token):
+        s = Serializer(secret_key)
+        try:
+            # decrypt token using secret key
+            data = s.loads(token)
+        except SignatureExpired:
+            # Valid Token, but expired
+            return None
+        except BadSignature:
+            # Invalid Token
+            return None
+        user_id = data['id']
+        return user_id
 
 
 class UserGroupAssociation(Base):
@@ -97,6 +123,7 @@ class Meal(Base):
     owner = relationship("User", back_populates="meals", foreign_keys=[owner_id])
     user_group = relationship("UserGroup")
     ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
+    diet_plans = relationship("DietPlanItem", back_populates="meal")
 
     @property
     def serialize(self):
@@ -249,12 +276,15 @@ class Inventory(Base):
 class InventoryItem(Base):
     __tablename__ = 'inventory_items'
     id = Column(Integer, primary_key = True)
+    inventory_id = Column(Integer, ForeignKey('inventories.id'))
     titleEN = Column(String(80), nullable = True)  # TODO: remove those fields later and replace with good/food_id
     titleDE = Column(String(80), nullable = True)
-    inventory_id = Column(Integer, ForeignKey('inventories.id'))
+    status = Column(SmallInteger, nullable = True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
     food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
     good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
     level = Column(Integer, nullable = True)
+    need_from_diet_plan = Column(Integer, nullable = True)
+    need_additional = Column(Integer, nullable = True)
     re_order_level = Column(Integer, nullable = True)
     re_order_quantity = Column(Integer, nullable = True)
 
@@ -281,23 +311,33 @@ class InventoryItem(Base):
 class ShoppingOrder(Base):
     __tablename__ = 'shopping_orders'
     id = Column(Integer, primary_key = True)
+    status = Column(SmallInteger, nullable = True)  # 0: closed, 1: open
+    created = Column(DateTime, default = datetime.datetime.utcnow)
+    closed = Column(DateTime, nullable = True)
     creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
-    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = False)
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)
 
     creator = relationship("User")
     user_group = relationship("UserGroup")
+    items = relationship("ShoppingOrderItem")
 
 
 # Items on a shopping list that must be bought / ordered
 class ShoppingOrderItem(Base):
     __tablename__ = 'shopping_order_items'
     id = Column(Integer, primary_key = True)
+    titleEN = Column(String(80), nullable = True)  # TODO: remove those fields later and replace with good/food_id
+    titleDE = Column(String(80), nullable = True)
     shopping_order_id = Column(Integer, ForeignKey('shopping_orders.id'))
     food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
     good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
     quantity = Column(Float, nullable = True)
     quantity_uom = Column(String(5), ForeignKey('units_of_measures.uom'), nullable = True)
-    checkOff = Column(Boolean, default = False)
+    in_basket = Column(Boolean, default = False)
+    in_basket_time = Column(DateTime, nullable = True)
+    in_basket_geo_lon = Column(Float, nullable = True)
+    in_basket_geo_lat = Column(Float, nullable = True)
+    sort_order = Column(SmallInteger, nullable = True)
     item_photo = Column(String, nullable = True)
     barcode_photo = Column(String, nullable = True)
     ingredients_photo = Column(String, nullable = True)
@@ -308,6 +348,56 @@ class ShoppingOrderItem(Base):
     shopping_order = relationship("ShoppingOrder")
     trade_item = relationship("TradeItem")
 
+
+class PlaningPeriodTemplate(Base):
+    __tablename__ = 'planing_period_templates'
+    id = Column(Integer, primary_key = True)
+    start_date = Column(Date, nullable = True)
+    end_date = Column(Date, nullable = True)
+    week_no = Column(SmallInteger, nullable = True)
+
+
+class DietPlan(Base):
+    __tablename__ = 'diet_plans'
+    id = Column(Integer, primary_key = True)
+    creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)
+    start_date = Column(Date, nullable = True)
+    end_date = Column(Date, nullable = True)
+    week_no = Column(SmallInteger, nullable = True)
+
+    items = relationship("DietPlanItem")
+    creator = relationship("User")
+    user_group = relationship("UserGroup")
+
+
+class DietPlanItem(Base):
+    __tablename__ = 'diet_plan_items'
+    id = Column(Integer, primary_key = True)
+    diet_plan_id = Column(Integer, ForeignKey('diet_plans.id'), nullable = False)
+    meal_id = Column(Integer, ForeignKey('meals.id'), nullable = False)
+    planned = Column(Boolean, nullable = False, default = True)
+    plan_date = Column(Date, nullable = True)
+    weekday = Column(SmallInteger, nullable = True)
+    portions = Column(SmallInteger, nullable = True)
+    consumed = Column(Boolean, nullable = True)
+
+    dietplan = relationship("DietPlan")
+    meal = relationship("Meal", back_populates="diet_plans")
+
+    @property
+    def serialize(self):
+        #Returns object data in easily serializable format
+        return {
+            'id' : self.id,
+            'diet_plan_id' : self.diet_plan_id,
+            'plan_date' : self.plan_date,
+            'weekday' : self.weekday,
+            'meal_id' : self.meal_id,
+            'planned' : self.planned,
+            'portions' : self.portions,
+            'consumed' : self.consumed,
+        }
 
 # Items that relate to real products bought in the retail / grocery stores
 class TradeItem(Base):

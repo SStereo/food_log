@@ -30,84 +30,10 @@
         background-color: #4285F4;
       }
 
-      .card.card-cascade {
-        width: 350px;
-        margin-left: auto;
-        margin-right: auto;
-      }
-
-      /*TODO: Create behaviour that for mobile devices the display is block in order to center the items */
-
-      @include media-breakpoint-up(md) {
-        display: block;
-      }
-
-      .card {
-        width: 350px;
-        margin-left: auto;
-        margin-right: auto;
-        display: inline-block;
-        @include media-breakpoint-up(md);
-      }
-
-      /* Styles for the shopping list form */
-
-      #sl-card1 {
-        width: 375px;
-      }
-
-      input[type="text"].sl-item {
-        width: 250px;
-        margin-right: 0px;
-        margin-bottom: 0px;
-        margin-top: 0px;
-        padding: 0px;
-      }
-
-      .sl-form {
-        position: relative;
-      }
-
-      .sl-btn {
-        position: absolute;
-        top: 0;
-        right: 5px;
-        padding-top: 5px;
-        padding-bottom: 5px;
-        padding-left: 15px;
-        padding-right: 15px;
-      }
-
-      .sl-success {
-        padding: 1em;
-        margin-bottom: 0.75rem;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-        color: #468847;
-        background-color: #dff0d8;
-        border: 1px solid #d6e9c6;
-        -webkit-border-radius: 4px;
-           -moz-border-radius: 4px;
-                border-radius: 4px;
-      }
-
-      .sl-error {
-        padding: 1em;
-        margin-bottom: 0.75rem;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-        color: #b94a48;
-        background-color: #f2dede;
-        border: 1px solid rgba(185, 74, 72, 0.3);
-        -webkit-border-radius: 4px;
-           -moz-border-radius: 4px;
-                border-radius: 4px;
-      }
-
     </Style>
+    {% block style %}
+    {% endblock %}
 
-    <script>
-
-
-    </script>
 </head>
 
 <body>

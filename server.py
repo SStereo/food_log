@@ -1,8 +1,10 @@
+# TODO: remove mixure of tabs in spaces for indent - use 4 spaces instead
+
 import os  # required to have access to the Port environment variable
 import json
 
 # Google cloud authentication & configuration
-from oauth2client.client import GoogleCredentials
+# from oauth2client.client import GoogleCredentials
 from google.oauth2 import service_account
 
 from google.cloud import translate  # for google translator api
@@ -14,8 +16,13 @@ from oauth2client.client import FlowExchangeError
 import httplib2
 from flask import make_response
 import requests
-import random, string
+import random
+import string
 from flask import session as login_session  # a dictionary to store information
+
+# used to protect endpoints to require an authenticated user first
+from flask import g  # variable valid for the reuquest only
+from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth, MultiAuth
 
 # National Nutrient Database - United States Department of Agriculture
 import ndb
@@ -23,25 +30,24 @@ import ndb
 # Required to identify the path within an URL, for referrer after login
 from urllib.parse import urlparse
 
-from datetime import datetime  #required for method "now" for file name change
-from flask import Flask, render_template, request, url_for, redirect, flash, jsonify, send_from_directory
-from werkzeug.utils import secure_filename  #required for file upload
+from datetime import date, datetime, timedelta
+from flask import Flask, render_template, request, url_for, redirect, \
+    flash, jsonify, send_from_directory, abort
+from werkzeug.utils import secure_filename  # required for file upload
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from food_database import (Base,
-                   User,
-                   UserGroup,
-                   UOM,
-                   Meal,
-                   Ingredient,
-                   Food,
-                   FoodComposition,
-                   Nutrient,
-                   ShoppingOrder,
-                   ShoppingOrderItem,
-                   FoodMainGroup,
-                   InventoryItem,
-                   Inventory)
+from sqlalchemy.orm.exc import MultipleResultsFound
+from food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
+from food_database import FoodComposition, Nutrient, ShoppingOrder
+from food_database import ShoppingOrderItem, FoodMainGroup
+from food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
+from food_database import TradeItem
+
+# Setup Basic Authenntication handler
+# TODO: Implement: https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/examples/multi_auth.py
+basic_auth = HTTPBasicAuth()
+token_auth = HTTPTokenAuth('Bearer')  # TODO:Enable for Google/FB tokens
+multi_auth = MultiAuth(basic_auth, token_auth)
 
 # Application Settings
 UPLOAD_FOLDER = 'upload'
@@ -50,6 +56,9 @@ ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'gif'])
 app = Flask(__name__)
 app.secret_key = "ABC123"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# User data settings
+FUTURE_DIET_PLANS = 52
 
 # Database connection
 DB_CONNECTION = os.environ.get('DB_CONNECTION')
@@ -64,7 +73,7 @@ jsonString = """{
   "type": "service_account",
   "project_id": "long-memory-188919",
   "private_key_id": "b26b39e14a2375751b5064b77e426243b4625de4",
-  "private_key": \""""+PK+"""\",
+  "private_key": \"""" + PK + """\",
   "client_email": "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
   "client_id": "106478515271128625146",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -73,18 +82,20 @@ jsonString = """{
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
 }"""
 service_account_info = json.loads(jsonString)
-# TODO: Solve scope bug on heroko environment looking at: https://developers.google.com/identity/protocols/googlescopes#languagev1
-# https://developers.google.com/identity/protocols/OAuth2ServiceAccount
-SCOPES = ['https://www.googleapis.com/auth/cloud-language', 'https://www.googleapis.com/auth/cloud-translation']
-google_cloud_credentials = service_account.Credentials.from_service_account_info(
-    service_account_info, scopes=SCOPES)
+SCOPES = ['https://www.googleapis.com/auth/cloud-language',
+          'https://www.googleapis.com/auth/cloud-translation']
+google_cloud_credentials = service_account \
+    .Credentials \
+    .from_service_account_info(
+        service_account_info,
+        scopes=SCOPES)
 
 # Google translate client
-translate_client = translate.Client(target_language='en',credentials=google_cloud_credentials)
+translate_client = translate.Client(target_language='en',
+                                    credentials=google_cloud_credentials)
 
-# Google natural language client
-# TODO: Solve scope bug on heroko environment looking at: https://developers.google.com/identity/protocols/googlescopes#languagev1
-language_client = language.LanguageServiceClient(credentials=google_cloud_credentials)
+language_client = language.LanguageServiceClient(
+    credentials=google_cloud_credentials)
 
 # Google oauth credentials
 GOOGLE_WEB_CLIENT_ID = os.environ.get('GOOGLE_WEB_CLIENT_ID')
@@ -102,39 +113,49 @@ NDB_KEY = os.environ.get('NDB_KEY')
 nutrientDict = {}
 items = session.query(Nutrient)
 for i in items:
-    nutrientDict.update({i.titleEN:i.id})
+    nutrientDict.update({i.titleEN: i.id})
 
 uomDict = {}
 items = session.query(UOM)
 for i in items:
-    uomDict.update({i.uom:i.type})
+    uomDict.update({i.uom: i.type})
+
+
+@app.route('/testpage')
+def testpage():
+    return render_template("testpage.html")
+
 
 # Custom Static folders
 @app.route('/css/<path:filename>')
 def css_static(filename):
     return send_from_directory('static/css', filename)
 
+
 @app.route('/js/<path:filename>')
 def js_static(filename):
     return send_from_directory('static/js', filename)
+
 
 @app.route('/font/<path:filename>')
 def font_static(filename):
     return send_from_directory('static/font', filename)
 
+
 @app.route('/img/<path:filename>')
 def img_static(filename):
     return send_from_directory('static/img', filename)
+
 
 @app.route('/sass/<path:filename>')
 def sass_static(filename):
     return send_from_directory('static/sass', filename)
 
+
 @app.route('/upload/<path:filename>')
 def upload_static(filename):
     return send_from_directory('upload', filename)
 
-# Application Routes
 
 @app.route('/login')
 def showLogin():
@@ -142,10 +163,119 @@ def showLogin():
     redirect_next = urlparse(request.referrer)[2]
     print("Previous page was %s" % redirect_next)
     if redirect_next == '':
-        redirect_next ='/'
-    state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(32))
+        redirect_next = '/'
+    state = ''.join(
+        random.choice(
+            string.ascii_uppercase + string.digits) for x in range(32))
     login_session['state'] = state
-    return render_template("login.html", STATE=state, CLIENT_ID=GOOGLE_WEB_CLIENT_ID, redirect_next=redirect_next)
+    return render_template(
+        "login.html",
+        STATE=state,
+        CLIENT_ID=GOOGLE_WEB_CLIENT_ID,
+        redirect_next=redirect_next)
+
+
+@app.route('/signup', methods=['GET', 'POST'])
+def showSignup():
+    if request.method == 'GET':
+        return render_template("signup.html")
+    elif request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+
+        if username is None or email is None or password is None:
+            abort(400)
+        if 'email' in login_session.keys():
+            abort(400)  # existing User
+        else:
+            login_session['username'] = username
+            login_session['email'] = email
+            login_session['provider'] = 'local'
+            login_session['user_id'] = createUser(login_session, password)
+    return redirect('/')
+
+
+def createUser(login_session, password):
+    if (login_session['provider'] == 'local'):
+        newUser=User(
+        name=login_session['username'],
+        email=login_session['email'])
+
+        newUser.hash_password(password)
+        session.add(newUser)
+        session.commit()
+    else:
+        newUser=User(
+                name=login_session['username'],
+                email=login_session['email'],
+                picture=login_session['picture'])
+        session.add(newUser)
+        session.commit()
+
+    # Initialize required data sets
+    generateDietPlans(newUser.id)
+
+    return newUser.id
+
+
+# Callback function that is reuired by flask-HTTPAuth
+@basic_auth.verify_password
+def verify_password(email, password):
+    user = session.query(User).filter_by(email = email).first()
+    if not user or not user.verify_password(password):
+        return False
+    g.user = user
+    return True
+
+
+# TODO: use this function when clear how to store tokens on the client
+@app.route('/token')
+@basic_auth.login_required
+def get_auth_token():
+    token = g.user.generate_auth_token()
+    return jsonify({'token': token.decode('ascii')})
+
+
+def createUserGroup(user_id):
+
+    newUserGroup = UserGroup(name="Group1")
+    a = UserGroupAssociation(is_owner=True)
+    a.user = session.query(User).filter_by(id=user_id).one()
+    newUserGroup.users.append(a)
+
+    session.add(newUserGroup)
+    session.commit()
+
+    return newUserGroup.id
+
+def listUsersInGroup(group_id):
+
+    g = session.query(UserGroup).filter_by(id=group_id).one()
+
+    for assoc in g.users:
+        print(assoc.user.name)
+
+# Retrieves the user object
+def getUserInfo(user_id):
+    user = session.query(User).filter_by(id=user_id).one()
+    return user
+
+# Retrieves the user id based on an email
+def getUserID(email):
+    try:
+        user = session.query(User).filter_by(email=email).one()
+        return user.id
+    except:
+        return None
+
+# Retrieves the user id based on an email
+def getUserGroupID(user_id):
+    try:
+        user_group = session.query(UserGroup).filter_by(owner=user_id).one()
+        return user_group.id
+    except:
+        return None
 
 
 @app.route('/gconnect', methods=['POST'])
@@ -160,13 +290,11 @@ def gconnect():
 
     try:
         # Upgrade the authorization code into a credentials object
-        # TODO: Replace json file with path variable?
-        #oauth_flow = flow_from_clientsecrets('client_secrets.json', scope='')
-        #oauth_flow.redirect_uri = 'postmessage'
-        oauth_flow = OAuth2WebServerFlow(client_id=GOOGLE_WEB_CLIENT_ID,
-                           client_secret=GOOGLE_CLIENT_SECRET,
-                           scope='',
-                           redirect_uri='postmessage')
+        oauth_flow = OAuth2WebServerFlow(
+            client_id=GOOGLE_WEB_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET,
+            scope='',
+            redirect_uri='postmessage')
 
         credentials = oauth_flow.step2_exchange(code)
     except FlowExchangeError:
@@ -207,8 +335,8 @@ def gconnect():
     stored_access_token = login_session.get('access_token')
     stored_gplus_id = login_session.get('gplus_id')
     if stored_access_token is not None and gplus_id == stored_gplus_id:
-        response = make_response(json.dumps('Current user is already connected.'),
-                                 200)
+        response = make_response(
+            json.dumps('Current user is already connected.'), 200)
         response.headers['Content-Type'] = 'application/json'
         return response
 
@@ -234,7 +362,8 @@ def gconnect():
     user_id = getUserID(login_session['email'])
 
     if not user_id:
-        login_session['user_id'] = createUser(login_session)
+        password = None
+        login_session['user_id'] = createUser(login_session, password)
     else:
         login_session['user_id'] = user_id
 
@@ -244,9 +373,14 @@ def gconnect():
     output += '!</h1>'
     output += '<img src="'
     output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
+    output += ' " style = "width: 300px; height: 300px;border-radius: " \
+        "150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
     flash("you are now logged in as %s" % login_session['username'])
-    print("done!")
+
+    # TODO: add code to generate own server token to be send to client
+    # token = user.generate_auth_token(600)
+    # return jsonify({'token': token.decode('ascii')})
+
     return output
 
 
@@ -268,10 +402,13 @@ def gdisconnect():
         response.headers['Content-Type'] = 'application/json'
         return response
 
-            # TODO: Logout / disconnect does not work correctly unless the browser is closed / the cookie is no longer valid
-            # at the moment it will show as failed to revoke token with a status 400 from google
+        # TODO: Logout / disconnect does not work correctly unless
+        # the browser is closed / the cookie is no longer valid
+        # at the moment it will show as failed to revoke token
+        # with a status 400 from google
     else:
-        response = make_response(json.dumps('Failed to revoke token for given user.'), 400)
+        response = make_response(json.dumps(
+            'Failed to revoke token for given user.'), 400)
         response.headers['Content-Type'] = 'application/json'
         return response
 
@@ -279,32 +416,38 @@ def gdisconnect():
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
     if request.args.get('state') != login_session['state']:
-        response = make_response(json.dumps('Invalid state parameter.'), 401)
+        response = make_response(json.dumps(
+            'Invalid state parameter.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
-    access_token = request.data.decode("utf-8") # .decode("utf-8") added by soeren
+    access_token = request.data.decode("utf-8")
     print("access token: %s" % access_token)
-    url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' % (
-        FACEBOOK_APP_ID, FACEBOOK_SECRET_KEY, access_token)
+    url = 'https://graph.facebook.com/oauth/access_token?' \
+        'grant_type=fb_exchange_token&client_id=%s&' \
+        'client_secret=%s&fb_exchange_token=%s' % (FACEBOOK_APP_ID,
+                                                   FACEBOOK_SECRET_KEY,
+                                                   access_token)
     h = httplib2.Http()
-    result = h.request(url, 'GET')[1].decode("utf-8") # .decode("utf-8") added by soeren
+    result = h.request(url, 'GET')[1].decode("utf-8")
 
     print("Exchange token result: %s" % result)
     # Use token to get user info from API
-    userinfo_url = "https://graph.facebook.com/v2.8/me"
+    # userinfo_url = "https://graph.facebook.com/v2.8/me"
     '''
-        Due to the formatting for the result from the server token exchange we have to
-        split the token first on commas and select the first index which gives us the key : value
-        for the server access token then we split it on colons to pull out the actual token value
-        and replace the remaining quotes with nothing so that it can be used directly in the graph
-        api calls
+        Due to the formatting for the result from the server token
+        exchange we have to split the token first on commas and select the
+        first index which gives us the key : value for the server access token
+        then we split it on colons to pull out the actual token value
+        and replace the remaining quotes with nothing so that it can be used
+        directly in the graph api calls
     '''
     token = result.split(',')[0].split(':')[1].replace('"', '')
 
-    url = 'https://graph.facebook.com/v2.8/me?access_token=%s&fields=name,id,email' % token
+    url = 'https://graph.facebook.com/v2.8/me' \
+        '?access_token=%s&fields=name,id,email' % token
     h = httplib2.Http()
     result = h.request(url, 'GET')[1]
-    print("url sent for API access:%s"% url)
+    print("url sent for API access:%s" % url)
     print("API JSON result: %s" % result)
     data = json.loads(result)
     login_session['provider'] = 'facebook'
@@ -316,7 +459,8 @@ def fbconnect():
     login_session['access_token'] = token
 
     # Get user picture
-    url = 'https://graph.facebook.com/v2.8/me/picture?access_token=%s&redirect=0&height=200&width=200' % token
+    url = 'https://graph.facebook.com/v2.8/me/picture' \
+        '?access_token=%s&redirect=0&height=200&width=200' % token
     h = httplib2.Http()
     result = h.request(url, 'GET')[1]
     data = json.loads(result)
@@ -325,8 +469,10 @@ def fbconnect():
 
     # see if user exists
     user_id = getUserID(login_session['email'])
+
     if not user_id:
-        user_id = createUser(login_session)
+        password = None
+        user_id = createUser(login_session, password)
     login_session['user_id'] = user_id
 
     output = ''
@@ -336,7 +482,8 @@ def fbconnect():
     output += '!</h1>'
     output += '<img src="'
     output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
+    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;" \
+        "-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
 
     flash("Now logged in as %s" % login_session['username'])
     return output
@@ -347,7 +494,8 @@ def fbdisconnect():
     facebook_id = login_session['facebook_id']
     # The access token must me included to successfully logout
     access_token = login_session['access_token']
-    url = 'https://graph.facebook.com/%s/permissions?access_token=%s' % (facebook_id,access_token)
+    url = 'https://graph.facebook.com/%s/permissions?access_token=%s' \
+        % (facebook_id, access_token)
     h = httplib2.Http()
     result = h.request(url, 'DELETE')[1]
     return "you have been logged out"
@@ -361,12 +509,13 @@ def disconnect():
             gdisconnect()
             del login_session['gplus_id']
             del login_session['access_token']
+            del login_session['picture']
         if login_session['provider'] == 'facebook':
             fbdisconnect()
             del login_session['facebook_id']
+            del login_session['picture']
         del login_session['username']
         del login_session['email']
-        del login_session['picture']
         del login_session['user_id']
         del login_session['provider']
         print("You have successfully been logged out.")
@@ -384,24 +533,39 @@ def showHome():
 @app.route('/meals')
 def showMeals():
     meals = session.query(Meal).all()
-    #user = getUserInfo(login_session['user_id'])
-    return render_template("meals.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
+    return render_template(
+        "meals.html",
+        meals=meals,
+        getIngredients=getIngredients,
+        loginSession=login_session)
 
 
 @app.route('/food_facts')
+@multi_auth.login_required
 def showFoodFacts():
     return render_template("food_facts.html")
 
 
 @app.route('/shoppinglist')
+# @token_auth.login_required
 def showShoppingList():
+
     if 'username' not in login_session:
         return redirect ('/login')
         # TODO: return to the intendet page after login or redirect to original URL using request.referrer
     else:
         # TODO: If member of a group filter by group and not by creator
         meals = session.query(Meal).filter_by(owner_id=login_session['user_id']).all()
-        return render_template("shoppinglist.html",meals=meals,getIngredients=getIngredients,loginSession=login_session)
+        #current_date = date.today()
+        # TODO: Fix the fucking query
+        # diet_plan = session.query(DietPlan.id,DietPlan.creator_id,DietPlan.start_date,DietPlan.end_date).\
+                        # filter(DietPlan.creator_id = login_session['user_id'], DietPlan.start_date <= date.today(), DietPlan.end_date >= date.today()).all()
+        diet_plan = session.query(DietPlan).first()
+        if not diet_plan:
+            generateDietPlans(login_session['user_id'])
+            diet_plan = session.query(DietPlan).first()
+        print(diet_plan.start_date)
+        return render_template("shoppinglist.html",meals=meals,diet_plan=diet_plan,getIngredients=getIngredients,loginSession=login_session)
 
 
 @app.route('/shoppinglist/items', methods = ['GET','POST'])
@@ -452,6 +616,63 @@ def shopping_item_handler():
         session.commit()
         inventory_items.append(inventory_item)
         return jsonify(inventory_items = [i.serialize for i in inventory_items])
+
+
+@app.route('/dietplan', methods = ['GET','POST','PUT','DELETE'])
+def dietplan_handler():
+    diet_plan_items = []
+
+    if request.method == 'POST':
+        # TODO: fix
+        diet_plan_id = request.form.get('diet_plan_id')
+        meal_id = request.form.get('meal_id')
+        data_field = request.form.get('FIELD')
+        data_value = request.form.get('VALUE')
+
+        try:
+            diet_plan_item = session.query(DietPlanItem).filter_by(diet_plan_id = diet_plan_id, meal_id = meal_id).one_or_none()
+        except MultipleResultsFound:
+            print("Duplicate dietplans found!!!")
+
+        if diet_plan_item:
+            if data_field == "dp-date": diet_plan_item.plan_date = data_value
+            elif data_field == "dp-portions": diet_plan_item.portions = data_value
+            elif data_field == "dp-consumed": diet_plan_item.consumed = data_value
+            elif data_field == "dp-planned": diet_plan_item.planned = data_value
+            session.commit()
+        else:
+            diet_plan_item = DietPlanItem(
+                diet_plan_id = diet_plan_id,
+                meal_id = meal_id
+                )
+            session.add(diet_plan_item)
+            if data_field == "dp-date": diet_plan_item.plan_date = data_value
+            elif data_field == "dp-portions": diet_plan_item.portions = data_value
+            elif data_field == "dp-consumed": diet_plan_item.consumed = data_value
+            elif data_field == "dp-planned": diet_plan_item.planned = data_value
+            session.commit()
+
+        diet_plan_items.append(diet_plan_item)
+        return jsonify(diet_plan_items = [i.serialize for i in diet_plan_items])
+
+    elif request.method == 'GET':
+        #diet_plan_id = request.form.get('diet_plan_id')
+        diet_plan_id = request.args.get('diet_plan_id')
+        diet_plan_items = session.query(DietPlanItem).filter_by(diet_plan_id=diet_plan_id).all()
+        return jsonify(diet_plan_items = [i.serialize for i in diet_plan_items])
+
+    # TODO: No longer used
+    elif request.method == 'DELETE':
+        diet_plan_id = request.form.get('diet_plan_id')
+        meal_id = request.form.get('meal_id')
+        try:
+            diet_plan_item = session.query(DietPlanItem).filter_by(diet_plan_id = diet_plan_id, meal_id = meal_id).one_or_none()
+        except MultipleResultsFound:
+            print("Duplicate dietplans found!!!")
+
+        session.delete(diet_plan_item)
+        session.commit()
+        return "item deleted"
 
 
 @app.route('/meals/add', methods=['GET','POST'])
@@ -588,57 +809,41 @@ def jsonMeals():
     return jsonify(Meals=[m.serialize for m in items])
 
 
-# ---------------- User Helper Functions ---------------------------
-# Creates a new user in the database
-def createUser(login_session):
-    newUser = User(name=login_session['username'], email=login_session[
-                   'email'], picture=login_session['picture'])
-    session.add(newUser)
+def generateDietPlans(user_id):
+    # Initialize time periods for diet plans
+    # TODO: Ensure no overlapping diet plan periods are generated
+    current_date = date.today()
+    current_weekday = current_date.weekday()
+    d_start = current_date - timedelta(days=current_weekday)
+    obj_diet_plans = []
+
+    for x in range(0, FUTURE_DIET_PLANS):
+        d_from = d_start + timedelta(days=(x*7))
+        d_to = d_start + timedelta(days=(6 + (x*7)))
+        week_no = d_from.isocalendar()[1]
+        obj_diet_plans.append(
+            DietPlan(
+                creator_id=user_id,
+                start_date=d_from,
+                end_date=d_to,
+                week_no=week_no,)
+        )
+    session.add_all(obj_diet_plans)
     session.commit()
-    #user = session.query(User).filter_by(email=login_session['email']).one()
-
-    return newUser.id
 
 
-def createUserGroup(user_id):
-
-    newUserGroup = UserGroup(name="Group1")
-    a = UserGroupAssociation(is_owner=True)
-    a.user = session.query(User).filter_by(id=user_id).one()
-    newUserGroup.users.append(a)
-
-    session.add(newUserGroup)
-    session.commit()
-
-    return newUserGroup.id
-
-def listUsersInGroup(group_id):
-
-    g = session.query(UserGroup).filter_by(id=group_id).one()
-
-    for assoc in g.users:
-        print(assoc.user.name)
-
-# Retrieves the user object
-def getUserInfo(user_id):
-    user = session.query(User).filter_by(id=user_id).one()
-    return user
-
-# Retrieves the user id based on an email
-def getUserID(email):
+@token_auth.verify_token
+def verify_token(token):
+    g.user = None
     try:
-        user = session.query(User).filter_by(email=email).one()
-        return user.id
+        data = jwt.loads(token)
     except:
-        return None
+        return False
+    if 'username' in data:
+        g.user = data['username']
+        return True
+    return False
 
-# Retrieves the user id based on an email
-def getUserGroupID(user_id):
-    try:
-        user_group = session.query(UserGroup).filter_by(owner=user_id).one()
-        return user_group.id
-    except:
-        return None
 
 # Food database helper functions
 def getFood(keyword):

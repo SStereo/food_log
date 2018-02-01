@@ -6,11 +6,13 @@ from food_database import (Base,
                    FoodComposition,
                    Nutrient,
                    ShoppingOrderItem,
-                   User)
+                   User,
+                   PlaningPeriodTemplate)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from datetime import date, datetime, timedelta
 
 #engine = create_engine('postgresql://vagrant:vagrant@127.0.0.1:5432/np')
 engine = create_engine('postgres://njxqkgsvotldpo:0091ec1051866196d42e608aadc421ef9bb58c37d9fcfe0e7bac4e9ce63929f8@ec2-54-228-182-57.eu-west-1.compute.amazonaws.com:5432/ddjblvctcusagj')
@@ -68,6 +70,23 @@ obj_uoms = [
            UOM(uom="kcal",longEN="kilocalories",shortDE="kcal",type="3"),
            UOM(uom="x",longEN="unknown",shortDE="x",type="3")
 ]
+
+
+NUMBER_TIME_PERIODS_GENERATED = 52
+current_date = date.today() # datetime.now()
+current_weekday = current_date.weekday()
+d_start = current_date - timedelta(days=current_weekday)
+obj_time_periods = []
+
+for x in range(0, NUMBER_TIME_PERIODS_GENERATED):
+    d_from = d_start + timedelta(days=(x*7))
+    d_to = d_start + timedelta(days=(6 + (x*7)))
+    week_no = d_from.isocalendar()[1]
+    obj_time_periods.append(
+        PlaningPeriodTemplate(start_date=d_from,end_date=d_to,week_no=week_no)
+    )
+
+
 
 # TODO: change field to say ndb nutrient mapping or so because other database have other terms for lookup
 obj_nutrients = [
@@ -355,4 +374,5 @@ session.add_all(obj_nutrients)
 session.add_all(obj_foods)
 session.add_all(obj_meals)
 session.add_all(obj_ingredients)
+session.add_all(obj_time_periods)
 session.commit()
