@@ -7,7 +7,10 @@ from food_database import (Base,
                    Nutrient,
                    ShoppingOrderItem,
                    User,
-                   PlaningPeriodTemplate)
+                   PlaningPeriodTemplate,
+                   DietPlanItem,
+                   DietPlan,
+                   Place)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -31,6 +34,12 @@ session.commit()
 num_rows_deleted = session.query(Nutrient).delete()
 session.commit()
 
+num_rows_deleted = session.query(DietPlanItem).delete()
+session.commit()
+
+num_rows_deleted = session.query(DietPlan).delete()
+session.commit()
+
 num_rows_deleted = session.query(Food).delete()
 session.commit()
 
@@ -40,8 +49,8 @@ session.commit()
 num_rows_deleted = session.query(UOM).delete()
 session.commit()
 
-num_rows_deleted = session.query(User).delete()
-session.commit()
+# num_rows_deleted = session.query(User).delete()
+# session.commit()
 
 # Create default user
 
@@ -368,6 +377,32 @@ obj_ingredients = [
                       ),
 ]
 
+
+obj_places = [
+    Place(
+        titleEN='NORMA Frauenaurach',
+        titleDE='NORMA Frauenaurach',
+        google_place_id='ChIJe5c7N0H_oUcRg62tY-FBrVA',
+        geo_lat='49.561972',
+        geo_lng='10.961898',
+        ),
+    Place(
+        titleEN='Dorfladen Hüttendorf',
+        titleDE='Dorfladen Hüttendorf',
+        google_place_id='ChIJn3nyUHL_oUcRR_VbmRcwF-w',
+        geo_lat='49.548049',
+        geo_lng='10.961172',
+        ),
+    Place(
+        titleEN='Edeka Neumühle',
+        titleDE='Edeka Neumühle',
+        google_place_id='ChIJ4-bDBrf4oUcRYofAX6KmRUU',
+        geo_lat='49.588103',
+        geo_lng='10.977139',
+        )
+            ]
+
+
 session.add_all(obj_users)
 session.add_all(obj_uoms)
 session.add_all(obj_nutrients)
@@ -375,4 +410,5 @@ session.add_all(obj_foods)
 session.add_all(obj_meals)
 session.add_all(obj_ingredients)
 session.add_all(obj_time_periods)
+session.add_all(obj_places)
 session.commit()

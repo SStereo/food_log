@@ -52,7 +52,7 @@ class User(Base):
     def verify_password(self, password):
         return pwd_context.verify(password, self.password_hash)
 
-    def generate_auth_token(self, expiration=600):
+    def generate_auth_token(self, expiration):
         s = Serializer(secret_key, expires_in=expiration)
         return s.dumps({'id': self.id})
 
@@ -408,6 +408,28 @@ class TradeItem(Base):
     gtin = Column(String(14), nullable = True)
     titleEN = Column(String(80), nullable = False)
     titleDE = Column(String(80), nullable = True)
+
+
+class Place(Base):
+    __tablename__ = 'places'
+    id = Column(Integer, primary_key = True)
+    titleEN = Column(String(80), nullable = False)  # storing google data not allowed except place id
+    titleDE = Column(String(80), nullable = True)
+    google_place_id = Column(String(80), nullable = True)
+    geo_lat = Column(Float, nullable = True)
+    geo_lng = Column(Float, nullable = True)
+
+    @property
+    def serialize(self):
+        #Returns object data in easily serializable format
+        return {
+            'id' : self.id,
+            'titleEN' : self.titleEN,
+            'titleDE' : self.titleDE,
+            'google_place_id' : self.google_place_id,
+            'geo_lat' : self.geo_lat,
+            'geo_lng' : self.geo_lng
+        }
 
 ####### insert at end of file #######
 

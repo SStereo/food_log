@@ -41,7 +41,7 @@ from food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
 from food_database import FoodComposition, Nutrient, ShoppingOrder
 from food_database import ShoppingOrderItem, FoodMainGroup
 from food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
-from food_database import TradeItem
+from food_database import TradeItem, Place
 
 # Setup Basic Authenntication handler
 # TODO: Implement: https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/examples/multi_auth.py
@@ -50,12 +50,13 @@ token_auth = HTTPTokenAuth('Bearer')  # TODO:Enable for Google/FB tokens
 multi_auth = MultiAuth(basic_auth, token_auth)
 
 # Application Settings
-UPLOAD_FOLDER = 'upload'
-ALLOWED_EXTENSIONS = set(['pdf', 'png', 'jpg', 'jpeg', 'gif'])
+
 
 app = Flask(__name__)
 app.secret_key = "ABC123"
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = 'upload'
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # limit to 2MB
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'png', 'jpg', 'jpeg', 'gif'}
 
 # User data settings
 FUTURE_DIET_PLANS = 52
@@ -101,6 +102,9 @@ language_client = language.LanguageServiceClient(
 GOOGLE_WEB_CLIENT_ID = os.environ.get('GOOGLE_WEB_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 
+# Google api key (used for maps), "WTF" required to resolve bug in h.terminal
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY_WTF')
+
 # Facebook oauth credentials
 FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID')
 FACEBOOK_SECRET_KEY = os.environ.get('FACEBOOK_SECRET_KEY')
@@ -124,6 +128,11 @@ for i in items:
 @app.route('/testpage')
 def testpage():
     return render_template("testpage.html")
+
+
+@app.route('/map')
+def map():
+    return render_template("map.html")
 
 
 # Custom Static folders
@@ -276,6 +285,45 @@ def getUserGroupID(user_id):
         return user_group.id
     except:
         return None
+
+
+# TODO: Create generic oauth endpoint
+@app.route('/oauth/<string:provider>', methods=['POST'])
+def providerOauth(provider):
+    # Step 1: Validate State token
+    if request.args.get('state') != login_session['state']:
+        response = make_response(json.dumps('Invalid state parameter.'), 401)
+        response.headers['Content-Type'] = 'application/json'
+        return response
+    # Step 2: Obtain One time authorization code
+    auth_code = request.data
+    # Step 3: Obtain Access Token
+    if provider == 'google':
+        print("provider code")
+    elif provider == 'facebook':
+        print("provider code")
+    else:
+        return 'Unrecognized provider'
+    # Step 4: Validate if user is already logged in
+
+    # Step 5: Store access token and provider user id in login_session
+    login_session['access_token'] = credentials.access_token
+    login_session['provider_user_id'] = gplus_id
+
+    # Step 6: Retrieve user profile information from provider_user_id
+
+    # Step 7: Create local user entry in DB if new User
+    user_id = getUserID(login_session['email'])
+    if not user_id:
+        password = None
+        user_id = createUser(login_session, password)
+    login_session['user_id'] = user_id
+
+    # Step 8: Create another authorization token (TODO: Why??)
+    token = user.generate_auth_token(600)
+
+    # Step 9: Create response back to the client
+    return jsonify({'token': token.decode('ascii')})
 
 
 @app.route('/gconnect', methods=['POST'])
@@ -564,8 +612,13 @@ def showShoppingList():
         if not diet_plan:
             generateDietPlans(login_session['user_id'])
             diet_plan = session.query(DietPlan).first()
-        print(diet_plan.start_date)
-        return render_template("shoppinglist.html",meals=meals,diet_plan=diet_plan,getIngredients=getIngredients,loginSession=login_session)
+        return render_template(
+            "shoppinglist.html",
+            meals=meals,
+            diet_plan=diet_plan,
+            getIngredients=getIngredients,
+            loginSession=login_session,
+            g_api_key=GOOGLE_API_KEY)
 
 
 @app.route('/shoppinglist/items', methods = ['GET','POST'])
@@ -589,17 +642,17 @@ def all_shopping_items_handler():
 
 
 # TODO: Think of combining both endpoints into one
-@app.route('/shoppinglist/item', methods = ['GET','DELETE','PUT'])
+@app.route('/shoppinglist/item', methods=['GET', 'DELETE', 'PUT'])
 def shopping_item_handler():
 
     inventory_items = []
 
     id = request.form.get('id')
-    inventory_item = session.query(InventoryItem).filter_by(id = id).one()
+    inventory_item = session.query(InventoryItem).filter_by(id=id).one()
 
     if request.method == 'GET':
         inventory_items.append(inventory_item)
-        return jsonify(inventory_items = [i.serialize for i in inventory_items])
+        return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
     elif request.method == 'DELETE':
         session.delete(inventory_item)
@@ -615,10 +668,10 @@ def shopping_item_handler():
             inventory_item.level = level
         session.commit()
         inventory_items.append(inventory_item)
-        return jsonify(inventory_items = [i.serialize for i in inventory_items])
+        return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
 
-@app.route('/dietplan', methods = ['GET','POST','PUT','DELETE'])
+@app.route('/dietplan', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def dietplan_handler():
     diet_plan_items = []
 
@@ -630,7 +683,9 @@ def dietplan_handler():
         data_value = request.form.get('VALUE')
 
         try:
-            diet_plan_item = session.query(DietPlanItem).filter_by(diet_plan_id = diet_plan_id, meal_id = meal_id).one_or_none()
+            diet_plan_item = session.query(DietPlanItem).filter_by(
+                diet_plan_id=diet_plan_id,
+                meal_id=meal_id).one_or_none()
         except MultipleResultsFound:
             print("Duplicate dietplans found!!!")
 
@@ -673,6 +728,19 @@ def dietplan_handler():
         session.delete(diet_plan_item)
         session.commit()
         return "item deleted"
+
+
+@app.route('/shoppinglist/map/places', methods = ['GET','POST'])
+def map_places_handler():
+
+    places = []
+
+    if request.method == 'POST':
+        return 'not yet implemented'
+
+    elif request.method == 'GET':
+        places = session.query(Place).all()
+        return jsonify(places = [i.serialize for i in places])
 
 
 @app.route('/meals/add', methods=['GET','POST'])
@@ -802,9 +870,9 @@ def showMeal(meal_id):
     return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
 
 
-# API endpoint
-@app.route('/meals/JSON')
-def jsonMeals():
+# API endpoints
+@app.route('/api/v1/meals')
+def apiMeals():
     items = session.query(Meal).all()
     return jsonify(Meals=[m.serialize for m in items])
 
@@ -927,16 +995,17 @@ def analyze_ingredient(ingredient_text, **kwargs):
     # Create a whole sentence so the language api understands the context
     # and provides better results
     intro_text = {
-        'de':'Die Speise besteht aus',
-        'en':'The meal consists of'
-        }
+        'de': 'Die Speise besteht aus',
+        'en': 'The meal consists of'
+    }
 
     # Using google language api to identify
     # adjectives = processing (pre or at home)
     # nouns = custom UOM and ingredients/food
     # conjunctions = "and", "or", etc. for alternatives
-    # Reference: https://cloud.google.com/natural-language/docs/reference/rest/v1/Token
-    content = ' '.join([intro_text[target_language],ingredient_text])
+    # Reference:
+    # https://cloud.google.com/natural-language/docs/reference/rest/v1/Token
+    content = ' '.join([intro_text[target_language], ingredient_text])
     print("content: %s" % content)
     document = language.types.Document(
         content=content,
@@ -995,7 +1064,7 @@ def analyze_ingredient(ingredient_text, **kwargs):
             if ((index + 1) > skip_intro_words):
                 if token_parse_label == 'NN':
                     case = 3
-                    if return_value == None:
+                    if return_value is None:
                         return_value = token.lemma
                     else:
                         return_value = return_value + ' ' + token.lemma
@@ -1004,7 +1073,7 @@ def analyze_ingredient(ingredient_text, **kwargs):
                     return_value = token.lemma
                 elif (case < 2) and (token_pos_tag == 'NOUN'):
                     case = 1
-                    if return_value == None:
+                    if return_value is None:
                         return_value = token.lemma
                     else:
                         return_value = return_value + ' ' + token.lemma
@@ -1012,6 +1081,7 @@ def analyze_ingredient(ingredient_text, **kwargs):
             index += 1
 
     return return_value
+
 
 def getIngredients(meal_id):
     if meal_id:
@@ -1023,7 +1093,9 @@ def getIngredients(meal_id):
 
 def allowed_file(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+           filename.rsplit('.', 1)[1].lower() in \
+           app.config['ALLOWED_EXTENSIONS']
+
 
 if __name__ == '__main__':
     app.debug = True

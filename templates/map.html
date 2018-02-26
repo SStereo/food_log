@@ -1,0 +1,350 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Hunting Food</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <!-- STATIC folder version -->
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/mdb.min.css" rel="stylesheet">
+    <link href="/static/main_styles.css" rel="stylesheet">
+
+    <Style>
+      .logoXL {
+          /*background: url("/static/obstkorb.jpg")no-repeat center center; */
+          background: url("static/obstkorb.jpg")no-repeat center center;
+          background-size: cover;
+          /*height: 1000px; */
+      }
+
+      .navbar {
+        background-color: rgba(51,105,30,1);
+      }
+
+      .top-nav-collapse {
+        background-color: #4285F4;
+      }
+
+      #map {
+        height: 500px;
+      }
+
+      #location {
+        height: 70px;
+      }
+
+      .classic-tabs li a {
+        margin: 0px;
+        padding: 5px;
+      }
+
+    </style>
+</head>
+
+<body>
+
+  <!--Main Navigation-->
+  <header>
+    <nav class="navbar fixed-top navbar-expand-lg navbar-dark">
+        <a class="navbar-brand" href="#"><strong>HuntingFood.com</strong></a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+
+                <li id="nav-1" class="nav-item">
+                    <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+                </li>
+                <li id="nav-2" class="nav-item">
+                    <a class="nav-link" href="/meals">Meals</a>
+                </li>
+                <li id="nav-3" class="nav-item">
+                    <a class="nav-link" href="/food_facts">Food Facts</a>
+                </li>
+                <li id="nav-3" class="nav-item active">
+                    <a class="nav-link" href="/shoppinglist">Shopping List</a>
+                </li>
+                <li id="nav-4" class="nav-item">
+
+                    <a class="nav-link" href="/disconnect">Logout</a>
+
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+  </header>
+  <div style="height: 10px">
+
+  </div>
+  <!--Main Navigation-->
+
+  <!--Main Layout-->
+
+
+<main class="text-center py-5">
+
+    <!-- Nav tabs -->
+    <div class="tabs-wrapper">
+        <ul class="slim nav classic-tabs tabs-orange" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link waves-light slim" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-heart fa-1x" aria-hidden="true"></i><br> Speiseplan</a>
+            </li>
+            <li class="nav-item">
+                <a class="slim nav-link waves-light active" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-plus fa-1x" aria-hidden="true"></i><br> Bestand</a>
+            </li>
+            <li class="nav-item">
+                <a class="slim nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-1x" aria-hidden="true"></i><br> Einkaufsliste</a>
+            </li>
+            <li class="nav-item">
+                <a class="slim nav-link waves-light" data-toggle="tab" href="#panel64" role="tab"><i class="fa fa-map-marker fa-1x" aria-hidden="true"></i><br> Karte</a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab panels -->
+    <div class="tab-content" id="sl-card1">
+      <!--Panel 4-->
+      <div class="tab-pane fade" id="panel64" role="tabpanel">
+        <div id="location">
+          <div id="marker_title">Rewe</div>
+          <button>zeige Einkaufsliste</button>
+        </div>
+        <div id="map"></div>
+      </div>
+    </div>
+</main>
+
+
+  <!--Main Layout-->
+
+    <!-- SCRIPTS -->
+
+    <script type=text/javascript src="/static/js/jquery-3.2.1.js"></script>
+    <script type=text/javascript src="/static/js/popper.js"></script>
+    <script type=text/javascript src="/static/js/bootstrap.js"></script>
+    <script type=text/javascript src="/static/js/mdb.js"></script>
+    <script type=text/javascript src="/static/js/main.js"></script>
+
+    <!-- Modification of fixed floating button to allow standard click event instead of opening the child items
+        https://mdbootstrap.com/support/bug-button-floating/
+      TODO: Not required in Layout? Re-think better place for this -->
+
+
+<!-- <script type=text/javascript src="/static/js/shoppinglist.js"></script> -->
+<script>
+var map;
+var markers = [];
+
+function mapLoadPlaces() {
+  $.ajax({
+    type: 'GET',
+    url: '/shoppinglist/map/places',
+    dataType: 'json',
+    success: function(response) {
+      var largeInfowindow = new google.maps.InfoWindow();
+      var bounds = new google.maps.LatLngBounds();
+      var places = response['places']
+      var n = places.length;
+      for (var i = 0; i < n; i++) {
+        var position = {lat: places[i].geo_lat, lng: places[i].geo_lng};
+        var title = places[i].titleDE;
+        var marker = new google.maps.Marker({
+          map: map,
+          position: position,
+          title: title,
+          animation: google.maps.Animation.DROP,
+          id: i
+        });
+        markers.push(marker);
+        bounds.extend(marker.position);
+        marker.addListener('click', function() {
+          mapPopulateInfoWindow(this, largeInfowindow);
+        });
+      }
+    map.fitBounds(bounds);
+    }
+  });
+}
+
+
+function mapMakeMarkerIcon(markerColor) {
+  var markerImage = new google.maps.MarkerImage(
+    'http://chart.googleapis.com/chart?chst=d_map_spin&chld=1.15|0|'+markerColor +
+    '|40|_|%E2%80%A2',
+    new google.maps.Size(21, 34),
+    new google.maps.Point(0, 0),
+    new google.maps.Point(10, 34),
+    new google.maps.Size(21, 34));
+  return markerImage
+}
+
+
+function mapPopulateInfoWindow(marker, infowindow) {
+  if (infowindow.marker != marker) {
+    infowindow.marker = marker;
+    infowindow.setContent('<div>' + marker.title + '</div>');
+    infowindow.open(map, marker);
+    // Make sure the marker property is cleared if the infowindo is closed.
+    infowindow.addListener('closeclick', function() {
+      infowindow.setMarker(null);
+    });
+  }
+}
+
+
+function initMap() {
+  var styledMapType = new google.maps.StyledMapType(
+          [
+            {elementType: 'geometry', stylers: [{color: '#ebe3cd'}]},
+            {elementType: 'labels.text.fill', stylers: [{color: '#523735'}]},
+            {elementType: 'labels.text.stroke', stylers: [{color: '#f5f1e6'}]},
+            {
+              featureType: 'administrative',
+              elementType: 'geometry.stroke',
+              stylers: [{color: '#c9b2a6'}]
+            },
+            {
+              featureType: 'administrative.land_parcel',
+              elementType: 'geometry.stroke',
+              stylers: [{color: '#dcd2be'}]
+            },
+            {
+              featureType: 'administrative.land_parcel',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#ae9e90'}]
+            },
+            {
+              featureType: 'landscape.natural',
+              elementType: 'geometry',
+              stylers: [{color: '#dfd2ae'}]
+            },
+            {
+              featureType: 'poi',
+              elementType: 'geometry',
+              stylers: [{color: '#dfd2ae'}]
+            },
+            {
+              featureType: 'poi',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#93817c'}]
+            },
+            {
+              featureType: 'poi.park',
+              elementType: 'geometry.fill',
+              stylers: [{color: '#a5b076'}]
+            },
+            {
+              featureType: 'poi.park',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#447530'}]
+            },
+            {
+              featureType: 'road',
+              elementType: 'geometry',
+              stylers: [{color: '#f5f1e6'}]
+            },
+            {
+              featureType: 'road.arterial',
+              elementType: 'geometry',
+              stylers: [{color: '#fdfcf8'}]
+            },
+            {
+              featureType: 'road.highway',
+              elementType: 'geometry',
+              stylers: [{color: '#f8c967'}]
+            },
+            {
+              featureType: 'road.highway',
+              elementType: 'geometry.stroke',
+              stylers: [{color: '#e9bc62'}]
+            },
+            {
+              featureType: 'road.highway.controlled_access',
+              elementType: 'geometry',
+              stylers: [{color: '#e98d58'}]
+            },
+            {
+              featureType: 'road.highway.controlled_access',
+              elementType: 'geometry.stroke',
+              stylers: [{color: '#db8555'}]
+            },
+            {
+              featureType: 'road.local',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#806b63'}]
+            },
+            {
+              featureType: 'transit.line',
+              elementType: 'geometry',
+              stylers: [{color: '#dfd2ae'}]
+            },
+            {
+              featureType: 'transit.line',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#8f7d77'}]
+            },
+            {
+              featureType: 'transit.line',
+              elementType: 'labels.text.stroke',
+              stylers: [{color: '#ebe3cd'}]
+            },
+            {
+              featureType: 'transit.station',
+              elementType: 'geometry',
+              stylers: [{color: '#dfd2ae'}]
+            },
+            {
+              featureType: 'water',
+              elementType: 'geometry.fill',
+              stylers: [{color: '#11d3c2'}]
+            },
+            {
+              featureType: 'water',
+              elementType: 'labels.text.fill',
+              stylers: [{color: '#92998d'}]
+            }
+          ],
+          {name: 'Styled Map'});
+
+  // Map
+  console.log("Running map");
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 49.557241, lng: 10.957213},
+    zoom: 14,
+    mapTypeControlOptions: {
+       mapTypeIds: ['roadmap', 'satellite', 'styled_map']
+    }
+  });
+
+  //Associate the styled map with the MapTypeId and set it to display.
+   map.mapTypes.set('styled_map', styledMapType);
+   map.setMapTypeId('styled_map');
+
+  // Marker, TODO: Add search criteria so that only nearby points are shown
+  mapLoadPlaces();
+
+  // InfoWindows
+
+  // event listener for InfoWindows
+
+}
+
+</script>
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?v=3&libraries=places&key={{ g_api_key }}&callback=initMap">
+</script>
+
+
+
+</body>
+
+</html>
