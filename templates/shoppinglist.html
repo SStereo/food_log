@@ -101,9 +101,6 @@
           <li class="nav-item">
               <a class="slim nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-1x" aria-hidden="true"></i><br> Einkaufsliste</a>
           </li>
-          <li class="nav-item">
-              <a class="slim nav-link waves-light" data-toggle="tab" href="#panel64" role="tab"><i class="fa fa-map-marker fa-1x" aria-hidden="true"></i><br> Karte</a>
-          </li>
       </ul>
   </div>
 
@@ -228,21 +225,6 @@
       </div>
       <!--/.Panel 3-->
 
-      <!--Panel 4-->
-      <!-- TODO: Make map work with class tab-pane of mdb -->
-      <!-- <div class="tab-pane fade" id="panel64" role="tabpanel"> -->
-      <div id="panel64" role="tabpanel">
-          <div id="location">
-            <input id="search" type="text" placeholder="suche">
-            <div id="marker_title">ausgewählt: Rewe</div>
-            <button>zeige Einkaufsliste</button>
-          </div>
-          <div id="map">
-
-          </div>
-      </div>
-      <!--/.Panel 4-->
-
   </div>
 </main>
 {% endblock %}
@@ -252,7 +234,6 @@
   // This is a shortform of $(document).ready(function () { ... });
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
   var url_dp_items = "{{ url_for('dietplan_handler') }}";
-  var url_map_items = "{{ url_for('map_places_handler') }}";
   var dp_id = {{ diet_plan.id }};
 </script>
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>
@@ -277,9 +258,5 @@
     $('input[name=dp-consumed]').change(dpSaveItem);
 
   })
-</script>
-
-<script async defer
-  src="https://maps.googleapis.com/maps/api/js?v=3&libraries=places&key={{ g_api_key }}&callback=initMap">
 </script>
 {% endblock %}

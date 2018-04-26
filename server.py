@@ -128,7 +128,10 @@ def testpage():
 
 @app.route('/map')
 def map():
-    return render_template("map.html")
+    return render_template(
+        "map.html",
+        loginSession=login_session,
+        g_api_key=GOOGLE_API_KEY)
 
 
 # Custom Static folders
@@ -688,8 +691,8 @@ def dietplan_handler():
         if diet_plan_item:
             if data_field == "dp-date": diet_plan_item.plan_date = data_value
             elif data_field == "dp-portions": diet_plan_item.portions = data_value
-            elif data_field == "dp-consumed": diet_plan_item.consumed = data_value
-            elif data_field == "dp-planned": diet_plan_item.planned = data_value
+            elif data_field == "dp-consumed": diet_plan_item.consumed = str_to_bool(data_value)
+            elif data_field == "dp-planned": diet_plan_item.planned = str_to_bool(data_value)
             session.commit()
         else:
             diet_plan_item = DietPlanItem(
@@ -699,8 +702,8 @@ def dietplan_handler():
             session.add(diet_plan_item)
             if data_field == "dp-date": diet_plan_item.plan_date = data_value
             elif data_field == "dp-portions": diet_plan_item.portions = data_value
-            elif data_field == "dp-consumed": diet_plan_item.consumed = data_value
-            elif data_field == "dp-planned": diet_plan_item.planned = data_value
+            elif data_field == "dp-consumed": diet_plan_item.consumed = str_to_bool(data_value)
+            elif data_field == "dp-planned": diet_plan_item.planned = str_to_bool(data_value)
             session.commit()
 
         diet_plan_items.append(diet_plan_item)
@@ -1091,6 +1094,17 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in \
            app.config['ALLOWED_EXTENSIONS']
+
+
+def str_to_bool(s):
+    """ Required for passing boolean values from html via Ajax to the backend
+    """
+    if (s == 'True') or (s == 'true'):
+        return True
+    elif (s == 'False') or (s == 'false'):
+        return False
+    else:
+        raise ValueError
 
 
 if __name__ == '__main__':
