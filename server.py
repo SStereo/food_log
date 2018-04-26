@@ -44,14 +44,11 @@ from food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
 from food_database import TradeItem, Place
 
 # Setup Basic Authenntication handler
-# TODO: Implement: https://github.com/miguelgrinberg/Flask-HTTPAuth/blob/master/examples/multi_auth.py
 basic_auth = HTTPBasicAuth()
 token_auth = HTTPTokenAuth('Bearer')  # TODO:Enable for Google/FB tokens
 multi_auth = MultiAuth(basic_auth, token_auth)
 
 # Application Settings
-
-
 app = Flask(__name__)
 app.secret_key = "ABC123"
 app.config['UPLOAD_FOLDER'] = 'upload'
@@ -69,20 +66,20 @@ DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
 # Google Cloud Connection
-PK = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
-jsonString = """{
-  "type": "service_account",
-  "project_id": "long-memory-188919",
-  "private_key_id": "b26b39e14a2375751b5064b77e426243b4625de4",
-  "private_key": \"""" + PK + """\",
-  "client_email": "serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com",
-  "client_id": "106478515271128625146",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://accounts.google.com/o/oauth2/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com"
-}"""
-service_account_info = json.loads(jsonString)
+PK_escaped = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
+PK_raw = PK_escaped.replace('\\n', '\n')
+service_account_info = dict(
+    type='service_account',
+    project_id='long-memory-188919',
+    private_key_id='b26b39e14a2375751b5064b77e426243b4625de4',
+    private_key=PK_raw,
+    client_email='serviceaccount-owner@long-memory-188919.iam.gserviceaccount.com',  # noqa
+    client_id='106478515271128625146',
+    auth_uri='https://accounts.google.com/o/oauth2/auth',
+    token_uri='https://accounts.google.com/o/oauth2/token',
+    auth_provider_x509_cert_url='https://www.googleapis.com/oauth2/v1/certs',
+    client_x509_cert_url='https://www.googleapis.com/robot/v1/metadata/x509/serviceaccount-owner%40long-memory-188919.iam.gserviceaccount.com'  # noqa
+)
 SCOPES = ['https://www.googleapis.com/auth/cloud-language',
           'https://www.googleapis.com/auth/cloud-translation']
 google_cloud_credentials = service_account \
@@ -94,7 +91,6 @@ google_cloud_credentials = service_account \
 # Google translate client
 translate_client = translate.Client(target_language='en',
                                     credentials=google_cloud_credentials)
-
 language_client = language.LanguageServiceClient(
     credentials=google_cloud_credentials)
 
@@ -1100,4 +1096,4 @@ def allowed_file(filename):
 if __name__ == '__main__':
     app.debug = True
     port = int(os.environ.get('PORT', 8000))
-    app.run(host='', port=port)
+    app.run(host='0.0.0.0', port=port)
