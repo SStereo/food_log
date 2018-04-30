@@ -115,7 +115,7 @@ var ViewModel = function() {
     var today = new Date();
     var d = new Date();
     var date_range = [];
-    const num_days = 5;
+    const num_days = 7;
     var d_string = '';
     today.setDate(today.getDate() - 1);
     for (var i = 0; i < num_days; i++) {

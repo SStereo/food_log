@@ -7,10 +7,8 @@
 
   /* Styles for the shopping list form */
 
-  #sl-card1 {
-    width: 475px;
-    padding: 0.5rem;
-    height: 100%;
+  .calendar {
+    padding-bottom: 15px;
   }
 
   input[type="text"].sl-item {
@@ -101,89 +99,78 @@
       <!--Panel 1-->
       <div class="tab-pane fade" id="panel61" role="tabpanel">
 
-        <!--Pagination dark grey-->
-        <nav>
-            <ul class="pagination pg-darkgrey">
-                <!--Arrow left-->
-                <li class="page-item">
-                    <a class="page-link" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                        <span class="sr-only">Previous</span>
-                    </a>
-                </li>
+      <div class="container">
 
-                <!--Numbers-->
-                <li class="page-item active"><a class="page-link">Woche {{ diet_plan.week_no }}</a></li>
-                <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 1 }}</a></li>
-                <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 2 }}</a></li>
+          <!--Pagination dark grey-->
+          <nav>
+              <ul class="pagination pg-darkgrey">
+                  <!--Arrow left-->
+                  <li class="page-item">
+                      <a class="page-link" aria-label="Previous">
+                          <span aria-hidden="true">&laquo;</span>
+                          <span class="sr-only">Previous</span>
+                      </a>
+                  </li>
 
-                <!--Arrow right-->
-                <li class="page-item">
-                    <a class="page-link" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                        <span class="sr-only">Next</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
-        <!--/Pagination dark grey-->
+                  <!--Numbers-->
+                  <li class="page-item active"><a class="page-link">Woche {{ diet_plan.week_no }}</a></li>
+                  <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 1 }}</a></li>
+                  <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 2 }}</a></li>
+
+                  <!--Arrow right-->
+                  <li class="page-item">
+                      <a class="page-link" aria-label="Next">
+                          <span aria-hidden="true">&raquo;</span>
+                          <span class="sr-only">Next</span>
+                      </a>
+                  </li>
+              </ul>
+          </nav>
+          <!--/Pagination dark grey-->
+      </div>
 
 
-        <div data-bind="foreach: timeGrid">
-          <div class="card">
-            <div class="card-header">
-              Diet Plan
-            </div>
-            <!--Card content-->
-            <div class="card-body">
-              <h5 class="card-title" data-bind="html: $data.dayShort()"></h5>
+        <div class="container">
+          <div class="row" data-bind="foreach: timeGrid">
+            <div class="col calendar">
+              <div class="card">
 
-              <div class="form-group" data-bind="foreach: $data.dietPlanItems">
-                    <table>
-                      <tr>
-                        <th>done</th>
-                        <th colspan="2">meal</th>
-                        <th>action</th>
-                      </tr>
-                      <tr>
-                        <td>
-                          <div class="form-check">
-                            <input type="checkbox" value="" id="filledInCheckbox1" data-bind="attr: { id: 'consumed' + $data.id() }, checked: consumed">
-                            <label data-bind="attr: { for: 'consumed' + $data.id() }">
+                <div class="card-header">
+                  <h5 class="card-title" data-bind="html: $data.dayShort()"></h5>
+                </div>
 
-                            </label>
-                          </div>
-                        </td>
-                        <td>
-                          <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id"></select>
-                        </td>
-                        <td>
-                          <img class="dp-meal-image" data-bind="attr: { src: '/upload/' + $root.getMealImageURL(meal_id) }">
-                        </td>
-                        <td>
-                          <button type="button" class="btn btn-light" data-bind="click: function(data, event) { $root.removeDietPlanItem($parent, data, event) }">remove</button>
-                        </td>
-                      </tr>
-                    </table>
+                <div data-bind="foreach: $data.dietPlanItems">
+                  <div class="card-body">
+                    <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id"></select>
+                    <img class="dp-meal-image" data-bind="attr: { src: '/upload/' + $root.getMealImageURL(meal_id) }">
+                    <button type="button" class="btn btn-light" data-bind="click: function(data, event) { $root.removeDietPlanItem($parent, data, event) }">remove</button>
+                  </div>
+                </div>
+
+                <div class="card-footer">
+                  <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id_select2add"></select>
+                  <button type="button" class="btn btn-primary" data-bind="click: $root.addDietPlanItem">add</button>
+                </div>
+
               </div>
-              <select class="browser-default" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id_select2add"></select>
-              <button type="button" class="btn btn-primary" data-bind="click: $root.addDietPlanItem">add</button>
             </div>
           </div>
         </div>
-      </div>
       <!--/.Panel 1-->
 
       <!--Panel 2-->
       <div class="tab-pane fade in show active" id="panel62" role="tabpanel">
-        <div id="sl-messages"></div>
 
-        <div class="sl-form">
-          <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
-          <button onclick="slSaveData()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
-        </div>
-        <div id="sl-items">
+        <div class="container">
+          <div id="sl-messages"></div>
 
+          <div class="sl-form">
+            <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
+            <button onclick="slSaveData()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
+          </div>
+          <div id="sl-items">
+
+          </div>
         </div>
 
       </div>
