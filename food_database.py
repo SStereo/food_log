@@ -374,13 +374,11 @@ class DietPlan(Base):
 class DietPlanItem(Base):
     __tablename__ = 'diet_plan_items'
     id = Column(Integer, primary_key = True)
-    diet_plan_id = Column(Integer, ForeignKey('diet_plans.id'), nullable = False)
-    meal_id = Column(Integer, ForeignKey('meals.id'), nullable = False)
-    planned = Column(Boolean, nullable = False, default = True)
-    plan_date = Column(Date, nullable = True)
-    weekday = Column(SmallInteger, nullable = True)
-    portions = Column(SmallInteger, nullable = True)
-    consumed = Column(Boolean, nullable = True)
+    diet_plan_id = Column(Integer, ForeignKey('diet_plans.id'), nullable=False)
+    meal_id = Column(Integer, ForeignKey('meals.id'), nullable=False)
+    plan_date = Column(Date, nullable=False)
+    portions = Column(SmallInteger, nullable=True)
+    consumed = Column(Boolean, nullable=True)
 
     dietplan = relationship("DietPlan")
     meal = relationship("Meal", back_populates="diet_plans")
@@ -392,9 +390,8 @@ class DietPlanItem(Base):
             'id' : self.id,
             'diet_plan_id' : self.diet_plan_id,
             'plan_date' : self.plan_date,
-            'weekday' : self.weekday,
             'meal_id' : self.meal_id,
-            'planned' : self.planned,
+            'meal' : self.meal.title,
             'portions' : self.portions,
             'consumed' : self.consumed,
         }

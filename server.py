@@ -20,6 +20,9 @@ import random
 import string
 from flask import session as login_session  # a dictionary to store information
 
+# required for custom date url parameter for the dietplan get endpoint per day
+from werkzeug.routing import BaseConverter, ValidationError
+
 # used to protect endpoints to require an authenticated user first
 from flask import g  # variable valid for the reuquest only
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth, MultiAuth
@@ -48,12 +51,31 @@ basic_auth = HTTPBasicAuth()
 token_auth = HTTPTokenAuth('Bearer')  # TODO:Enable for Google/FB tokens
 multi_auth = MultiAuth(basic_auth, token_auth)
 
+
+# Custom url date parameter converter for dietplan per day get method
+# TODO: Delete this in case it is not longer needed
+class DateConverter(BaseConverter):
+    """Extracts a ISO8601 date from the path and validates it."""
+
+    regex = r'\d{4}-\d{2}-\d{2}'
+
+    def to_python(self, value):
+        try:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValidationError()
+
+    def to_url(self, value):
+        return value.strftime('%Y-%m-%d')
+
+
 # Application Settings
 app = Flask(__name__)
 app.secret_key = "ABC123"
 app.config['UPLOAD_FOLDER'] = 'upload'
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # limit to 2MB
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'png', 'jpg', 'jpeg', 'gif'}
+app.url_map.converters['date'] = DateConverter
 
 # User data settings
 FUTURE_DIET_PLANS = 52
@@ -670,63 +692,113 @@ def shopping_item_handler():
         return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
 
-@app.route('/dietplan', methods=['GET', 'POST', 'PUT', 'DELETE'])
-def dietplan_handler():
-    diet_plan_items = []
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# API Endpoints
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+@app.route('/api/v1/meals', methods=['GET'])
+def api_v1_meals():
+    if request.method == 'GET':
+        meals = session.query(Meal).filter_by(owner_id=login_session['user_id']).all()
+        return jsonify(meals=[m.serialize for m in meals])
+
+
+@app.route('/api/v1/dietplan/<int:diet_plan_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
+def api_v1_dietplan(diet_plan_id):
+    dp_items = []
+    if request.method == 'GET':
+        plan_date = request.args.get('plan_date')
+        if plan_date:
+            dp_items = session.query(DietPlanItem).filter_by(
+                diet_plan_id=diet_plan_id,
+                plan_date=plan_date).all()
+        else:
+            dp_items = session.query(DietPlanItem).filter_by(
+                diet_plan_id=diet_plan_id).all()
+        return jsonify(diet_plan_items=[i.serialize for i in dp_items])
 
     if request.method == 'POST':
-        # TODO: fix
-        diet_plan_id = request.form.get('diet_plan_id')
+        plan_date = request.form.get('plan_date')
         meal_id = request.form.get('meal_id')
-        data_field = request.form.get('FIELD')
-        data_value = request.form.get('VALUE')
+        consumed = request.form.get('consumed')
+        portions = request.form.get('portions')
 
-        try:
-            diet_plan_item = session.query(DietPlanItem).filter_by(
-                diet_plan_id=diet_plan_id,
-                meal_id=meal_id).one_or_none()
-        except MultipleResultsFound:
-            print("Duplicate dietplans found!!!")
+        if portions is None:
+            portions = None
+        elif not (portions.isnumeric()):
+            portions = None
+        elif portions == '':
+            portions = None
 
-        if diet_plan_item:
-            if data_field == "dp-date": diet_plan_item.plan_date = data_value
-            elif data_field == "dp-portions": diet_plan_item.portions = data_value
-            elif data_field == "dp-consumed": diet_plan_item.consumed = str_to_bool(data_value)
-            elif data_field == "dp-planned": diet_plan_item.planned = str_to_bool(data_value)
-            session.commit()
-        else:
+        if (plan_date) and (meal_id):
             diet_plan_item = DietPlanItem(
-                diet_plan_id = diet_plan_id,
-                meal_id = meal_id
+                diet_plan_id=diet_plan_id,
+                plan_date=plan_date,
+                meal_id=meal_id,
+                consumed=str_to_bool(consumed),
+                portions=portions
                 )
             session.add(diet_plan_item)
-            if data_field == "dp-date": diet_plan_item.plan_date = data_value
-            elif data_field == "dp-portions": diet_plan_item.portions = data_value
-            elif data_field == "dp-consumed": diet_plan_item.consumed = str_to_bool(data_value)
-            elif data_field == "dp-planned": diet_plan_item.planned = str_to_bool(data_value)
             session.commit()
+            dp_item = session.query(DietPlanItem).filter_by(
+                id=diet_plan_item.id).all()
+            return jsonify(diet_plan_item=[i.serialize for i in dp_item])
+        else:
+            response = make_response(json.dumps(
+                'Missing key fields to create a diet plan item (meal_id, plan_date, diet_plan_id).'), 400)
+            response.headers['Content-Type'] = 'application/json'
+            return response
 
-        diet_plan_items.append(diet_plan_item)
-        return jsonify(diet_plan_items = [i.serialize for i in diet_plan_items])
-
-    elif request.method == 'GET':
-        #diet_plan_id = request.form.get('diet_plan_id')
-        diet_plan_id = request.args.get('diet_plan_id')
-        diet_plan_items = session.query(DietPlanItem).filter_by(diet_plan_id=diet_plan_id).all()
-        return jsonify(diet_plan_items = [i.serialize for i in diet_plan_items])
-
-    # TODO: No longer used
-    elif request.method == 'DELETE':
-        diet_plan_id = request.form.get('diet_plan_id')
+    if request.method == 'PUT':
+        plan_date = request.form.get('plan_date')
         meal_id = request.form.get('meal_id')
-        try:
-            diet_plan_item = session.query(DietPlanItem).filter_by(diet_plan_id = diet_plan_id, meal_id = meal_id).one_or_none()
-        except MultipleResultsFound:
-            print("Duplicate dietplans found!!!")
+        id = request.form.get('id')
+        consumed = request.form.get('consumed')
+        portions = request.form.get('portions')
 
-        session.delete(diet_plan_item)
-        session.commit()
-        return "item deleted"
+        if portions is None:
+            portions = None
+        elif not (portions.isnumeric()):
+            portions = None
+        elif portions == '':
+            portions = None
+
+        diet_plan_item = session.query(
+            DietPlanItem).filter_by(id=id).one_or_none()
+
+        if (id) and (diet_plan_item):
+            diet_plan_item.plan_date = plan_date
+            diet_plan_item.meal_id = meal_id
+            diet_plan_item.consumed = str_to_bool(consumed)
+            diet_plan_item.portions = portions
+            session.commit()
+            response = make_response(json.dumps(
+                'Item successfully updated'), 200)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+        else:
+            response = make_response(json.dumps(
+                'Can not change item because item was not found'), 400)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+
+    if request.method == 'DELETE':
+        id = request.form.get('id')
+        diet_plan_item = session.query(
+            DietPlanItem).filter_by(id=id).one_or_none()
+
+        if (id) and (diet_plan_item):
+            session.delete(diet_plan_item)
+            session.commit()
+            response = make_response(json.dumps(
+                'Item successfully deleted'), 200)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+        else:
+            response = make_response(json.dumps(
+                'Can not delete item because item was not found'), 400)
+            response.headers['Content-Type'] = 'application/json'
+            return response
 
 
 @app.route('/shoppinglist/map/places', methods = ['GET','POST'])
@@ -867,13 +939,6 @@ def deleteMeal(meal_id):
 def showMeal(meal_id):
     o = session.query(Meal).filter_by(id=meal_id).one()
     return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
-
-
-# API endpoints
-@app.route('/api/v1/meals')
-def apiMeals():
-    items = session.query(Meal).all()
-    return jsonify(Meals=[m.serialize for m in items])
 
 
 def generateDietPlans(user_id):
@@ -1103,6 +1168,8 @@ def str_to_bool(s):
         return True
     elif (s == 'False') or (s == 'false'):
         return False
+    elif (s == '') or (s is None):
+        return None
     else:
         raise ValueError
 

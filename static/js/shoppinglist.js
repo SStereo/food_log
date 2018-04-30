@@ -9,108 +9,6 @@
   }
 
 
-  function dpLoadItems() {
-    $.ajax({
-      type: 'GET',
-      url: url_dp_items,
-      dataType: 'json',
-      data: {'diet_plan_id' : dp_id},
-      success: dpUpdateElements // name of function that processes the response
-    });
-  }
-
-
-  function dpUpdateElements(response) {
-
-    var n;
-    var elSelector;
-
-    var obj = "diet_plan_items";
-    var key_names = ["diet_plan_id", "meal_id"];
-    var key_values = [];
-    var data_fields = ["planned", "consumed", "plan_date", "portions"]; // "plan_date", "portions",
-    var data_element;
-
-    // Determine number or records
-    n = response['diet_plan_items'].length;
-
-    for (var i = 0; i < n; i++) {
-      // Get Keys
-      meal_id = response['diet_plan_items'][i]['meal_id'];
-      diet_plan_id = response['diet_plan_items'][i]['diet_plan_id'];
-
-      key_values = [];
-      for (var x = 0; x < key_names.length; x++) {
-        key_values.push(response[obj][i][key_names[x]]);
-      }
-
-      for (var y = 0; y < data_fields.length; y++) {
-        data_value = response[obj][i][data_fields[y]];
-        elSelector = "[data-key1='".concat(key_values[0],"'][data-key2='",key_values[1],"'][data-field='",data_fields[y],"']");
-        console.log(elSelector);
-        data_element = $(elSelector);
-
-        SetElementValue(data_element, data_value);
-      }
-
-    }
-    console.log("Update successful");
-  }
-
-
-  function SetElementValue (data_element, data_value) {
-    if (data_element.attr("type") == "checkbox") {
-      data_element.attr("checked", data_value);;
-    }
-    else if (data_element.attr("type") == "text"){
-      data_element.val(data_value);
-    }
-    else if (data_element.prop("tagName") == "SELECT"){
-      var elOption = data_element.find("option[value="+ data_value + "]");
-      elOption.attr('selected',true);
-      // console.log(elOption.attr('selected'));
-      data_element.val(data_value.toString());
-    }
-
-  }
-
-
-  function dpSaveItem() {
-
-    var data_field = $(this).attr("name");
-    if ($(this).attr("type") == "checkbox") {
-      var data_value = $(this).prop("checked");
-    }
-    else {
-      var data_value = $(this).val();
-    }
-
-    var diet_plan_id = parseInt($(this).attr("data-key1"));
-    var meal_id = parseInt($(this).attr("data-key2"));
-
-    console.log(meal_id);
-    console.log(data_field);
-    console.log(data_value);
-    method = 'POST'
-    dataObj = {
-      'diet_plan_id' : diet_plan_id,
-      'meal_id' : meal_id,
-      'FIELD' : data_field,
-      'VALUE' : data_value
-    };
-    $.ajax({
-      type: method,
-      url: url_dp_items,
-      dataType: 'json',
-      data: dataObj,
-      success: function() {
-        console.log("Field saved successfullly.");
-      } // name of function that processes the response
-    });
-
-  }
-
-
   function slSaveData() {
     var messageDiv = $('#sl-messages');
     var inputData = $('#sl-new-item').val();
@@ -181,3 +79,200 @@
     document.getElementById("sl-new-item").value = "";
 
   }
+
+
+  // KNOCKOUT FRAMEWORK IMPLEMENTATION
+
+  // VIEW MODEL
+var ViewModel = function() {
+  var self = this;
+
+  self.meals = ko.observableArray([]);
+  self.selectedWeek = ko.observable('');
+  self.timeGrid = ko.observableArray([]);
+
+  self.loadMeals = function() {
+    $.ajax({
+      type: 'GET',
+      url: url_api_meals,
+      dataType: 'json',
+      success: function(response) {
+        // turn the json string into a javascript object
+        var parsed = response['meals']
+
+        // for each iterable item create a new DietPlanItem observable
+        parsed.forEach( function(item) {
+          self.meals.push( new Meal(item) );
+        });
+      }
+    });
+  }
+
+  self.setViewPeriod = function(startDate, endDate) {
+    self.timeGrid.removeAll();
+
+    // Build date range for dietplan view
+    var today = new Date();
+    var d = new Date();
+    var date_range = [];
+    const num_days = 5;
+    var d_string = '';
+    today.setDate(today.getDate() - 1);
+    for (var i = 0; i < num_days; i++) {
+      today.setDate(today.getDate() + 1);
+      d_string = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
+      date_range.push(d_string);
+    }
+    console.log('View period = ' + date_range);
+
+    // Create a timeGrid for each day in the range
+    date_range.forEach( function(item) {
+
+      // add a day into the timeGrid
+      var timeGridDay = new TimeGridDay(item);
+      self.timeGrid.push( timeGridDay )
+
+      $.ajax({
+        type: 'GET',
+        url: url_dp_details,
+        dataType: 'json',
+        data: {
+          'plan_date' : item
+        },
+        success: function(response) {
+
+          // turn the json string into a javascript object
+          var parsed = response['diet_plan_items'] // JSON.parse(response['diet_plan_items']);
+
+          // for each iterable item create a new DietPlanItem observable
+          parsed.forEach( function(item) {
+            timeGridDay.dietPlanItems.push( new DietPlanItem(item) );
+          });
+        }
+      });
+    });
+  }
+
+  self.removeDietPlanItem = function(parent, data, event) {
+    console.log('removeDietPlanItem(meal_id=' + data.meal_id() + ')');
+
+    $.ajax({
+      type: 'DELETE',
+      url: url_dp_details,
+      dataType: 'json',
+      data: {
+        'id' : data.id(),
+        'diet_plan_id' : dp_id,
+        'meal_id' : data.meal_id(),
+        'plan_date' : data.plan_date(),
+      },
+      success: function(response) {
+        parent.dietPlanItems.remove(data);
+      }
+    });
+  }
+
+  // adds a diet plan item into a day within the timeGrid
+  self.addDietPlanItem = function(data, event) {
+
+    console.log('addDietPlanItem(meal_id=' + data.meal_id_select2add() + ')');
+
+    $.ajax({
+      type: 'POST',
+      url: url_dp_details,
+      dataType: 'json',
+      data: {
+        'diet_plan_id' : dp_id,
+        'meal_id' : data.meal_id_select2add(),
+        'plan_date' : data.date(),
+      },
+      success: function(response) {
+
+        // turn the json string into a javascript object
+        var parsed = response['diet_plan_item']
+
+        // for each iterable item create a new DietPlanItem observable
+        parsed.forEach( function(item) {
+          data.dietPlanItems.push( new DietPlanItem(item) );
+        });
+      }
+    });
+
+  }
+
+  self.getMealImageURL = function(meal_id) {
+    var m = '';
+    m = self.meals().find( function(item) {
+      return item.id() == meal_id();
+    });
+    if (m) {
+      console.log('getMealImageURL(' + meal_id() + ') = '  + m.image());
+      return m.image();
+    } else {
+      return ''
+    }
+  }
+
+  // Initialization
+  self.loadMeals();
+  self.setViewPeriod();
+}
+
+//TODO: this is the only CRUD function sitting outside of the ViewModel -> fix
+function saveDietPlanItem(newValue) {
+  console.log('saveDietPlanItem: newValue = ' + newValue + ', id = ' + this.id());
+
+  $.ajax({
+    type: 'PUT',
+    url: url_dp_details,
+    dataType: 'json',
+    data: {
+      'id' : this.id(),
+      'diet_plan_id' : dp_id,
+      'meal_id' : this.meal_id(),
+      'plan_date' : this.plan_date(),
+      'consumed' : this.consumed(),
+      'portions' : this.portions()
+    },
+    success: function(response) {
+      //TODO: undo changes in case of failure
+      console.log('saveDietPlanItem: success');
+    }
+  });
+
+}
+
+var Meal = function(data) {
+  this.id = ko.observable(data.id);
+  this.title = ko.observable(data.title);
+  this.description = ko.observable(data.description);
+  this.portions = ko.observable(data.portions);
+  this.rating = ko.observable(data.rating);
+  this.image = ko.observable(data.image);
+}
+
+var DietPlanItem = function(data) {
+  this.id = ko.observable(data.id);
+  this.diet_plan_id = ko.observable(data.diet_plan_id);
+  this.meal_id = ko.observable(data.meal_id);
+  this.meal_id.subscribe(saveDietPlanItem, this);
+  this.plan_date = ko.observable(data.plan_date);
+  this.plan_date.subscribe(saveDietPlanItem, this);
+  this.portions = ko.observable(data.portions);
+  this.portions.subscribe(saveDietPlanItem, this);
+  this.consumed = ko.observable(data.consumed);
+  this.consumed.subscribe(saveDietPlanItem, this);
+}
+
+var TimeGridDay = function(data) {
+  this.date = ko.observable(data);
+  this.dayShort = ko.pureComputed(function() {
+    var d = new Date(this.date());
+    return d.toDateString()
+  }, this);
+  this.dietPlanItems = ko.observableArray([]);
+  this.meal_id_select2add = ko.observable();
+}
+
+var vm = new ViewModel();
+ko.applyBindings(vm);

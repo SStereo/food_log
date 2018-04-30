@@ -1,5 +1,5 @@
 {% set activeMenuItem = 4 %}
-{% extends "layout.html" %}
+{% extends "layout2.html" %}
 
 
 {% block style %}
@@ -8,7 +8,7 @@
   /* Styles for the shopping list form */
 
   #sl-card1 {
-    width: 375px;
+    width: 475px;
     padding: 0.5rem;
     height: 100%;
   }
@@ -37,8 +37,8 @@
 
 
   .dp-meal-image {
-    width: 100px;
-    height: 100px;
+    max-width: : 50px;
+    height: 50px;
     background-position: center center;
     background-repeat: no-repeat;
     background-size: cover;
@@ -67,14 +67,6 @@
     -webkit-border-radius: 4px;
        -moz-border-radius: 4px;
             border-radius: 4px;
-  }
-
-  #map {
-    height: 500px;
-  }
-
-  #location {
-    height: 70px;
   }
 
   .classic-tabs li a {
@@ -133,73 +125,52 @@
                     </a>
                 </li>
             </ul>
-            <p><small>{{ diet_plan.start_date }} - {{ diet_plan.end_date}}</small></p>
         </nav>
         <!--/Pagination dark grey-->
 
-        {% for m in meals %}
-          <div class="card mx-md-1 my-2">
+
+        <div data-bind="foreach: timeGrid">
+          <div class="card">
+            <div class="card-header">
+              Diet Plan
+            </div>
             <!--Card content-->
             <div class="card-body">
+              <h5 class="card-title" data-bind="html: $data.dayShort()"></h5>
 
-              <div class="form-group">
-                <div class="view overlay hm-white-slight">
-                  <table>
-                    <tr>
-                      <td><a href="{{ url_for('showMeal', meal_id=m.id) }}">
-                        <div class="dp-meal-image" style="background-image: url('{{url_for('upload_static', filename=m.image)}}');"></div>
-                        </a>
-                      </td>
-                      <td>
-                        <h4 class="card-title">{{ m.title }}</h4>
-                      </td>
-                    </tr>
-                  </table>
-                  <input type="hidden" class="dp-meal-id" value="{{ m.id }}">
-                  <input type="checkbox" data-object="dpitem" data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="planned" name="dp-planned" class="filled-in" id="dp-chkbox{{ loop.index }}">
-                  <label for="dp-chkbox{{ loop.index }}">einplanen</label>
+              <div class="form-group" data-bind="foreach: $data.dietPlanItems">
+                    <table>
+                      <tr>
+                        <th>done</th>
+                        <th colspan="2">meal</th>
+                        <th>action</th>
+                      </tr>
+                      <tr>
+                        <td>
+                          <div class="form-check">
+                            <input type="checkbox" value="" id="filledInCheckbox1" data-bind="attr: { id: 'consumed' + $data.id() }, checked: consumed">
+                            <label data-bind="attr: { for: 'consumed' + $data.id() }">
 
-                  <div class="md-form">
-                  <select data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="portions" name="dp-portions" class="mdb-select">
-                      <option value="1">1 Portion</option>
-                      <option value="2">2 Portionen</option>
-                      <option value="3">3 Portionen</option>
-                      <option value="4">4 Portionen</option>
-                      <option value="5">5 Portionen</option>
-                      <option value="6">6 Portionen</option>
-                      <option value="7">7 Portionen</option>
-                      <option value="8">8 Portionen</option>
-                      <option value="9">9 Portionen</option>
-                      <option value="10">10 Portionen</option>
-                      <option value="11">11 Portionen</option>
-                      <option value="12">12 Portionen</option>
-                      <option value="13">13 Portionen</option>
-                      <option value="14">14 Portionen</option>
-                      <option value="15">15 Portionen</option>
-                  </select>
-                  </div>
-                  <div class="md-form">
-                    <input placeholder="Selected date" data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="plan_date" type="text" name="dp-date" class="form-control datepicker">
-                  </div>
-
-
-                    <label for="sl-menu-consumed">konsumiert</label>
-                    <div id="sl-menu-consumed" class="switch">
-                      <label>
-                        nein
-                        <input data-key1="{{ diet_plan.id }}" data-key2="{{ m.id }}" data-field="consumed" name="dp-consumed" type="checkbox">
-                        <span class="lever"></span>
-                        ja
-                      </label>
-
-                </div>
-
-                </div>
-
+                            </label>
+                          </div>
+                        </td>
+                        <td>
+                          <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id"></select>
+                        </td>
+                        <td>
+                          <img class="dp-meal-image" data-bind="attr: { src: '/upload/' + $root.getMealImageURL(meal_id) }">
+                        </td>
+                        <td>
+                          <button type="button" class="btn btn-light" data-bind="click: function(data, event) { $root.removeDietPlanItem($parent, data, event) }">remove</button>
+                        </td>
+                      </tr>
+                    </table>
               </div>
+              <select class="browser-default" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id_select2add"></select>
+              <button type="button" class="btn btn-primary" data-bind="click: $root.addDietPlanItem">add</button>
             </div>
           </div>
-        {% endfor %}
+        </div>
       </div>
       <!--/.Panel 1-->
 
@@ -231,31 +202,20 @@
 
 {% block script %}
 <script>
-  // This is a shortform of $(document).ready(function () { ... });
+  // Pass the end point urls to the java script module as variables
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
-  var url_dp_items = "{{ url_for('dietplan_handler') }}";
+  var url_api_meals = "{{ url_for('api_v1_meals') }}";
+  var url_dp_details = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
   var dp_id = {{ diet_plan.id }};
 </script>
+<script src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>
 <script>
   $(function () {
 
-    // Material Select Initialization
-    $('.mdb-select').material_select();
-
-    // Data Picker Initialization
-    $('.datepicker').pickadate();
-
     $('#myTab a:last').tab('show')
 
     slLoadItems();
-
-    dpLoadItems();
-
-    $('input[name=dp-planned]').change(dpSaveItem);
-    $('select[name=dp-portions]').change(dpSaveItem);
-    $('input[name=dp-date]').change(dpSaveItem);
-    $('input[name=dp-consumed]').change(dpSaveItem);
 
   })
 </script>
