@@ -80,44 +80,35 @@
 <main class="text-center py-5">
 
   <!-- Nav tabs -->
-  <div class="tabs-wrapper">
-      <ul class="slim nav classic-tabs tabs-orange" role="tablist">
-          <li class="nav-item">
-              <a class="nav-link waves-light slim" data-toggle="tab" href="#panel61" role="tab"><i class="fa fa-heart fa-1x" aria-hidden="true"></i><br> Speiseplan</a>
-          </li>
-          <li class="nav-item">
-              <a class="slim nav-link waves-light active" data-toggle="tab" href="#panel62" role="tab"><i class="fa fa-plus fa-1x" aria-hidden="true"></i><br> Bestand</a>
-          </li>
-          <li class="nav-item">
-              <a class="slim nav-link waves-light" data-toggle="tab" href="#panel63" role="tab"><i class="fa fa-shopping-cart fa-1x" aria-hidden="true"></i><br> Einkaufsliste</a>
-          </li>
-      </ul>
+  <div class="container">
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+      <li class="nav-item">
+        <a class="nav-link active" id="diet_plan-tab" data-toggle="tab" href="#diet_plan" role="tab" aria-controls="dietplan" aria-selected="true"><i class="fa fa-heart fa-1x" aria-hidden="true"></i> Speiseplan</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="inventory-tab" data-toggle="tab" href="#inventory" role="tab" aria-controls="inventory" aria-selected="false"><i class="fa fa-plus fa-1x" aria-hidden="true"></i> Bestand</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="shoppinglist-tab" data-toggle="tab" href="#shoppinglist" role="tab" aria-controls="shoppingslist" aria-selected="false"><i class="fa fa-shopping-cart fa-1x" aria-hidden="true"></i> Einkaufsliste</a>
+      </li>
+    </ul>
   </div>
 
-  <!-- Tab panels -->
-  <div class="tab-content" id="sl-card1">
-      <!--Panel 1-->
-      <div class="tab-pane fade" id="panel61" role="tabpanel">
+  <div class="tab-content" id="myTabContent">
+    <div class="tab-pane fade show active" id="diet_plan" role="tabpanel" aria-labelledby="diet_plan-tab">
 
       <div class="container">
-
-          <!--Pagination dark grey-->
-          <nav>
-              <ul class="pagination pg-darkgrey">
-                  <!--Arrow left-->
+          <nav ria-label="Week-Selector">
+              <ul class="pagination">
                   <li class="page-item">
                       <a class="page-link" aria-label="Previous">
                           <span aria-hidden="true">&laquo;</span>
                           <span class="sr-only">Previous</span>
                       </a>
                   </li>
-
-                  <!--Numbers-->
-                  <li class="page-item active"><a class="page-link">Woche {{ diet_plan.week_no }}</a></li>
-                  <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 1 }}</a></li>
-                  <li class="page-item"><a class="page-link">Woche {{ diet_plan.week_no + 2 }}</a></li>
-
-                  <!--Arrow right-->
+                  <!-- ko foreach: week_range -->
+                  <li class="page-item" data-bind="css: { active: $data.week_number() == $parent.week_selected() }"><a class="page-link" data-bind="click: $parent.changeWeek, text: 'Woche ' + $data.week_number()" href="#"></a></li>
+                  <!-- /ko -->
                   <li class="page-item">
                       <a class="page-link" aria-label="Next">
                           <span aria-hidden="true">&raquo;</span>
@@ -126,63 +117,49 @@
                   </li>
               </ul>
           </nav>
-          <!--/Pagination dark grey-->
       </div>
 
+      <div class="container">
+        <div class="row" data-bind="foreach: timeGrid">
+          <div class="col calendar">
+            <div class="card">
 
-        <div class="container">
-          <div class="row" data-bind="foreach: timeGrid">
-            <div class="col calendar">
-              <div class="card">
-
-                <div class="card-header">
-                  <h5 class="card-title" data-bind="html: $data.dayShort()"></h5>
-                </div>
-
-                <div data-bind="foreach: $data.dietPlanItems">
-                  <div class="card-body">
-                    <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id"></select>
-                    <img class="dp-meal-image" data-bind="attr: { src: '/upload/' + $root.getMealImageURL(meal_id) }">
-                    <button type="button" class="btn btn-light" data-bind="click: function(data, event) { $root.removeDietPlanItem($parent, data, event) }">remove</button>
-                  </div>
-                </div>
-
-                <div class="card-footer">
-                  <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id_select2add"></select>
-                  <button type="button" class="btn btn-primary" data-bind="click: $root.addDietPlanItem">add</button>
-                </div>
-
+              <div class="card-header">
+                <h5 class="card-title" data-bind="html: $data.dayShort()"></h5>
               </div>
+
+              <div data-bind="foreach: $data.dietPlanItems">
+                <div class="card-body">
+                  <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id"></select>
+                  <img class="dp-meal-image" data-bind="attr: { src: '/upload/' + $root.getMealImageURL(meal_id) }">
+                  <button type="button" class="btn btn-light" data-bind="click: function(data, event) { $root.removeDietPlanItem($parent, data, event) }">remove</button>
+                </div>
+              </div>
+
+              <div class="card-footer">
+                <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id_select2add"></select>
+                <button type="button" class="btn btn-primary" data-bind="click: $root.addDietPlanItem">add</button>
+              </div>
+
             </div>
           </div>
         </div>
-      <!--/.Panel 1-->
-
-      <!--Panel 2-->
-      <div class="tab-pane fade in show active" id="panel62" role="tabpanel">
-
-        <div class="container">
-          <div id="sl-messages"></div>
-
-          <div class="sl-form">
-            <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
-            <button onclick="slSaveData()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
-          </div>
-          <div id="sl-items">
-
-          </div>
+      </div>
+    </div>
+    <div class="tab-pane fade" id="inventory" role="tabpanel" aria-labelledby="inventory-tab">
+      <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nihil odit magnam minima, soluta doloribus reiciendis molestiae placeat unde eos molestias. Quisquam aperiam, pariatur. Tempora, placeat ratione porro voluptate odit minima.</p>
+    </div>
+    <div class="tab-pane fade" id="shoppinglist" role="tabpanel" aria-labelledby="shoppinglist-tab">
+      <div class="container">
+        <div id="sl-messages"></div>
+        <div class="sl-form">
+          <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
+          <button onclick="slSaveData()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
         </div>
-
+        <div id="sl-items">
+        </div>
       </div>
-      <!--/.Panel 2-->
-
-      <!--Panel 3-->
-      <div class="tab-pane fade" id="panel63" role="tabpanel">
-          <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nihil odit magnam minima, soluta doloribus reiciendis molestiae placeat unde eos molestias. Quisquam aperiam, pariatur. Tempora, placeat ratione porro voluptate odit minima.</p>
-
-      </div>
-      <!--/.Panel 3-->
-
+    </div>
   </div>
 </main>
 {% endblock %}
@@ -199,8 +176,6 @@
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>
 <script>
   $(function () {
-
-    $('#myTab a:last').tab('show')
 
     slLoadItems();
 

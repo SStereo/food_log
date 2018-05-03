@@ -1,4 +1,19 @@
 
+// Returns the ISO week of the date.
+// source: https://weeknumber.net/how-to/javascript
+DateGetWeek = function(d) {
+  var date = new Date(d.getTime());
+  date.setHours(0, 0, 0, 0);
+  // Thursday in current week decides the year.
+  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+  // January 4 is always in week 1.
+  var week1 = new Date(date.getFullYear(), 0, 4);
+  // Adjust to Thursday in week 1 and count number of weeks from date to week1.
+  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000
+                        - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+
+
   function slLoadItems() {
     $.ajax({
       type: 'GET',
@@ -88,7 +103,8 @@ var ViewModel = function() {
   var self = this;
 
   self.meals = ko.observableArray([]);
-  self.selectedWeek = ko.observable('');
+  self.week_selected = ko.observable('');
+  self.week_range = ko.observableArray([]);
   self.timeGrid = ko.observableArray([]);
 
   self.loadMeals = function() {
@@ -108,29 +124,100 @@ var ViewModel = function() {
     });
   }
 
-  self.setViewPeriod = function(startDate, endDate) {
-    self.timeGrid.removeAll();
+  self.changeWeek = function(data, event) {
+    self.week_selected(data.week_number());
+  }
 
-    // Build date range for dietplan view
-    var today = new Date();
-    var d = new Date();
-    var date_range = [];
+
+//TODO: Finish the init part to separate initialization from change week selector
+  self.initGrid = function() {
+    var start_date = new Date();
+    const week_range_max = 3;
     const num_days = 7;
+
+    // Determine date of first day of the current week
+    var today_weekday = (start_date.getDay() + 6) % 7; // monday is fist not sunday
+    d.setDate(start_date.getDate() - today_weekday);
+
+    // Set current week as selected
+    self.week_selected(DateGetWeek(d));
+
+    // Determine week number range
+    var d2 = new Date(d.getTime());
+    item = {
+      week_number: DateGetWeek(d2),
+      date_first_day: d2.getTime()
+    }
+    self.week_range.push( new GridWeek(item) );
+    for (var i = 1; i < week_range_max; i++) {
+      d2.setDate(d2.getDate() + 7);
+      item = {
+        week_number: DateGetWeek(d2),
+        date_first_day: d2.getTime()
+      }
+      console.log('Date beginning of week = ' + d2.toLocaleDateString());
+      self.week_range.push( new GridWeek(item) );
+    }
+
+  }
+
+
+  self.setViewPeriod = function(start_date) {
+
+    self.timeGrid.removeAll();
+    var date_range = [];
+    var item = '';
     var d_string = '';
-    today.setDate(today.getDate() - 1);
+    var d = new Date();
+    const week_range_max = 3;
+    const num_days = 7;
+
+    // If no start_date defined then set current date
+    if (!start_date) {
+      var start_date = new Date();
+    }
+
+    // Determine date of first day of the current week
+    var today_weekday = (start_date.getDay() + 6) % 7; // monday is fist not sunday
+    d.setDate(start_date.getDate() - today_weekday);
+    console.log('First day of the week = ' + d.toLocaleDateString());
+
+    // Set current week as selected
+    self.week_selected(DateGetWeek(d));
+    console.log('Current week = ' + self.week_selected());
+
+    // Determine week number range
+    var d2 = new Date(d.getTime());
+    item = {
+      week_number: DateGetWeek(d2),
+      date_first_day: d2.getTime()
+    }
+    self.week_range.push( new GridWeek(item) );
+    for (var i = 1; i < week_range_max; i++) {
+      d2.setDate(d2.getDate() + 7);
+      item = {
+        week_number: DateGetWeek(d2),
+        date_first_day: d2.getTime()
+      }
+      console.log('Date beginning of week = ' + d2.toLocaleDateString());
+      self.week_range.push( new GridWeek(item) );
+    }
+
+    // Determine current week date range
+    d.setDate(d.getDate() - 1);
     for (var i = 0; i < num_days; i++) {
-      today.setDate(today.getDate() + 1);
-      d_string = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
+      d.setDate(d.getDate() + 1);
+      d_string = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
       date_range.push(d_string);
     }
-    console.log('View period = ' + date_range);
 
     // Create a timeGrid for each day in the range
     date_range.forEach( function(item) {
 
       // add a day into the timeGrid
-      var timeGridDay = new TimeGridDay(item);
-      self.timeGrid.push( timeGridDay )
+      // TODO: Turn timeGrid into GridWeek (merge)
+      var grid_day = new GridDay(item);
+      self.timeGrid.push( grid_day )
 
       $.ajax({
         type: 'GET',
@@ -146,7 +233,7 @@ var ViewModel = function() {
 
           // for each iterable item create a new DietPlanItem observable
           parsed.forEach( function(item) {
-            timeGridDay.dietPlanItems.push( new DietPlanItem(item) );
+            grid_day.dietPlanItems.push( new DietPlanItem(item) );
           });
         }
       });
@@ -264,7 +351,7 @@ var DietPlanItem = function(data) {
   this.consumed.subscribe(saveDietPlanItem, this);
 }
 
-var TimeGridDay = function(data) {
+var GridDay = function(data) {
   this.date = ko.observable(data);
   this.dayShort = ko.pureComputed(function() {
     var d = new Date(this.date());
@@ -272,6 +359,11 @@ var TimeGridDay = function(data) {
   }, this);
   this.dietPlanItems = ko.observableArray([]);
   this.meal_id_select2add = ko.observable();
+}
+
+var GridWeek = function(data) {
+  this.week_number = ko.observable(data.week_number);
+  this.date_first_day = ko.observable(data.date_first_day);
 }
 
 var vm = new ViewModel();
