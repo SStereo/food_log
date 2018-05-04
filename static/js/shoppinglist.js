@@ -105,7 +105,6 @@ var ViewModel = function() {
   self.meals = ko.observableArray([]);
   self.week_selected = ko.observable('');
   self.week_range = ko.observableArray([]);
-  self.timeGrid = ko.observableArray([]);
 
   self.loadMeals = function() {
     $.ajax({
@@ -113,10 +112,7 @@ var ViewModel = function() {
       url: url_api_meals,
       dataType: 'json',
       success: function(response) {
-        // turn the json string into a javascript object
         var parsed = response['meals']
-
-        // for each iterable item create a new DietPlanItem observable
         parsed.forEach( function(item) {
           self.meals.push( new Meal(item) );
         });
@@ -125,115 +121,85 @@ var ViewModel = function() {
   }
 
   self.changeWeek = function(data, event) {
-    self.week_selected(data.week_number());
+    self.week_selected(data.week_index());
+    self.loadDietPlanItems();
   }
 
-
-//TODO: Finish the init part to separate initialization from change week selector
   self.initGrid = function() {
-    var start_date = new Date();
-    const week_range_max = 3;
-    const num_days = 7;
-
-    // Determine date of first day of the current week
-    var today_weekday = (start_date.getDay() + 6) % 7; // monday is fist not sunday
-    d.setDate(start_date.getDate() - today_weekday);
-
-    // Set current week as selected
-    self.week_selected(DateGetWeek(d));
-
-    // Determine week number range
-    var d2 = new Date(d.getTime());
-    item = {
-      week_number: DateGetWeek(d2),
-      date_first_day: d2.getTime()
-    }
-    self.week_range.push( new GridWeek(item) );
-    for (var i = 1; i < week_range_max; i++) {
-      d2.setDate(d2.getDate() + 7);
-      item = {
-        week_number: DateGetWeek(d2),
-        date_first_day: d2.getTime()
-      }
-      console.log('Date beginning of week = ' + d2.toLocaleDateString());
-      self.week_range.push( new GridWeek(item) );
-    }
-
-  }
-
-
-  self.setViewPeriod = function(start_date) {
-
-    self.timeGrid.removeAll();
-    var date_range = [];
     var item = '';
     var d_string = '';
+    var today = new Date();
     var d = new Date();
     const week_range_max = 3;
     const num_days = 7;
 
-    // If no start_date defined then set current date
-    if (!start_date) {
-      var start_date = new Date();
-    }
-
     // Determine date of first day of the current week
-    var today_weekday = (start_date.getDay() + 6) % 7; // monday is fist not sunday
-    d.setDate(start_date.getDate() - today_weekday);
-    console.log('First day of the week = ' + d.toLocaleDateString());
+    var today_weekday = (today.getDay() + 6) % 7; // monday is fist not sunday
+    d.setDate(today.getDate() - today_weekday);
 
-    // Set current week as selected
-    self.week_selected(DateGetWeek(d));
-    console.log('Current week = ' + self.week_selected());
+    // Make first week the default selected one
+    self.week_selected(0);  // TODO: Find a better way for filtering
 
-    // Determine week number range
+    // ++++++ Generate Week Objects +++++
     var d2 = new Date(d.getTime());
-    item = {
-      week_number: DateGetWeek(d2),
-      date_first_day: d2.getTime()
-    }
-    self.week_range.push( new GridWeek(item) );
-    for (var i = 1; i < week_range_max; i++) {
-      d2.setDate(d2.getDate() + 7);
+    var d3 = new Date();
+    for (var i = 0; i < week_range_max; i++) {
+      date_range = [];
+      // after the first week increment the start day by 7 days
+      if (i > 0) {
+        d2.setDate(d2.getDate() + 7);
+      }
+
+      // Copy start date into other variable
+      d3 = new Date(d2.getTime());
+
+      // Determine all days of week
+      d3.setDate(d3.getDate() - 1);
+      for (var y = 0; y < num_days; y++) {
+        d3.setDate(d3.getDate() + 1);
+        d_string = d3.getFullYear() + '-' + (d3.getMonth() + 1) + '-' + d3.getDate();
+        date_range.push(d_string);
+      }
+
+      // Create a new GridWeek object with initial meta data (item)
       item = {
         week_number: DateGetWeek(d2),
-        date_first_day: d2.getTime()
+        index: i,  // TODO: remove once filter is improved
+        date_first_day: d2.getTime(),
+        date_range: date_range
       }
-      console.log('Date beginning of week = ' + d2.toLocaleDateString());
-      self.week_range.push( new GridWeek(item) );
+      var grid_week = new GridWeek(item);
+      self.week_range.push(grid_week);
+
+      // Create GridDay objects for each day in the date range
+      grid_week.date_range().forEach( function(item) {
+        var grid_day = new GridDay(item);
+        grid_week.grid_days.push( grid_day )
+      })
+
     }
+    // +++++++++++++++++++++++
+  }
 
-    // Determine current week date range
-    d.setDate(d.getDate() - 1);
-    for (var i = 0; i < num_days; i++) {
-      d.setDate(d.getDate() + 1);
-      d_string = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-      date_range.push(d_string);
-    }
-
-    // Create a timeGrid for each day in the range
-    date_range.forEach( function(item) {
-
-      // add a day into the timeGrid
-      // TODO: Turn timeGrid into GridWeek (merge)
-      var grid_day = new GridDay(item);
-      self.timeGrid.push( grid_day )
-
+  self.loadDietPlanItems = function() {
+    var index = self.week_selected();
+    self.week_range()[index].grid_days().forEach( function(item) {
+      // Deletes all dietPlanObjects prior of loading them fresh from the server
+      item.dietPlanItems.removeAll();
+      // Loads data from the REST API
       $.ajax({
         type: 'GET',
         url: url_dp_details,
         dataType: 'json',
         data: {
-          'plan_date' : item
+          'plan_date' : item.date()
         },
         success: function(response) {
-
           // turn the json string into a javascript object
           var parsed = response['diet_plan_items'] // JSON.parse(response['diet_plan_items']);
-
           // for each iterable item create a new DietPlanItem observable
-          parsed.forEach( function(item) {
-            grid_day.dietPlanItems.push( new DietPlanItem(item) );
+          parsed.forEach( function(object) {
+            item.dietPlanItems.push( new DietPlanItem(object) );
           });
         }
       });
@@ -302,7 +268,28 @@ var ViewModel = function() {
 
   // Initialization
   self.loadMeals();
-  self.setViewPeriod();
+  self.initGrid();
+  self.loadDietPlanItems();
+
+  self.selectedGridWeek = ko.computed(function() {
+    // Sets the selected week by filtering on the index
+    var index = self.week_selected();
+    return ko.utils.arrayFilter(self.week_range()[index].grid_days(), function(item) {
+      return true;
+    });
+
+    // TODO: This is NOT WORKING
+    var array = ko.utils.arrayFilter(self.week_range(), function(item) {
+      if (item.week_number() == self.week_selected()) {
+        return true;
+      } else {
+        return false;
+      }
+    });
+    return array.grid_days;
+
+  })
+
 }
 
 //TODO: this is the only CRUD function sitting outside of the ViewModel -> fix
@@ -363,7 +350,10 @@ var GridDay = function(data) {
 
 var GridWeek = function(data) {
   this.week_number = ko.observable(data.week_number);
+  this.week_index = ko.observable(data.index); // TODO: remove once filter is improved
   this.date_first_day = ko.observable(data.date_first_day);
+  this.date_range = ko.observableArray(data.date_range);
+  this.grid_days = ko.observableArray([]);
 }
 
 var vm = new ViewModel();
