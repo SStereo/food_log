@@ -40,8 +40,10 @@ class User(Base):
     name = Column(String(250), nullable=False)
     email = Column(String(250), nullable=False)
     picture = Column(String(250), nullable=True)
-    username = Column(String(32), index=True)
-    password_hash = Column(String(250))
+    provider = Column(String(250), nullable=True)
+    active = Column(Boolean(), default=True)
+    confirmed_at = Column(DateTime())
+    password_hash = Column(String(255))
 
     groups = relationship("UserGroupAssociation", back_populates="user")
     meals = relationship("Meal", cascade="save-update, merge, delete")
@@ -56,20 +58,21 @@ class User(Base):
         s = Serializer(secret_key, expires_in=expiration)
         return s.dumps({'id': self.id})
 
-    @staticmethod
-    def verify_auth_token(token):
-        s = Serializer(secret_key)
-        try:
-            # decrypt token using secret key
-            data = s.loads(token)
-        except SignatureExpired:
-            # Valid Token, but expired
-            return None
-        except BadSignature:
-            # Invalid Token
-            return None
-        user_id = data['id']
-        return user_id
+    # TODO: Understand properties based on Flask-login
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+            return str(self.id)
 
 
 class UserGroupAssociation(Base):
@@ -267,7 +270,7 @@ class Inventory(Base):
     __tablename__ = 'inventories'
     id = Column(Integer, primary_key = True)
     creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
-    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = False)
+    user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)
 
     creator = relationship("User", foreign_keys=[creator_id])
     user_group = relationship("UserGroup", foreign_keys=[user_group_id])
@@ -283,7 +286,7 @@ class InventoryItem(Base):
     food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
     good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
     level = Column(Integer, nullable = True)
-    need_from_diet_plan = Column(Integer, nullable = True)
+    need_from_diet_plan = Column(Integer, nullable = True)  # TODO: enhance? flat need from dietplans does not provide visibility and time clarity to dp elements
     need_additional = Column(Integer, nullable = True)
     re_order_level = Column(Integer, nullable = True)
     re_order_quantity = Column(Integer, nullable = True)

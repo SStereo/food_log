@@ -30,8 +30,11 @@ from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth, MultiAuth
 # National Nutrient Database - United States Department of Agriculture
 import ndb
 
+# required to create a wrapper function for authentication
+from functools import wraps
+
 # Required to identify the path within an URL, for referrer after login
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, url_for, redirect, \
@@ -143,6 +146,203 @@ for i in items:
     uomDict.update({i.uom: i.type})
 
 
+def login_required(func):
+
+    @wraps(func)
+    def decorated_view(*args, **kwargs):
+        if 'user_id' not in login_session:
+            return login()
+        else:
+            return func(*args, **kwargs)
+    return decorated_view
+
+
+def login(*args):
+    if args:
+        message = args[0]
+    else:
+        message = None
+
+    # Generate a new CSRF token
+    app.jinja_env.globals['csrf_token'] = generate_csrf_token()
+
+    if request.referrer:
+        previous_url = urlparse(request.referrer)[2]
+    else:
+        previous_url = '/'
+    target_url = request.url
+    if not target_url or previous_url == '/':
+        target_url = '/'
+    return render_template(
+        "login.html",
+        G_CLIENT_ID=GOOGLE_WEB_CLIENT_ID,
+        F_APP_ID=FACEBOOK_APP_ID,
+        redirect_next=target_url,
+        message=message)
+
+# --------------
+# User Functions
+def createUser(login_session, password):
+    if (login_session['provider'] == 'local'):
+        newUser = User(
+            name=login_session['username'],
+            email=login_session['email'],
+            provider=login_session['provider'])
+        print('Create new local user')
+        newUser.hash_password(password)
+        session.add(newUser)
+        session.commit()
+    else:
+        newUser = User(
+            name=login_session['username'],
+            email=login_session['email'],
+            picture=login_session['picture'],
+            provider=login_session['provider'])
+        session.add(newUser)
+        session.commit()
+
+    # Initialize required data sets
+    generateDietPlans(newUser.id)
+    createInventory(newUser.id)
+
+    return newUser
+
+
+def createUserGroup(user_id):
+
+    newUserGroup = UserGroup(name="Group1")
+    a = UserGroupAssociation(is_owner=True)
+    a.user = session.query(User).filter_by(id=user_id).one()
+    newUserGroup.users.append(a)
+
+    session.add(newUserGroup)
+    session.commit()
+
+    return newUserGroup.id
+
+
+def listUsersInGroup(group_id):
+    g = session.query(UserGroup).filter_by(id=group_id).one()
+
+    for assoc in g.users:
+        print(assoc.user.name)
+
+# Retrieves the user object
+def getUserInfo(user_id):
+    user = session.query(User).filter_by(id=user_id).one()
+    return user
+
+# Retrieves the user id based on an email
+# TODO: Is this function redundant cause of getUser?
+def getUserID(email):
+    try:
+        user = session.query(User).filter_by(email=email).one()
+        return user.id
+    except:
+        return None
+
+# Retrieves the user id based on an email
+def getUserGroupID(user_id):
+    try:
+        user_group = session.query(UserGroup).filter_by(owner=user_id).one()
+        return user_group.id
+    except:
+        return None
+
+# Retrieves the user based on an email
+def getUser(email):
+    try:
+        user = User.query.filter_by(email=email).one()
+        return user
+    except:
+        return None
+
+
+def validateUser(login_session):
+    '''
+    After successfuly 3rd party authentication checks if user
+    is authorized to access the application. Creates a user object if
+    necessary.
+    '''
+    # Validates if user exists and creates if necessary
+    user = getUser(login_session['email'])
+    if not user:
+        password = None
+        user = createUser(login_session, password)
+
+    if not user.active:
+        return False  # user is not authorized
+    else:
+        login_session['user_id'] = user.id
+        login_session['provider'] = user.provider
+        return True  # user is authorized
+
+
+@app.before_request
+def csrf_protect():
+    '''
+    Aborts any post request if csrf token in the form does not match the
+    csrf token stored in the session
+    '''
+    if request.method == "POST":
+        token_from_qs = ''
+        token_from_header = ''
+        token_from_form = ''
+
+        token = login_session['_csrf_token']  # .pop('_csrf_token', None)
+        print("token_from_session %s" % token)
+
+        # token from form (hidden input field)
+        token_from_form = request.form.get('_csrf_token')
+        print("token_from_form %s" % token_from_form)
+
+        # token from ajax post request during 3rd party oauth
+        if 'state' in parse_qs(urlparse(request.url).query):
+            utoken_from_qs = parse_qs(urlparse(request.url).query)['state']
+            print("utoken_from_qs %s" % utoken_from_qs)
+            token_from_qs = utoken_from_qs[0] #  TODO: Find out why in python 2 this part was required: .encode('ascii', 'ignore')
+            print("token_from_qs %s" % token_from_qs)
+        # token from ajax post request as part of header
+        elif 'X-CSRF-Token' in request.headers:
+            token_from_header = request.headers['X-CSRF-Token']
+            print("token_from_header %s" % token_from_header)
+        # TODO: Check when csrf token can be ommitted for REST api calls that are using an api token for security
+
+        if not token:
+            print("Abort due to missing session token")
+            abort(403)
+        elif (token != token_from_form) and (token != token_from_qs) and (token != token_from_header):
+            print("Abort due to incorrect token")
+            abort(403)
+
+
+def generate_csrf_token():
+    if '_csrf_token' not in login_session:
+        print("no csrf token in login session, re-create ..")
+        login_session['_csrf_token'] = ''.join(
+            random.choice(
+                string.ascii_uppercase + string.digits) for x in range(32))
+    elif '_csrf_token' not in app.jinja_env.globals:
+        print("no csrf token in jinja_env, re-create ..")
+        login_session['_csrf_token'] = ''.join(
+            random.choice(
+                string.ascii_uppercase + string.digits) for x in range(32))
+    return login_session['_csrf_token']
+
+
+def welcome():
+    output = ''
+    output += '<h1>Welcome, '
+    output += login_session['username']
+
+    output += '!</h1>'
+    output += '<img src="'
+    output += login_session['picture']
+    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;" \
+        "-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
+    return output
+
+
 @app.route('/testpage')
 def testpage():
     return render_template("testpage.html")
@@ -187,28 +387,28 @@ def upload_static(filename):
     return send_from_directory('upload', filename)
 
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def showLogin():
-    # Generate a random session id and pass it to the login template
-    redirect_next = urlparse(request.referrer)[2]
-    print("Previous page was %s" % redirect_next)
-    if redirect_next == '':
-        redirect_next = '/'
-    state = ''.join(
-        random.choice(
-            string.ascii_uppercase + string.digits) for x in range(32))
-    login_session['state'] = state
-    return render_template(
-        "login.html",
-        STATE=state,
-        CLIENT_ID=GOOGLE_WEB_CLIENT_ID,
-        redirect_next=redirect_next)
-
-
-@app.route('/signup', methods=['GET', 'POST'])
-def showSignup():
     if request.method == 'GET':
-        return render_template("signup.html")
+        return login()
+    elif request.method == 'POST':
+        login_session['email'] = request.form['email']
+        password = request.form['password']
+        user = getUser(login_session['email'])
+        if not user:
+            return login("Unknown username or incorrect password")
+        else:
+            if user.verify_password(password) and validateUser(login_session):
+                flash("User successfully logged in")
+                return redirect('/')
+            else:
+                return login("Unknown username or incorrect password")
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def showRegister():
+    if request.method == 'GET':
+        return render_template("register.html")
     elif request.method == 'POST':
         username = request.form['username']
         email = request.form['email']
@@ -222,90 +422,9 @@ def showSignup():
             login_session['username'] = username
             login_session['email'] = email
             login_session['provider'] = 'local'
-            login_session['user_id'] = createUser(login_session, password)
+            user = createUser(login_session, password)
+            validateUser(login_session)
     return redirect('/')
-
-
-def createUser(login_session, password):
-    if (login_session['provider'] == 'local'):
-        newUser=User(
-        name=login_session['username'],
-        email=login_session['email'])
-
-        newUser.hash_password(password)
-        session.add(newUser)
-        session.commit()
-    else:
-        newUser=User(
-                name=login_session['username'],
-                email=login_session['email'],
-                picture=login_session['picture'])
-        session.add(newUser)
-        session.commit()
-
-    # Initialize required data sets
-    generateDietPlans(newUser.id)
-
-    return newUser.id
-
-
-# Callback function that is reuired by flask-HTTPAuth
-@basic_auth.verify_password
-def verify_password(email, password):
-    user = session.query(User).filter_by(email = email).first()
-    if not user or not user.verify_password(password):
-        return False
-    g.user = user
-    return True
-
-
-# TODO: use this function when clear how to store tokens on the client
-@app.route('/token')
-@basic_auth.login_required
-def get_auth_token():
-    token = g.user.generate_auth_token()
-    return jsonify({'token': token.decode('ascii')})
-
-
-def createUserGroup(user_id):
-
-    newUserGroup = UserGroup(name="Group1")
-    a = UserGroupAssociation(is_owner=True)
-    a.user = session.query(User).filter_by(id=user_id).one()
-    newUserGroup.users.append(a)
-
-    session.add(newUserGroup)
-    session.commit()
-
-    return newUserGroup.id
-
-def listUsersInGroup(group_id):
-
-    g = session.query(UserGroup).filter_by(id=group_id).one()
-
-    for assoc in g.users:
-        print(assoc.user.name)
-
-# Retrieves the user object
-def getUserInfo(user_id):
-    user = session.query(User).filter_by(id=user_id).one()
-    return user
-
-# Retrieves the user id based on an email
-def getUserID(email):
-    try:
-        user = session.query(User).filter_by(email=email).one()
-        return user.id
-    except:
-        return None
-
-# Retrieves the user id based on an email
-def getUserGroupID(user_id):
-    try:
-        user_group = session.query(UserGroup).filter_by(owner=user_id).one()
-        return user_group.id
-    except:
-        return None
 
 
 # TODO: Create generic oauth endpoint
@@ -350,7 +469,7 @@ def providerOauth(provider):
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     # Validate state token
-    if request.args.get('state') != login_session['state']:
+    if request.args.get('state') != login_session['_csrf_token']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
@@ -425,32 +544,14 @@ def gconnect():
     login_session['email'] = data['email']
     login_session['provider'] = 'google'
 
-    # Validates if user already exists in the database
-    # if not it creates a new account in the Database
-
-    user_id = getUserID(login_session['email'])
-
-    if not user_id:
-        password = None
-        login_session['user_id'] = createUser(login_session, password)
+    # Validate user against database
+    if validateUser(login_session):
+        output = welcome()
+        flash("Now logged in as %s" % login_session['username'])
+        return output
     else:
-        login_session['user_id'] = user_id
-
-    output = ''
-    output += '<h1>Welcome, '
-    output += login_session['username']
-    output += '!</h1>'
-    output += '<img src="'
-    output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: " \
-        "150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
-    flash("you are now logged in as %s" % login_session['username'])
-
-    # TODO: add code to generate own server token to be send to client
-    # token = user.generate_auth_token(600)
-    # return jsonify({'token': token.decode('ascii')})
-
-    return output
+        flash('User is not authorized to access this application')
+        return False
 
 
 # DISCONNECT - Revoke a current user's token and reset their login_session
@@ -484,7 +585,7 @@ def gdisconnect():
 
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
-    if request.args.get('state') != login_session['state']:
+    if request.args.get('state') != login_session['_csrf_token']:
         response = make_response(json.dumps(
             'Invalid state parameter.'), 401)
         response.headers['Content-Type'] = 'application/json'
@@ -536,26 +637,14 @@ def fbconnect():
 
     login_session['picture'] = data["data"]["url"]
 
-    # see if user exists
-    user_id = getUserID(login_session['email'])
-
-    if not user_id:
-        password = None
-        user_id = createUser(login_session, password)
-    login_session['user_id'] = user_id
-
-    output = ''
-    output += '<h1>Welcome, '
-    output += login_session['username']
-
-    output += '!</h1>'
-    output += '<img src="'
-    output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;" \
-        "-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
-
-    flash("Now logged in as %s" % login_session['username'])
-    return output
+    # Validate user against database
+    if validateUser(login_session):
+        output = welcome()
+        flash("Now logged in as %s" % login_session['username'])
+        return output
+    else:
+        flash('User is not authorized to access this application')
+        return False
 
 
 @app.route('/fbdisconnect')
@@ -610,36 +699,29 @@ def showMeals():
 
 
 @app.route('/food_facts')
-@multi_auth.login_required
 def showFoodFacts():
     return render_template("food_facts.html")
 
 
 @app.route('/shoppinglist')
-# @token_auth.login_required
+@login_required
 def showShoppingList():
-
-    if 'username' not in login_session:
-        return redirect ('/login')
-        # TODO: return to the intendet page after login or redirect to original URL using request.referrer
-    else:
-        # TODO: If member of a group filter by group and not by creator
-        meals = session.query(Meal).filter_by(owner_id=login_session['user_id']).all()
-        #current_date = date.today()
-        # TODO: Fix the fucking query
-        # diet_plan = session.query(DietPlan.id,DietPlan.creator_id,DietPlan.start_date,DietPlan.end_date).\
-                        # filter(DietPlan.creator_id = login_session['user_id'], DietPlan.start_date <= date.today(), DietPlan.end_date >= date.today()).all()
+    # TODO: If member of a group filter by group and not by creator
+    meals = session.query(Meal).filter_by(
+        owner_id=login_session['user_id']).all()
+    diet_plan = session.query(DietPlan).filter_by(
+        creator_id=login_session['user_id']).first()
+    # diet_plan = session.query(DietPlan).first()
+    if not diet_plan:
+        generateDietPlans(login_session['user_id'])
         diet_plan = session.query(DietPlan).first()
-        if not diet_plan:
-            generateDietPlans(login_session['user_id'])
-            diet_plan = session.query(DietPlan).first()
-        return render_template(
-            "shoppinglist.html",
-            meals=meals,
-            diet_plan=diet_plan,
-            getIngredients=getIngredients,
-            loginSession=login_session,
-            g_api_key=GOOGLE_API_KEY)
+    return render_template(
+        "shoppinglist.html",
+        meals=meals,
+        diet_plan=diet_plan,
+        getIngredients=getIngredients,
+        loginSession=login_session,
+        g_api_key=GOOGLE_API_KEY)
 
 
 @app.route('/shoppinglist/items', methods = ['GET','POST'])
@@ -815,13 +897,8 @@ def map_places_handler():
 
 
 @app.route('/meals/add', methods=['GET','POST'])
+@login_required
 def addMeals():
-    # required if no user has yet loged in so the dictionary does not have the key
-    if 'username' not in login_session:
-        return redirect ('/login')
-        # TODO: return to the intendet page after login or redirect to original URL using request.referrer
-
-
     if request.method == 'POST' and request.form['button'] == "Save":
 
         # ---- FILE HANDLING -----
@@ -961,6 +1038,14 @@ def generateDietPlans(user_id):
                 week_no=week_no,)
         )
     session.add_all(obj_diet_plans)
+    session.commit()
+
+
+def createInventory(user_id):
+    obj_inventory = Inventory(
+        creator_id=user_id
+    )
+    session.add(obj_inventory)
     session.commit()
 
 

@@ -1,7 +1,7 @@
-
+"use strict";
 // Returns the ISO week of the date.
 // source: https://weeknumber.net/how-to/javascript
-DateGetWeek = function(d) {
+var DateGetWeek = function(d) {
   var date = new Date(d.getTime());
   date.setHours(0, 0, 0, 0);
   // Thursday in current week decides the year.
@@ -62,6 +62,8 @@ DateGetWeek = function(d) {
   function slCreateElements(response) {
     var items = document.getElementById("sl-items");
     var n;
+    var itemValue = '';
+    var itemId = '';
     n = response['inventory_items'].length;
 
     for (var i = 0; i < n; i++) {
@@ -99,7 +101,7 @@ DateGetWeek = function(d) {
   // KNOCKOUT FRAMEWORK IMPLEMENTATION
 
   // VIEW MODEL
-var ViewModel = function() {
+var dpViewModel = function() {
   var self = this;
 
   self.meals = ko.observableArray([]);
@@ -126,6 +128,7 @@ var ViewModel = function() {
   }
 
   self.initGrid = function() {
+    var date_range = [];
     var item = '';
     var d_string = '';
     var today = new Date();
@@ -233,6 +236,9 @@ var ViewModel = function() {
     $.ajax({
       type: 'POST',
       url: url_dp_details,
+      headers: {
+        'X-CSRF-TOKEN' : csrf_token
+      },
       dataType: 'json',
       data: {
         'diet_plan_id' : dp_id,
@@ -325,6 +331,24 @@ var Meal = function(data) {
   this.image = ko.observable(data.image);
 }
 
+var GridWeek = function(data) {
+  this.week_number = ko.observable(data.week_number);
+  this.week_index = ko.observable(data.index); // TODO: remove once filter is improved
+  this.date_first_day = ko.observable(data.date_first_day);
+  this.date_range = ko.observableArray(data.date_range);
+  this.grid_days = ko.observableArray([]);
+}
+
+var GridDay = function(data) {
+  this.date = ko.observable(data);
+  this.dayShort = ko.pureComputed(function() {
+    var d = new Date(this.date());
+    return d.toDateString()
+  }, this);
+  this.dietPlanItems = ko.observableArray([]);
+  this.meal_id_select2add = ko.observable();
+}
+
 var DietPlanItem = function(data) {
   this.id = ko.observable(data.id);
   this.diet_plan_id = ko.observable(data.diet_plan_id);
@@ -338,23 +362,10 @@ var DietPlanItem = function(data) {
   this.consumed.subscribe(saveDietPlanItem, this);
 }
 
-var GridDay = function(data) {
-  this.date = ko.observable(data);
-  this.dayShort = ko.pureComputed(function() {
-    var d = new Date(this.date());
-    return d.toDateString()
-  }, this);
-  this.dietPlanItems = ko.observableArray([]);
-  this.meal_id_select2add = ko.observable();
+var invViewModel = function() {
+  var self = this;
+
 }
 
-var GridWeek = function(data) {
-  this.week_number = ko.observable(data.week_number);
-  this.week_index = ko.observable(data.index); // TODO: remove once filter is improved
-  this.date_first_day = ko.observable(data.date_first_day);
-  this.date_range = ko.observableArray(data.date_range);
-  this.grid_days = ko.observableArray([]);
-}
-
-var vm = new ViewModel();
-ko.applyBindings(vm);
+var dpVM = new dpViewModel();
+ko.applyBindings(dpVM, document.getElementById('diet_plan'));

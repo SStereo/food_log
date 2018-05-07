@@ -49,8 +49,8 @@ session.commit()
 num_rows_deleted = session.query(UOM).delete()
 session.commit()
 
-# num_rows_deleted = session.query(User).delete()
-# session.commit()
+num_rows_deleted = session.query(User).delete()
+session.commit()
 
 # Create default user
 
