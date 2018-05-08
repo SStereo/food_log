@@ -55,7 +55,10 @@ session.commit()
 # Create default user
 
 obj_users = [
-            User(name="admin",email="admin@huntingfood.com")
+            User(
+                name="admin",
+                email="admin@huntingfood.com",
+                language="DE")
 ]
 
 

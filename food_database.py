@@ -38,15 +38,22 @@ class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
-    email = Column(String(250), nullable=False)
+    email = Column(String(250), nullable=False, unique=True)
     picture = Column(String(250), nullable=True)
     provider = Column(String(250), nullable=True)
+    provider_id = Column(String(250), nullable=True)
     active = Column(Boolean(), default=True)
     confirmed_at = Column(DateTime())
     password_hash = Column(String(255))
+    language = Column(String(6), nullable=False)
+    default_diet_plan_id = Column(Integer, ForeignKey('diet_plans.id'), nullable=True)
+    default_inventory_id = Column(Integer, ForeignKey('inventories.id'), nullable=True)
 
     groups = relationship("UserGroupAssociation", back_populates="user")
-    meals = relationship("Meal", cascade="save-update, merge, delete")
+    meals = relationship("Meal", cascade="all, delete-orphan")
+    inventories = relationship("Inventory", primaryjoin='User.id == Inventory.creator_id', cascade="all, delete-orphan")
+    diet_plans = relationship("DietPlan", primaryjoin='User.id == DietPlan.creator_id', cascade="all, delete-orphan", back_populates="creator")
+    shopping_order = relationship("ShoppingOrder", cascade="all, delete-orphan")
 
     def hash_password(self, password):
         self.password_hash = pwd_context.encrypt(password)
@@ -125,8 +132,8 @@ class Meal(Base):
 
     owner = relationship("User", back_populates="meals", foreign_keys=[owner_id])
     user_group = relationship("UserGroup")
-    ingredients = relationship("Ingredient", cascade="save-update, merge, delete")
-    diet_plans = relationship("DietPlanItem", back_populates="meal")
+    ingredients = relationship("Ingredient", cascade="all, delete-orphan")
+    diet_plans = relationship("DietPlanItem", back_populates="meal", cascade="all, delete-orphan")
 
     @property
     def serialize(self):
@@ -272,9 +279,9 @@ class Inventory(Base):
     creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
     user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)
 
-    creator = relationship("User", foreign_keys=[creator_id])
+    creator = relationship("User", primaryjoin='User.id == Inventory.creator_id')
     user_group = relationship("UserGroup", foreign_keys=[user_group_id])
-    items = relationship("InventoryItem", back_populates="inventory")
+    items = relationship("InventoryItem", back_populates="inventory", cascade="all, delete-orphan")
 
 class InventoryItem(Base):
     __tablename__ = 'inventory_items'
@@ -300,12 +307,15 @@ class InventoryItem(Base):
         #Returns object data in easily serializable format
         return {
             'id' : self.id,
+            'inventory_id' : self.inventory_id,
             'titleEN' : self.titleEN,
             'titleDE' : self.titleDE,
-            'inventory_id' : self.inventory_id,
+            'status' : self.status,
             'food_id' : self.food_id,
             'good_id' : self.good_id,
             'level' : self.level,
+            'need_from_diet_plan' : self.need_from_diet_plan,
+            'need_additional' : self.need_additional,
             're_order_level' : self.re_order_level,
             're_order_quantity' : self.re_order_quantity
         }
@@ -322,7 +332,7 @@ class ShoppingOrder(Base):
 
     creator = relationship("User")
     user_group = relationship("UserGroup")
-    items = relationship("ShoppingOrderItem")
+    items = relationship("ShoppingOrderItem", cascade="all, delete-orphan")
 
 
 # Items on a shopping list that must be bought / ordered
@@ -365,12 +375,9 @@ class DietPlan(Base):
     id = Column(Integer, primary_key = True)
     creator_id = Column(Integer,ForeignKey('users.id'), nullable = False)
     user_group_id = Column(Integer,ForeignKey('user_groups.id'), nullable = True)
-    start_date = Column(Date, nullable = True)
-    end_date = Column(Date, nullable = True)
-    week_no = Column(SmallInteger, nullable = True)
 
-    items = relationship("DietPlanItem")
-    creator = relationship("User")
+    items = relationship("DietPlanItem", cascade="all, delete-orphan")
+    creator = relationship("User", primaryjoin='User.id == DietPlan.creator_id')
     user_group = relationship("UserGroup")
 
 

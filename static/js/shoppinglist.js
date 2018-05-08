@@ -192,7 +192,7 @@ var dpViewModel = function() {
       // Loads data from the REST API
       $.ajax({
         type: 'GET',
-        url: url_dp_details,
+        url: url_api_dietplan,
         dataType: 'json',
         data: {
           'plan_date' : item.date()
@@ -214,7 +214,7 @@ var dpViewModel = function() {
 
     $.ajax({
       type: 'DELETE',
-      url: url_dp_details,
+      url: url_api_dietplan,
       dataType: 'json',
       data: {
         'id' : data.id(),
@@ -235,7 +235,7 @@ var dpViewModel = function() {
 
     $.ajax({
       type: 'POST',
-      url: url_dp_details,
+      url: url_api_dietplan,
       headers: {
         'X-CSRF-TOKEN' : csrf_token
       },
@@ -298,13 +298,14 @@ var dpViewModel = function() {
 
 }
 
-//TODO: this is the only CRUD function sitting outside of the ViewModel -> fix
+// This callback function is called whenever a subscription event on observables are triggered
+// TODO: this is the only CRUD function sitting outside of the ViewModel -> fix
 function saveDietPlanItem(newValue) {
   console.log('saveDietPlanItem: newValue = ' + newValue + ', id = ' + this.id());
 
   $.ajax({
     type: 'PUT',
-    url: url_dp_details,
+    url: url_api_dietplan,
     dataType: 'json',
     data: {
       'id' : this.id(),
@@ -362,10 +363,281 @@ var DietPlanItem = function(data) {
   this.consumed.subscribe(saveDietPlanItem, this);
 }
 
+
+// ++++++++++++++++++++++++++ INVENTORY +++++++++++++++++++++++++++++++++++++++
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+var ENTER_KEY = 13;
+var ESCAPE_KEY = 27;
+
+// A factory function we can use to create binding handlers for specific
+// keycodes.
+function keyhandlerBindingFactory(keyCode) {
+	return {
+		init: function (element, valueAccessor, allBindingsAccessor, data, bindingContext) {
+			var wrappedHandler, newValueAccessor;
+
+			// wrap the handler with a check for the enter key
+			wrappedHandler = function (data, event) {
+				if (event.keyCode === keyCode) {
+					valueAccessor().call(this, data, event);
+				}
+			};
+
+			// create a valueAccessor with the options that we would want to pass to the event binding
+			newValueAccessor = function () {
+				return {
+					keyup: wrappedHandler
+				};
+			};
+
+			// call the real event binding's init function
+			ko.bindingHandlers.event.init(element, newValueAccessor, allBindingsAccessor, data, bindingContext);
+		}
+	};
+}
+
+// a custom binding to handle the enter key
+ko.bindingHandlers.enterKey = keyhandlerBindingFactory(ENTER_KEY);
+
+// another custom binding, this time to handle the escape key
+ko.bindingHandlers.escapeKey = keyhandlerBindingFactory(ESCAPE_KEY);
+
+// wrapper to hasFocus that also selects text and applies focus async
+ko.bindingHandlers.selectAndFocus = {
+	init: function (element, valueAccessor, allBindingsAccessor, bindingContext) {
+		ko.bindingHandlers.hasFocus.init(element, valueAccessor, allBindingsAccessor, bindingContext);
+		ko.utils.registerEventHandler(element, 'focus', function () {
+			element.focus();
+		});
+	},
+	update: function (element, valueAccessor) {
+		ko.utils.unwrapObservable(valueAccessor()); // for dependency
+		// ensure that element is visible before trying to focus
+		setTimeout(function () {
+			ko.bindingHandlers.hasFocus.update(element, valueAccessor);
+		}, 0);
+	}
+};
+
+
+function saveInventoryItem(newValue) {
+  console.log('saveInventoryItem: newValue = ' + newValue + ', id = ' + this.id());
+
+  $.ajax({
+    type: 'PUT',
+    url: url_api_inventory,
+    dataType: 'json',
+    data: {
+      'id' : this.id(),
+      'inventory_id' : inv_id,
+      'titleEN' : '',
+      'titleDE' : this.title(),
+      'status' : this.status(),
+      'food_id' : '',
+      'good_id' : '',
+      'level' : '',
+      'need_from_diet_plan' : '',
+      'need_additional' : '',
+      're_order_level' : '',
+      're_order_quantity' : ''
+    },
+    success: function(response) {
+      //TODO: undo changes in case of failure
+      console.log('saveInventoryItem: success');
+    }
+  });
+}
+
+var InventoryItem = function(data) {
+  this.id = ko.observable(data.id);
+  this.inventory_id = ko.observable(data.inventory_id);
+
+  this.title = ko.observable(data.titleDE);  // TODO: Enable multi-language support
+  this.title.subscribe(saveInventoryItem, this);
+
+  this.status = ko.observable(data.status);
+  this.status.subscribe(saveInventoryItem, this);
+
+  this.level = ko.observable(data.level);
+  this.level.subscribe(saveInventoryItem, this);
+
+  this.consumed = ko.observable(data.consumed);
+  this.consumed.subscribe(saveInventoryItem, this);
+
+  this.need_additional = ko.observable(data.need_additional);
+  this.need_additional.subscribe(saveInventoryItem, this);
+
+  this.re_order_level = ko.observable(data.re_order_level);
+  this.re_order_level.subscribe(saveInventoryItem, this);
+
+  this.re_order_quantity = ko.observable(data.re_order_quantity);
+  this.re_order_quantity.subscribe(saveInventoryItem, this);
+
+  this.good_id = ko.observable(data.good_id);
+  this.good_id.subscribe(saveInventoryItem, this);
+
+  this.need_from_diet_plan = ko.observable(data.need_from_diet_plan);
+
+  this.editing = ko.observable(false);
+
+  this.statusText = ko.computed(function() {
+    switch (this.status()) {
+      case 0: return 'no-need';
+      case 1: return 'no-stock';
+      case 2: return 'insufficient-stock';
+      case 3: return 'on-stock';
+    };
+  }, this);
+
+}
+
+
 var invViewModel = function() {
   var self = this;
+  this.inventoryItems = ko.observableArray([]);
+
+  // store the new Inventory value being entered
+	this.current = ko.observable();
+
+  this.filterStatus = ko.observable('all');
+
+  this.filteredInventoryItems = ko.computed(function () {
+			switch (self.filterStatus()) {
+			case '0':
+				return self.inventoryItems().filter(function (item) {
+					return item.status() == 0;
+				});
+			case '1':
+				return self.inventoryItems().filter(function (item) {
+					return item.status() == 1;
+				});
+      case '2':
+				return self.inventoryItems().filter(function (item) {
+					return item.status() == 2;
+				});
+      case '3':
+        return self.inventoryItems().filter(function (item) {
+          return item.status() == 3;
+        });
+			default:
+				return self.inventoryItems();
+			}
+		});
+
+  self.loadInventoryItems = function() {
+    self.inventoryItems.removeAll();
+    // Loads data from the REST API
+    $.ajax({
+      type: 'GET',
+      url: url_api_inventory,
+      dataType: 'json',
+      success: function(response) {
+        var parsed = response['inventory_items']
+        // for each iterable item create a new InventoryItem observable
+        parsed.forEach( function(object) {
+          self.inventoryItems.push( new InventoryItem(object) );
+        });
+      }
+    });
+  };
+
+  self.removeInventoryItem = function(data, event) {
+    console.log('removeInventoryItem(id=' + data.id() + ')');
+
+    $.ajax({
+      type: 'DELETE',
+      url: url_api_inventory,
+      dataType: 'json',
+      data: {
+        'id' : data.id()
+      },
+      success: function(response) {
+        self.inventoryItems.remove(data);
+      }
+    });
+  };
+
+  self.toogleStatus = function(data, event) {
+    console.log('toggle');
+    if (data.status() < 3) {
+      data.status(data.status() + 1);
+    } else {
+      data.status(0);
+    }
+  };
+
+  // adds a inventory item
+  self.addInventoryItem = function(data, event) {
+
+    var current = self.current().trim();
+    if (current) {
+      console.log('addInventoryItem');
+
+      $.ajax({
+        type: 'POST',
+        url: url_api_inventory,
+        headers: {
+          'X-CSRF-TOKEN' : csrf_token
+        },
+        dataType: 'json',
+        data: {
+          'titleEN' : '',
+          'titleDE' : current,
+          'status' : 1,
+        },
+        success: function(response) {
+
+          // turn the json string into a javascript object
+          var parsed = response['inventory_item']
+
+          // for each iterable item create a new DietPlanItem observable
+          parsed.forEach( function(item) {
+            self.inventoryItems.push( new InventoryItem(item) );
+          });
+        }
+      });
+    }
+    self.current('');
+  };
+
+  // edit an item
+	this.editItem = function (item) {
+		item.editing(true);
+		item.previousTitle = item.title();
+	}.bind(this);
+
+  // stop editing an item.  Remove the item, if it is now empty
+	this.saveEditing = function (item) {
+		item.editing(false);
+
+		var title = item.title();
+		var trimmedTitle = title.trim();
+
+		// Observable value changes are not triggered if they're consisting of whitespaces only
+		// Therefore we've to compare untrimmed version with a trimmed one to chech whether anything changed
+		// And if yes, we've to set the new value manually
+		if (title !== trimmedTitle) {
+			item.title(trimmedTitle);
+		}
+
+		if (!trimmedTitle) {
+			this.remove(item);
+		}
+	}.bind(this);
+
+	// cancel editing an item and revert to the previous content
+	this.cancelEditing = function (item) {
+		item.editing(false);
+		item.title(item.previousTitle);
+	}.bind(this);
+
+  self.loadInventoryItems();
 
 }
 
 var dpVM = new dpViewModel();
 ko.applyBindings(dpVM, document.getElementById('diet_plan'));
+
+var invVM = new invViewModel();
+ko.applyBindings(invVM, document.getElementById('inventory'));

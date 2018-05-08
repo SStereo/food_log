@@ -7,11 +7,15 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>Hunting Food</title>
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- only css <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"> -->
+    <script defer src="https://use.fontawesome.com/releases/v5.0.12/js/all.js" integrity="sha384-Voup2lBiiyZYkRto2XWqbzxHXwzcm4A5RfdfG6466bu5LqjwwrjXCMBQBLMWh7qR" crossorigin="anonymous"></script>
+
 
     <!-- STATIC folder version -->
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='main_styles.css') }}" rel="stylesheet">
+    <!-- <link href="{{ url_for('static', filename='main_styles.css') }}" rel="stylesheet"> -->
+
 
     <Style>
       .logoXL {

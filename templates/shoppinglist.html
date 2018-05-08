@@ -5,72 +5,7 @@
 {% block style %}
 <style>
 
-  /* Styles for the shopping list form */
 
-  .calendar {
-    padding-bottom: 15px;
-  }
-
-  input[type="text"].sl-item {
-    width: 250px;
-    margin-right: 0px;
-    margin-bottom: 0px;
-    margin-top: 0px;
-    padding: 0px;
-  }
-
-  .sl-form {
-    position: relative;
-  }
-
-  .sl-btn {
-    position: absolute;
-    top: 0;
-    right: 5px;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-
-
-  .dp-meal-image {
-    max-width: : 50px;
-    height: 50px;
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: cover;
-    display: inline-block;
-  }
-
-  .sl-success {
-    padding: 1em;
-    margin-bottom: 0.75rem;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-    color: #468847;
-    background-color: #dff0d8;
-    border: 1px solid #d6e9c6;
-    -webkit-border-radius: 4px;
-       -moz-border-radius: 4px;
-            border-radius: 4px;
-  }
-
-  .sl-error {
-    padding: 1em;
-    margin-bottom: 0.75rem;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-    color: #b94a48;
-    background-color: #f2dede;
-    border: 1px solid rgba(185, 74, 72, 0.3);
-    -webkit-border-radius: 4px;
-       -moz-border-radius: 4px;
-            border-radius: 4px;
-  }
-
-  .classic-tabs li a {
-    margin: 0px;
-    padding: 5px;
-  }
 
 </style>
 {% endblock %}
@@ -79,48 +14,50 @@
 {% block body %}
 <main class="text-center py-5">
 
-  <!-- Nav tabs -->
+  <!-- Tab Navigation -->
   <div class="container">
     <ul class="nav nav-tabs" id="myTab" role="tablist">
       <li class="nav-item">
-        <a class="nav-link active" id="diet_plan-tab" data-toggle="tab" href="#diet_plan" role="tab" aria-controls="dietplan" aria-selected="true"><i class="fa fa-heart fa-1x" aria-hidden="true"></i> Speiseplan</a>
+        <a class="nav-link active" id="diet_plan-tab" data-toggle="tab" href="#diet_plan" role="tab" aria-controls="dietplan" aria-selected="true"><div class="sl-nav-icon"><i class="fas fa-utensils" aria-hidden="true"></i></div> Speiseplan</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="inventory-tab" data-toggle="tab" href="#inventory" role="tab" aria-controls="inventory" aria-selected="false"><i class="fa fa-plus fa-1x" aria-hidden="true"></i> Bestand</a>
+        <a class="nav-link" id="inventory-tab" data-toggle="tab" href="#inventory" role="tab" aria-controls="inventory" aria-selected="false"><div class="sl-nav-icon"><i class="fas fa-warehouse" aria-hidden="true"></i></div> Bestand</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="shoppinglist-tab" data-toggle="tab" href="#shoppinglist" role="tab" aria-controls="shoppingslist" aria-selected="false"><i class="fa fa-shopping-cart fa-1x" aria-hidden="true"></i> Einkaufsliste</a>
+        <a class="nav-link" id="shoppinglist-tab" data-toggle="tab" href="#shoppinglist" role="tab" aria-controls="shoppingslist" aria-selected="false"><div class="sl-nav-icon"><i class="fas fa-shopping-basket" aria-hidden="true"></i></div> Einkaufsliste</a>
       </li>
     </ul>
   </div>
 
+  <!-- Tabs -->
   <div class="tab-content" id="myTabContent">
+
+    <!-- Tab 1: Dietplan -->
     <div class="tab-pane fade show active" id="diet_plan" role="tabpanel" aria-labelledby="diet_plan-tab">
-
       <div class="container">
-          <nav ria-label="Week-Selector">
-              <ul class="pagination">
-                  <li class="page-item">
-                      <a class="page-link" aria-label="Previous">
-                          <span aria-hidden="true">&laquo;</span>
-                          <span class="sr-only">Previous</span>
-                      </a>
-                  </li>
-                  <!-- ko foreach: week_range -->
-                  <li class="page-item" data-bind="css: { active: $data.week_number() == $parent.week_selected() }"><a class="page-link" data-bind="click: $parent.changeWeek, text: 'Woche ' + $data.week_number()" href="#"></a></li>
-                  <!-- /ko -->
-                  <li class="page-item">
-                      <a class="page-link" aria-label="Next">
-                          <span aria-hidden="true">&raquo;</span>
-                          <span class="sr-only">Next</span>
-                      </a>
-                  </li>
-              </ul>
-          </nav>
-      </div>
 
-      <div class="container">
-        <!-- <div class="row" data-bind="foreach: timeGrid"> -->
+        <!-- Navbar: week selector -->
+        <nav ria-label="Week-Selector">
+            <ul class="pagination">
+                <li class="page-item">
+                    <a class="page-link" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                        <span class="sr-only">Previous</span>
+                    </a>
+                </li>
+                <!-- ko foreach: week_range -->
+                <li class="page-item" data-bind="css: { active: $data.week_number() == $parent.week_selected() }"><a class="page-link" data-bind="click: $parent.changeWeek, text: 'Woche ' + $data.week_number()" href="#"></a></li>
+                <!-- /ko -->
+                <li class="page-item">
+                    <a class="page-link" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                        <span class="sr-only">Next</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Grid: Calendar -->
         <div class="row" data-bind="foreach: selectedGridWeek">
           <div class="col calendar">
             <div class="card">
@@ -149,14 +86,25 @@
     </div>
 
 
-
+    <!-- Tab 2: Inventory -->
     <div class="tab-pane fade" id="inventory" role="tabpanel" aria-labelledby="inventory-tab">
       <div class="container">
-
-
-
+        <header>
+				  <input class="new-inv" data-bind="value: current, valueUpdate: 'afterkeydown', enterKey: addInventoryItem" placeholder="Neue Zutat/Gegenstand" autofocus>
+			  </header>
+        <section data-bind="visible: inventoryItems().length">
+  				<ul class="inv-list" data-bind="foreach: filteredInventoryItems">
+  					<li data-bind="css: statusText">
+  						<div class="view">
+                <button class="toggle btn btn-primary" data-bind="text: statusText, click: $root.toogleStatus"></button>
+  							<label data-bind="text: title, event: { dblclick: $root.editItem }"></label>
+  							<button class="destroy" data-bind="click: $root.removeInventoryItem"></button>
+  						</div>
+  						<input class="edit" data-bind="value: title, valueUpdate: 'afterkeydown', enterKey: $root.saveEditing, escapeKey: $root.cancelEditing, selectAndFocus: editing, event: { blur: $root.saveEditing }">
+  					</li>
+  				</ul>
+			  </section>
       </div>
-      <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nihil odit magnam minima, soluta doloribus reiciendis molestiae placeat unde eos molestias. Quisquam aperiam, pariatur. Tempora, placeat ratione porro voluptate odit minima.</p>
     </div>
 
 
@@ -180,8 +128,10 @@
   // Pass the end point urls to the java script module as variables
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
   var url_api_meals = "{{ url_for('api_v1_meals') }}";
-  var url_dp_details = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
+  var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
   var dp_id = {{ diet_plan.id }};
+  var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
+  var inv_id = {{ inventory.id }};
   var csrf_token = "{{ csrf_token }}";
 </script>
 <script src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>

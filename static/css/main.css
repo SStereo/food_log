@@ -1,0 +1,223 @@
+
+
+/* this style is not working */
+.sl-tab-icon {
+  font-size: 2em;
+}
+
+/* Styles for the shopping list form */
+
+.calendar {
+  padding-bottom: 15px;
+}
+
+input[type="text"].sl-item {
+  width: 250px;
+  margin-right: 0px;
+  margin-bottom: 0px;
+  margin-top: 0px;
+  padding: 0px;
+}
+
+.sl-form {
+  position: relative;
+}
+
+.sl-btn {
+  position: absolute;
+  top: 0;
+  right: 5px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+
+.dp-meal-image {
+  max-width: : 50px;
+  height: 50px;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: inline-block;
+}
+
+.sl-success {
+  padding: 1em;
+  margin-bottom: 0.75rem;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: #468847;
+  background-color: #dff0d8;
+  border: 1px solid #d6e9c6;
+  -webkit-border-radius: 4px;
+     -moz-border-radius: 4px;
+          border-radius: 4px;
+}
+
+.sl-error {
+  padding: 1em;
+  margin-bottom: 0.75rem;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: #b94a48;
+  background-color: #f2dede;
+  border: 1px solid rgba(185, 74, 72, 0.3);
+  -webkit-border-radius: 4px;
+     -moz-border-radius: 4px;
+          border-radius: 4px;
+}
+
+.classic-tabs li a {
+  margin: 0px;
+  padding: 5px;
+}
+
+
+/* Inventory Styles */
+.inv-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.inv-list li {
+	position: relative;
+	font-size: 24px;
+	border-bottom: 1px solid #ededed;
+}
+
+.inv-list li:last-child {
+	border-bottom: none;
+}
+
+.inv-list li.editing {
+	border-bottom: none;
+	padding: 0;
+}
+
+.inv-list li.editing .edit {
+	display: block;
+	width: 506px;
+	padding: 12px 16px;
+	margin: 0 0 0 43px;
+}
+
+.inv-list li.editing .view {
+	display: block;
+  border: 1px;
+}
+
+.inv-list li .toggle {
+	text-align: center;
+  font-size: 0.5em;
+	width: 80px;
+	/* auto, since non-WebKit browsers doesn't support input styling */
+	height: auto;
+	position: absolute;
+	top: 0;
+	bottom: 0;
+  left: 0;
+	margin: auto 0;
+	border: none; /* Mobile Safari */
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.inv-list li .toggle {
+	/*opacity: 0;*/
+}
+
+.inv-list li label {
+	word-break: break-all;
+	padding: 15px 15px 15px 95px;
+	display: block;
+	line-height: 1.2;
+	transition: color 0.4s;
+  margin-bottom: 0px;
+  border-radius: .25rem;
+}
+
+.inv-list li.no-need label {
+	color: #ffffff;
+	text-decoration: none;
+  background-color: #bfbfbf;
+}
+
+.inv-list li.no-stock label {
+	color: #ffffff;
+	text-decoration: none;
+  background-color: #6c180f;
+}
+
+.inv-list li.insufficient-stock label {
+	color: #ffffff;
+	text-decoration: none;
+  background-color: #d28805;
+}
+
+.inv-list li.on-stock label {
+	color: #005911;
+	text-decoration: none;
+  background-color: #7eaa89
+}
+
+.inv-list li .destroy {
+	display: none;
+	position: absolute;
+	top: 0;
+	right: 10px;
+	bottom: 0;
+	width: 40px;
+	height: 40px;
+	margin: auto 0;
+	font-size: 30px;
+	color: #cc9a9a;
+	margin-bottom: 11px;
+	transition: color 0.2s ease-out;
+}
+
+.inv-list li .destroy:hover {
+	color: #af5b5e;
+}
+
+.inv-list li .destroy:after {
+	content: '×';
+}
+
+.inv-list li:hover .destroy {
+	display: block;
+}
+
+.inv-list li .edit {
+	display: none;
+}
+
+.inv-list li.editing:last-child {
+	margin-bottom: -1px;
+}
+
+.new-inv,
+.edit {
+	position: relative;
+	margin: 0;
+	width: 100%;
+	font-size: 24px;
+	font-family: inherit;
+	font-weight: inherit;
+	line-height: 1.4em;
+	border: 0;
+	color: inherit;
+	padding: 6px;
+	border: 1px solid #999;
+	box-shadow: inset 0 -1px 5px 0 rgba(0, 0, 0, 0.2);
+	box-sizing: border-box;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.new-inv {
+	padding: 16px 16px 16px 60px;
+	border: none;
+	background: rgba(0, 0, 0, 0.003);
+	box-shadow: inset 0 -2px 1px rgba(0,0,0,0.03);
+}

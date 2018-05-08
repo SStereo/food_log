@@ -180,30 +180,36 @@ def login(*args):
         redirect_next=target_url,
         message=message)
 
-# --------------
+
 # User Functions
 def createUser(login_session, password):
     if (login_session['provider'] == 'local'):
         newUser = User(
-            name=login_session['username'],
+            name=login_session['name'],
             email=login_session['email'],
-            provider=login_session['provider'])
+            provider=login_session['provider'],
+            language='DE')  # TODO: Fetch default settings from an additional user setting page after registration
         print('Create new local user')
         newUser.hash_password(password)
         session.add(newUser)
         session.commit()
     else:
         newUser = User(
-            name=login_session['username'],
+            name=login_session['name'],
             email=login_session['email'],
             picture=login_session['picture'],
-            provider=login_session['provider'])
+            provider=login_session['provider'],
+            provider_id=login_session['provider_id'],
+            language='DE')
         session.add(newUser)
         session.commit()
 
     # Initialize required data sets
-    generateDietPlans(newUser.id)
-    createInventory(newUser.id)
+    diet_plan = createDietPlan(newUser.id)
+    inventory = createInventory(newUser.id)
+    newUser.default_diet_plan_id = diet_plan.id
+    newUser.default_inventory_id = inventory.id
+    session.commit()
 
     return newUser
 
@@ -252,7 +258,7 @@ def getUserGroupID(user_id):
 # Retrieves the user based on an email
 def getUser(email):
     try:
-        user = User.query.filter_by(email=email).one()
+        user = session.query(User).filter_by(email=email).one()
         return user
     except:
         return None
@@ -265,9 +271,11 @@ def validateUser(login_session):
     necessary.
     '''
     # Validates if user exists and creates if necessary
+    print("ValidateUser with login_session[email] = " + login_session['email'])
     user = getUser(login_session['email'])
     if not user:
         password = None
+        print("Create a new user ...")
         user = createUser(login_session, password)
 
     if not user.active:
@@ -275,8 +283,10 @@ def validateUser(login_session):
     else:
         login_session['user_id'] = user.id
         login_session['provider'] = user.provider
+        login_session['language'] = user.language
+        login_session['default_diet_plan_id'] = user.default_diet_plan_id
+        login_session['default_inventory_id'] = user.default_inventory_id
         return True  # user is authorized
-
 
 @app.before_request
 def csrf_protect():
@@ -333,7 +343,7 @@ def generate_csrf_token():
 def welcome():
     output = ''
     output += '<h1>Welcome, '
-    output += login_session['username']
+    output += login_session['name']
 
     output += '!</h1>'
     output += '<img src="'
@@ -419,51 +429,12 @@ def showRegister():
         if 'email' in login_session.keys():
             abort(400)  # existing User
         else:
-            login_session['username'] = username
+            login_session['name'] = username
             login_session['email'] = email
             login_session['provider'] = 'local'
             user = createUser(login_session, password)
             validateUser(login_session)
     return redirect('/')
-
-
-# TODO: Create generic oauth endpoint
-@app.route('/oauth/<string:provider>', methods=['POST'])
-def providerOauth(provider):
-    # Step 1: Validate State token
-    if request.args.get('state') != login_session['state']:
-        response = make_response(json.dumps('Invalid state parameter.'), 401)
-        response.headers['Content-Type'] = 'application/json'
-        return response
-    # Step 2: Obtain One time authorization code
-    auth_code = request.data
-    # Step 3: Obtain Access Token
-    if provider == 'google':
-        print("provider code")
-    elif provider == 'facebook':
-        print("provider code")
-    else:
-        return 'Unrecognized provider'
-    # Step 4: Validate if user is already logged in
-
-    # Step 5: Store access token and provider user id in login_session
-    login_session['access_token'] = credentials.access_token
-    login_session['provider_user_id'] = gplus_id
-
-    # Step 6: Retrieve user profile information from provider_user_id
-
-    # Step 7: Create local user entry in DB if new User
-    user_id = getUserID(login_session['email'])
-    if not user_id:
-        password = None
-        user_id = createUser(login_session, password)
-    login_session['user_id'] = user_id
-
-    # Step 8: Create another authorization token (TODO: Why??)
-    token = user.generate_auth_token(600)
-
-    # Step 9: Create response back to the client
-    return jsonify({'token': token.decode('ascii')})
 
 
 @app.route('/gconnect', methods=['POST'])
@@ -530,7 +501,7 @@ def gconnect():
 
     # Store the access token in the session for later use.
     login_session['access_token'] = credentials.access_token
-    login_session['gplus_id'] = gplus_id
+    login_session['provider_id'] = gplus_id
 
     # Get user info
     userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
@@ -539,7 +510,7 @@ def gconnect():
 
     data = answer.json()
 
-    login_session['username'] = data['name']
+    login_session['name'] = data['name']
     login_session['picture'] = data['picture']
     login_session['email'] = data['email']
     login_session['provider'] = 'google'
@@ -547,7 +518,7 @@ def gconnect():
     # Validate user against database
     if validateUser(login_session):
         output = welcome()
-        flash("Now logged in as %s" % login_session['username'])
+        flash("Now logged in as %s" % login_session['name'])
         return output
     else:
         flash('User is not authorized to access this application')
@@ -621,9 +592,9 @@ def fbconnect():
     print("API JSON result: %s" % result)
     data = json.loads(result)
     login_session['provider'] = 'facebook'
-    login_session['username'] = data["name"]
+    login_session['name'] = data["name"]
     login_session['email'] = data["email"]
-    login_session['facebook_id'] = data["id"]
+    login_session['provider_id'] = data["id"]
 
     # The token must be stored in the login_session in order to properly logout
     login_session['access_token'] = token
@@ -640,7 +611,7 @@ def fbconnect():
     # Validate user against database
     if validateUser(login_session):
         output = welcome()
-        flash("Now logged in as %s" % login_session['username'])
+        flash("Now logged in as %s" % login_session['name'])
         return output
     else:
         flash('User is not authorized to access this application')
@@ -649,7 +620,7 @@ def fbconnect():
 
 @app.route('/fbdisconnect')
 def fbdisconnect():
-    facebook_id = login_session['facebook_id']
+    facebook_id = login_session['provider_id']
     # The access token must me included to successfully logout
     access_token = login_session['access_token']
     url = 'https://graph.facebook.com/%s/permissions?access_token=%s' \
@@ -665,14 +636,14 @@ def disconnect():
     if 'provider' in login_session:
         if login_session['provider'] == 'google':
             gdisconnect()
-            del login_session['gplus_id']
+            del login_session['provider_id']
             del login_session['access_token']
             del login_session['picture']
         if login_session['provider'] == 'facebook':
             fbdisconnect()
-            del login_session['facebook_id']
+            del login_session['provider_id']
             del login_session['picture']
-        del login_session['username']
+        del login_session['name']
         del login_session['email']
         del login_session['user_id']
         del login_session['provider']
@@ -711,16 +682,18 @@ def showShoppingList():
         owner_id=login_session['user_id']).all()
     diet_plan = session.query(DietPlan).filter_by(
         creator_id=login_session['user_id']).first()
-    # diet_plan = session.query(DietPlan).first()
+    inventory = session.query(Inventory).filter_by(
+        creator_id=login_session['user_id']).first()
     if not diet_plan:
-        generateDietPlans(login_session['user_id'])
+        createDietPlan(login_session['user_id'])
         diet_plan = session.query(DietPlan).first()
     return render_template(
         "shoppinglist.html",
         meals=meals,
         diet_plan=diet_plan,
+        inventory=inventory,
         getIngredients=getIngredients,
-        loginSession=login_session,
+        loginSession=login_session,  # TODO: is that necessary to pass it to the client?
         g_api_key=GOOGLE_API_KEY)
 
 
@@ -805,23 +778,42 @@ def api_v1_dietplan(diet_plan_id):
         consumed = request.form.get('consumed')
         portions = request.form.get('portions')
 
-        if portions is None:
-            portions = None
-        elif not (portions.isnumeric()):
-            portions = None
-        elif portions == '':
-            portions = None
-
         if (plan_date) and (meal_id):
+
+            # Create DIET PLAN ITEM
             diet_plan_item = DietPlanItem(
                 diet_plan_id=diet_plan_id,
                 plan_date=plan_date,
                 meal_id=meal_id,
                 consumed=str_to_bool(consumed),
-                portions=portions
+                portions=str_to_numeric(portions)
                 )
             session.add(diet_plan_item)
             session.commit()
+
+            # Create INVENTORY ITEMS per food item refernced in the
+            # meal ingredients
+            goods_items = session.query(Food).join(
+                Food.referencedIn).filter(Ingredient.meal_id == meal_id).all()
+            for row in goods_items:
+                print("Generate inventory items: " + row.titleDE)
+                if (row.titleDE):
+                    inventory_item = InventoryItem(
+                        inventory_id=login_session['default_inventory_id'],
+                        titleEN=row.titleEN,
+                        titleDE=row.titleDE,
+                        status=1,
+                        food_id=row.id,
+                        good_id='',
+                        level=0,
+                        need_from_diet_plan=99,  # TODO: Add calculation based on portions and uom of ingredients
+                        need_additional=0,
+                        re_order_level=99,
+                        re_order_quantity=99
+                        )
+                    session.add(inventory_item)
+                    session.commit()
+
             dp_item = session.query(DietPlanItem).filter_by(
                 id=diet_plan_item.id).all()
             return jsonify(diet_plan_item=[i.serialize for i in dp_item])
@@ -838,13 +830,6 @@ def api_v1_dietplan(diet_plan_id):
         consumed = request.form.get('consumed')
         portions = request.form.get('portions')
 
-        if portions is None:
-            portions = None
-        elif not (portions.isnumeric()):
-            portions = None
-        elif portions == '':
-            portions = None
-
         diet_plan_item = session.query(
             DietPlanItem).filter_by(id=id).one_or_none()
 
@@ -852,7 +837,7 @@ def api_v1_dietplan(diet_plan_id):
             diet_plan_item.plan_date = plan_date
             diet_plan_item.meal_id = meal_id
             diet_plan_item.consumed = str_to_bool(consumed)
-            diet_plan_item.portions = portions
+            diet_plan_item.portions = str_to_numeric(portions)
             session.commit()
             response = make_response(json.dumps(
                 'Item successfully updated'), 200)
@@ -871,6 +856,111 @@ def api_v1_dietplan(diet_plan_id):
 
         if (id) and (diet_plan_item):
             session.delete(diet_plan_item)
+            session.commit()
+            response = make_response(json.dumps(
+                'Item successfully deleted'), 200)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+        else:
+            response = make_response(json.dumps(
+                'Can not delete item because item was not found'), 400)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+
+
+@app.route('/api/v1/inventory/<int:inventory_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
+def api_v1_inventory(inventory_id):
+    inventory_items = []
+    if request.method == 'GET':
+        inventory_items = session.query(InventoryItem).filter_by(
+                inventory_id=inventory_id).all()
+        return jsonify(inventory_items=[i.serialize for i in inventory_items])
+
+    if request.method == 'POST':
+        titleEN = request.form.get('titleEN')
+        titleDE = request.form.get('titleDE')
+        status = request.form.get('status')
+        food_id = request.form.get('food_id')
+        good_id = request.form.get('good_id')
+        level = request.form.get('level')
+        need_from_diet_plan = request.form.get('need_from_diet_plan')
+        need_additional = request.form.get('need_additional')
+        re_order_level = request.form.get('re_order_level')
+        re_order_quantity = request.form.get('re_order_quantity')
+
+        if (titleDE) and (status):
+            inventory_item = InventoryItem(
+                inventory_id=inventory_id,
+                titleEN=titleEN,
+                titleDE=titleDE,
+                status=str_to_numeric(status),
+                food_id=str_to_numeric(food_id),
+                good_id=str_to_numeric(good_id),
+                level=str_to_numeric(level),
+                need_from_diet_plan=str_to_numeric(need_from_diet_plan),
+                need_additional=str_to_numeric(need_additional),
+                re_order_level=str_to_numeric(re_order_level),
+                re_order_quantity=str_to_numeric(re_order_quantity)
+                )
+            session.add(inventory_item)
+            session.commit()
+            # TODO: avoid calling again the database when all data is in the
+            # session, solve problem that object is not iterable
+            inventory_item = session.query(InventoryItem).filter_by(
+                id=inventory_item.id).all()
+            return jsonify(inventory_item=[i.serialize for i in inventory_item])
+        else:
+            response = make_response(json.dumps(
+                'Missing key fields to create an inventory item (titleDE, status).'), 400)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+
+    if request.method == 'PUT':
+        id = request.form.get('id')
+        titleEN = request.form.get('titleEN')
+        titleDE = request.form.get('titleDE')
+        status = request.form.get('status')
+        food_id = request.form.get('food_id')
+        good_id = request.form.get('good_id')
+        level = request.form.get('level')
+        need_from_diet_plan = request.form.get('need_from_diet_plan')
+        need_additional = request.form.get('need_additional')
+        re_order_level = request.form.get('re_order_level')
+        re_order_quantity = request.form.get('re_order_quantity')
+
+        inventory_item = session.query(
+            InventoryItem).filter_by(id=id).one_or_none()
+
+        if (id) and (inventory_item):
+            inventory_item.titleEN = titleEN,
+            inventory_item.titleDE = titleDE,
+            inventory_item.status = str_to_numeric(status),
+            inventory_item.food_id = str_to_numeric(food_id),
+            inventory_item.good_id = str_to_numeric(good_id),
+            inventory_item.level = str_to_numeric(level),
+            inventory_item.need_from_diet_plan = str_to_numeric(need_from_diet_plan),
+            inventory_item.need_additional = str_to_numeric(need_additional),
+            inventory_item.re_order_level = str_to_numeric(re_order_level),
+            inventory_item.re_order_quantity = str_to_numeric(re_order_quantity)
+
+            session.commit()
+            response = make_response(json.dumps(
+                'Item successfully updated'), 200)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+        else:
+            response = make_response(json.dumps(
+                'Can not change item because item was not found'), 400)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+
+    if request.method == 'DELETE':
+        id = request.form.get('id')
+        inventory_item = session.query(
+            InventoryItem).filter_by(id=id).one_or_none()
+
+        if (id) and (inventory_item):
+            session.delete(inventory_item)
             session.commit()
             response = make_response(json.dumps(
                 'Item successfully deleted'), 200)
@@ -949,12 +1039,14 @@ def addMeals():
             ingredient_text = request.form['ingredient'+row]
 
             # Translate local language to EN
-            translation =  translate_client.translate(ingredient_text)
+            translation = translate_client.translate(
+                ingredient_text, source_language=login_session['language'])
             print("newIngredient.titleEN = " + translation['translatedText'])
-            print("detected source language = " + translation['detectedSourceLanguage'])
+            # print("detected source language = " + translation['detectedSourceLanguage'])
 
             # Identify food entity from entered text using language processing
-            # use en language to improve results since en splits combined german words
+            # use en language to improve results since en splits combined
+            # german words
             food_entity = analyze_ingredient(translation['translatedText'], language='en')
             print("Food entity: %s" % food_entity)
 
@@ -992,19 +1084,16 @@ def addMeals():
         return render_template("meals_add.html",uoms=uoms,foods=foods)
 
 
-@app.route('/meals/delete/<int:meal_id>', methods=['GET','POST'])
+@app.route('/meals/delete/<int:meal_id>', methods=['GET', 'POST'])
+@login_required
 def deleteMeal(meal_id):
-
-    if 'username' not in login_session:
-        return redirect ('/login')
-        # TODO: return to the intendet page after login or redirect to original URL using request.referrer
 
     o = session.query(Meal).filter_by(id=meal_id).one()
     if request.method == 'POST' and request.form['button'] == "Delete":
         session.delete(o)
         session.commit()
-        #TODO: flash("Meal deleted")
-        #TODO: Delete image file from folder
+        # TODO: flash("Meal deleted")
+        # TODO: Delete image file from folder
         return redirect(url_for('showMeals'))
     elif request.method == 'GET':
         return render_template("meals_delete.html",meal=o)
@@ -1018,35 +1107,23 @@ def showMeal(meal_id):
     return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
 
 
-def generateDietPlans(user_id):
-    # Initialize time periods for diet plans
-    # TODO: Ensure no overlapping diet plan periods are generated
-    current_date = date.today()
-    current_weekday = current_date.weekday()
-    d_start = current_date - timedelta(days=current_weekday)
-    obj_diet_plans = []
+def createDietPlan(user_id):
 
-    for x in range(0, FUTURE_DIET_PLANS):
-        d_from = d_start + timedelta(days=(x*7))
-        d_to = d_start + timedelta(days=(6 + (x*7)))
-        week_no = d_from.isocalendar()[1]
-        obj_diet_plans.append(
-            DietPlan(
-                creator_id=user_id,
-                start_date=d_from,
-                end_date=d_to,
-                week_no=week_no,)
-        )
-    session.add_all(obj_diet_plans)
+    obj_diet_plan = DietPlan(
+        creator_id=user_id)
+    session.add(obj_diet_plan)
     session.commit()
+
+    return obj_diet_plan
 
 
 def createInventory(user_id):
     obj_inventory = Inventory(
-        creator_id=user_id
-    )
+        creator_id=user_id)
     session.add(obj_inventory)
     session.commit()
+
+    return obj_inventory
 
 
 @token_auth.verify_token
@@ -1072,7 +1149,7 @@ def getFood(keyword):
         results = n.search_keyword(keyword)
         if results:
 
-            i = list(results['items'])[0] #TODO: identify relevant item, for now take the first one
+            i = list(results['items'])[0]  #TODO: identify relevant item, for now take the first one
             print("Found NDB item: "+i.get_name())
 
             # Create Food Main Group
@@ -1255,6 +1332,24 @@ def str_to_bool(s):
         return False
     elif (s == '') or (s is None):
         return None
+    else:
+        raise ValueError
+
+
+def str_to_numeric(s):
+    """ Required for handling none values correctly
+    """
+    if s is None:
+        s = None
+        return s
+    elif s == '':
+        s = None
+        return s
+    elif not (s.isnumeric()):
+        s = None
+        return s
+    elif (s.isnumeric()):
+        return s
     else:
         raise ValueError
 
