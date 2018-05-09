@@ -3,6 +3,9 @@
 import os  # required to have access to the Port environment variable
 import json
 
+# Enable logging of events
+import logging
+
 # Google cloud authentication & configuration
 # from oauth2client.client import GoogleCredentials
 from google.oauth2 import service_account
@@ -42,7 +45,7 @@ from flask import Flask, render_template, request, url_for, redirect, \
 from werkzeug.utils import secure_filename  # required for file upload
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm.exc import MultipleResultsFound
+from sqlalchemy import exc
 from food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
 from food_database import FoodComposition, Nutrient, ShoppingOrder
 from food_database import ShoppingOrderItem, FoodMainGroup
@@ -54,6 +57,9 @@ basic_auth = HTTPBasicAuth()
 token_auth = HTTPTokenAuth('Bearer')  # TODO:Enable for Google/FB tokens
 multi_auth = MultiAuth(basic_auth, token_auth)
 
+# Set Logging level
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Custom url date parameter converter for dietplan per day get method
 # TODO: Delete this in case it is not longer needed
@@ -793,10 +799,21 @@ def api_v1_dietplan(diet_plan_id):
 
             # Create INVENTORY ITEMS per food item refernced in the
             # meal ingredients
-            goods_items = session.query(Food).join(
-                Food.referencedIn).filter(Ingredient.meal_id == meal_id).all()
+
+            try:
+                goods_items = session.query(Food).\
+                    join(Food.referencedIn).\
+                    filter(Ingredient.meal_id == meal_id).all()
+                if len(goods_items) == 0:
+                    raise NoRecordsError(
+                        'Generate Inventory: No goods found from diet plan')
+            except NoRecordsError:
+                logging.info('No records found')
+            except exc.SQLAlchemyError:
+                logging.exception('Some problem occurred')
+
             for row in goods_items:
-                print("Generate inventory items: " + row.titleDE)
+                logging.info("Generate inventory items: " + str(row.titleEN))
                 if (row.titleDE):
                     inventory_item = InventoryItem(
                         inventory_id=login_session['default_inventory_id'],
@@ -1352,6 +1369,23 @@ def str_to_numeric(s):
         return s
     else:
         raise ValueError
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class NoRecordsError(Error):
+    """Exception raised when an all() query does not return any results.
+
+    Attributes:
+        query -- the query that returned no values
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        # self.query = query
+        self.message = message
+
 
 
 if __name__ == '__main__':
