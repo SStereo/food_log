@@ -23,9 +23,6 @@ import random
 import string
 from flask import session as login_session  # a dictionary to store information
 
-# required for custom date url parameter for the dietplan get endpoint per day
-from werkzeug.routing import BaseConverter, ValidationError
-
 # used to protect endpoints to require an authenticated user first
 from flask import g  # variable valid for the reuquest only
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth, MultiAuth
@@ -46,11 +43,15 @@ from werkzeug.utils import secure_filename  # required for file upload
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import exc
+
+# Import own modules
+import tools
 from food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
 from food_database import FoodComposition, Nutrient, ShoppingOrder
 from food_database import ShoppingOrderItem, FoodMainGroup
 from food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
 from food_database import TradeItem, Place
+
 
 # Setup Basic Authenntication handler
 basic_auth = HTTPBasicAuth()
@@ -61,22 +62,6 @@ multi_auth = MultiAuth(basic_auth, token_auth)
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Custom url date parameter converter for dietplan per day get method
-# TODO: Delete this in case it is not longer needed
-class DateConverter(BaseConverter):
-    """Extracts a ISO8601 date from the path and validates it."""
-
-    regex = r'\d{4}-\d{2}-\d{2}'
-
-    def to_python(self, value):
-        try:
-            return datetime.strptime(value, '%Y-%m-%d').date()
-        except ValueError:
-            raise ValidationError()
-
-    def to_url(self, value):
-        return value.strftime('%Y-%m-%d')
-
 
 # Application Settings
 app = Flask(__name__)
@@ -84,7 +69,6 @@ app.secret_key = "ABC123"
 app.config['UPLOAD_FOLDER'] = 'upload'
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # limit to 2MB
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'png', 'jpg', 'jpeg', 'gif'}
-app.url_map.converters['date'] = DateConverter
 
 # User data settings
 FUTURE_DIET_PLANS = 52
@@ -687,12 +671,22 @@ def showShoppingList():
     meals = session.query(Meal).filter_by(
         owner_id=login_session['user_id']).all()
     diet_plan = session.query(DietPlan).filter_by(
-        creator_id=login_session['user_id']).first()
+        id=login_session['default_diet_plan_id']).first()
     inventory = session.query(Inventory).filter_by(
-        creator_id=login_session['user_id']).first()
+        id=login_session['default_inventory_id']).first()
+
+    # TODO: Eliminate creation of inventory and diet plan because this
+    # should not happen in the first place. If required add update to the users
+    # defaults otherwise each time a new object is created
+    if not inventory:
+        print('No inventory found')
+        inventory = createInventory(login_session['user_id'])
+        login_session
+
     if not diet_plan:
-        createDietPlan(login_session['user_id'])
-        diet_plan = session.query(DietPlan).first()
+        print('No dietplan found')
+        diet_plan = createDietPlan(login_session['user_id'])
+
     return render_template(
         "shoppinglist.html",
         meals=meals,
@@ -791,15 +785,14 @@ def api_v1_dietplan(diet_plan_id):
                 diet_plan_id=diet_plan_id,
                 plan_date=plan_date,
                 meal_id=meal_id,
-                consumed=str_to_bool(consumed),
-                portions=str_to_numeric(portions)
+                consumed=tools.str_to_bool(consumed),
+                portions=tools.str_to_numeric(portions)
                 )
             session.add(diet_plan_item)
             session.commit()
 
             # Create INVENTORY ITEMS per food item refernced in the
             # meal ingredients
-
             try:
                 goods_items = session.query(Food).\
                     join(Food.referencedIn).\
@@ -814,14 +807,13 @@ def api_v1_dietplan(diet_plan_id):
 
             for row in goods_items:
                 logging.info("Generate inventory items: " + str(row.titleEN))
-                if (row.titleDE):
+                if (row.titleEN):
                     inventory_item = InventoryItem(
                         inventory_id=login_session['default_inventory_id'],
                         titleEN=row.titleEN,
                         titleDE=row.titleDE,
                         status=1,
                         food_id=row.id,
-                        good_id='',
                         level=0,
                         need_from_diet_plan=99,  # TODO: Add calculation based on portions and uom of ingredients
                         need_additional=0,
@@ -853,8 +845,8 @@ def api_v1_dietplan(diet_plan_id):
         if (id) and (diet_plan_item):
             diet_plan_item.plan_date = plan_date
             diet_plan_item.meal_id = meal_id
-            diet_plan_item.consumed = str_to_bool(consumed)
-            diet_plan_item.portions = str_to_numeric(portions)
+            diet_plan_item.consumed = tools.str_to_bool(consumed)
+            diet_plan_item.portions = tools.str_to_numeric(portions)
             session.commit()
             response = make_response(json.dumps(
                 'Item successfully updated'), 200)
@@ -910,14 +902,14 @@ def api_v1_inventory(inventory_id):
                 inventory_id=inventory_id,
                 titleEN=titleEN,
                 titleDE=titleDE,
-                status=str_to_numeric(status),
-                food_id=str_to_numeric(food_id),
-                good_id=str_to_numeric(good_id),
-                level=str_to_numeric(level),
-                need_from_diet_plan=str_to_numeric(need_from_diet_plan),
-                need_additional=str_to_numeric(need_additional),
-                re_order_level=str_to_numeric(re_order_level),
-                re_order_quantity=str_to_numeric(re_order_quantity)
+                status=tools.str_to_numeric(status),
+                food_id=tools.str_to_numeric(food_id),
+                good_id=tools.str_to_numeric(good_id),
+                level=tools.str_to_numeric(level),
+                need_from_diet_plan=tools.str_to_numeric(need_from_diet_plan),
+                need_additional=tools.str_to_numeric(need_additional),
+                re_order_level=tools.str_to_numeric(re_order_level),
+                re_order_quantity=tools.str_to_numeric(re_order_quantity)
                 )
             session.add(inventory_item)
             session.commit()
@@ -951,14 +943,14 @@ def api_v1_inventory(inventory_id):
         if (id) and (inventory_item):
             inventory_item.titleEN = titleEN,
             inventory_item.titleDE = titleDE,
-            inventory_item.status = str_to_numeric(status),
-            inventory_item.food_id = str_to_numeric(food_id),
-            inventory_item.good_id = str_to_numeric(good_id),
-            inventory_item.level = str_to_numeric(level),
-            inventory_item.need_from_diet_plan = str_to_numeric(need_from_diet_plan),
-            inventory_item.need_additional = str_to_numeric(need_additional),
-            inventory_item.re_order_level = str_to_numeric(re_order_level),
-            inventory_item.re_order_quantity = str_to_numeric(re_order_quantity)
+            inventory_item.status = tools.str_to_numeric(status),
+            inventory_item.food_id = tools.str_to_numeric(food_id),
+            inventory_item.good_id = tools.str_to_numeric(good_id),
+            inventory_item.level = tools.str_to_numeric(level),
+            inventory_item.need_from_diet_plan = tools.str_to_numeric(need_from_diet_plan),
+            inventory_item.need_additional = tools.str_to_numeric(need_additional),
+            inventory_item.re_order_level = tools.str_to_numeric(re_order_level),
+            inventory_item.re_order_quantity = tools.str_to_numeric(re_order_quantity)
 
             session.commit()
             response = make_response(json.dumps(
@@ -1054,23 +1046,28 @@ def addMeals():
         while request.form['ingredient'+str(x)]:
             row = str(x)
             ingredient_text = request.form['ingredient'+row]
+            user_language = login_session['language']
 
-            # Translate local language to EN
-            translation = translate_client.translate(
-                ingredient_text, source_language=login_session['language'])
-            print("newIngredient.titleEN = " + translation['translatedText'])
-            # print("detected source language = " + translation['detectedSourceLanguage'])
+            if (user_language != 'en'):
+                # Translate user language to en
+                translation = translate_client.translate(
+                    ingredient_text, source_language=login_session['language'])
+                ingredient_text_EN = translation['translatedText']
+                print("newIngredient.titleEN = " + ingredient_text_EN)
+            else:
+                ingredient_text_EN = ingredient_text
 
             # Identify food entity from entered text using language processing
             # use en language to improve results since en splits combined
             # german words
-            food_entity = analyze_ingredient(translation['translatedText'], language='en')
+            food_entity = analyze_ingredient(
+                translation['translatedText'], language='en')
             print("Food entity: %s" % food_entity)
 
             # Query a food database (e.g. NDB) to retrieve nutrient information
             # and to create a food master data record. The id of such a record
             # is returned if a match in the food database was found.
-            foodID = getFood(translation['translatedText'])
+            foodID = getFood(ingredient_text_EN, ingredient_text)
             if not foodID:
                 foodID = None
 
@@ -1157,7 +1154,7 @@ def verify_token(token):
 
 
 # Food database helper functions
-def getFood(keyword):
+def getFood(keyword, keyword_local_language):
     # Account Email: mailboxsoeren@gmail.com
     # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
 
@@ -1180,23 +1177,25 @@ def getFood(keyword):
             # Create Food
             food = session.query(Food).filter_by(titleEN=i.get_name()).first()
             if not food:
-                #print("Create new food: "+i.get_name())
-                food = Food(titleEN=i.get_name(),ndb_code=i.get_ndbno(),food_maingroup_id=foodMainGroup.id)
+                food = Food(
+                    titleEN=i.get_name(),
+                    titleDE=keyword_local_language,
+                    ndb_code=i.get_ndbno(),
+                    food_maingroup_id=foodMainGroup.id)
                 session.add(food)
                 session.commit()
 
                 # Create Nutrients
                 report = n.food_report(i.get_ndbno())
-                #print(report)
 
                 nutrients = report['food'].get_nutrients()
                 for n in nutrients:
                     # use existing nutrient object if exists
                     if n.get_name() in nutrientDict:
                         nutriendID = nutrientDict[n.get_name()] # retreive internal id based on the titleEN
+
                     # create new nutrient object
                     else:
-                        #print("Create new nutrient: "+n.get_name())
                         translated_text = translate_client.translate(n.get_name(),
                                                                     target_language='de')['translatedText']
                         newNutrient = Nutrient(value_uom=n.get_unit(),
@@ -1340,36 +1339,6 @@ def allowed_file(filename):
            app.config['ALLOWED_EXTENSIONS']
 
 
-def str_to_bool(s):
-    """ Required for passing boolean values from html via Ajax to the backend
-    """
-    if (s == 'True') or (s == 'true'):
-        return True
-    elif (s == 'False') or (s == 'false'):
-        return False
-    elif (s == '') or (s is None):
-        return None
-    else:
-        raise ValueError
-
-
-def str_to_numeric(s):
-    """ Required for handling none values correctly
-    """
-    if s is None:
-        s = None
-        return s
-    elif s == '':
-        s = None
-        return s
-    elif not (s.isnumeric()):
-        s = None
-        return s
-    elif (s.isnumeric()):
-        return s
-    else:
-        raise ValueError
-
 class Error(Exception):
     """Base class for exceptions in this module."""
     pass
@@ -1383,7 +1352,6 @@ class NoRecordsError(Error):
     """
 
     def __init__(self, message):
-        # self.query = query
         self.message = message
 
 

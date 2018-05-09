@@ -287,8 +287,8 @@ class InventoryItem(Base):
     __tablename__ = 'inventory_items'
     id = Column(Integer, primary_key = True)
     inventory_id = Column(Integer, ForeignKey('inventories.id'))
-    titleEN = Column(String(80), nullable = True)  # TODO: remove those fields later and replace with good/food_id
-    titleDE = Column(String(80), nullable = True)
+    titleEN = Column(String(160), nullable = True)  # TODO: remove those fields later and replace with good/food_id
+    titleDE = Column(String(160), nullable = True)
     status = Column(SmallInteger, nullable = True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
     food_id = Column(Integer, ForeignKey('foods.id'), nullable = True)
     good_id = Column(Integer, ForeignKey('goods.id'), nullable = True)
