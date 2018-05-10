@@ -1,5 +1,0 @@
-Soeren Fleisch 1 3 w
-Soeren Obst 1 2 t
-Soeren Spätzle 1 1 Mo
-Soeren Butter 0 0 w
-Soeren Avocado_mit_Vollkornbrot 1 1 t

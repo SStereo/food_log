@@ -1,0 +1,1 @@
+from huntingfood import app

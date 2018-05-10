@@ -1,4 +1,4 @@
-# TODO: remove mixure of tabs in spaces for indent - use 4 spaces instead
+from huntingfood import app
 
 import os  # required to have access to the Port environment variable
 import json
@@ -28,7 +28,7 @@ from flask import g  # variable valid for the reuquest only
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth, MultiAuth
 
 # National Nutrient Database - United States Department of Agriculture
-import ndb
+from huntingfood import ndb
 
 # required to create a wrapper function for authentication
 from functools import wraps
@@ -45,12 +45,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import exc
 
 # Import own modules
-import tools
-from food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
-from food_database import FoodComposition, Nutrient, ShoppingOrder
-from food_database import ShoppingOrderItem, FoodMainGroup
-from food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
-from food_database import TradeItem, Place
+from huntingfood import tools
+from huntingfood.food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
+from huntingfood.food_database import FoodComposition, Nutrient, ShoppingOrder
+from huntingfood.food_database import ShoppingOrderItem, FoodMainGroup
+from huntingfood.food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
+from huntingfood.food_database import TradeItem, Place
 
 
 # Setup Basic Authenntication handler
@@ -62,19 +62,11 @@ multi_auth = MultiAuth(basic_auth, token_auth)
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
-# Application Settings
-app = Flask(__name__)
-app.secret_key = "ABC123"
-app.config['UPLOAD_FOLDER'] = 'upload'
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # limit to 2MB
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'png', 'jpg', 'jpeg', 'gif'}
-
 # User data settings
 FUTURE_DIET_PLANS = 52
 
 # Database connection
-DB_CONNECTION = os.environ.get('DB_CONNECTION')
+DB_CONNECTION = app.config['DB_CONNECTION']
 engine = create_engine(DB_CONNECTION)
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
@@ -999,7 +991,7 @@ def map_places_handler():
 @login_required
 def addMeals():
     if request.method == 'POST' and request.form['button'] == "Save":
-
+        print("Start file handler")
         # ---- FILE HANDLING -----
         filename = ""
         if 'file' not in request.files:
@@ -1022,7 +1014,7 @@ def addMeals():
             now = datetime.now()
             filename = "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), filename.rsplit('.', 1)[1])  #$s replaced by timestamp and file extension
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), file.filename.rsplit('.', 1)[1]))
-            print("filename = " + filename)
+            print("filepath = " + filepath)
             file.save(filepath)
 
         # ---- MEAL CREATION -----
