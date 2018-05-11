@@ -9,6 +9,6 @@ class Config(object):
     UPLOAD_FOLDER = 'huntingfood\\upload'
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # limit to 2MB
     ALLOWED_EXTENSIONS = {'png', 'png', 'jpg', 'jpeg', 'gif'}
-    DB_CONNECTION = os.environ.get('DB_CONNECTION') or \
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DB_CONNECTION') or \
         'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False

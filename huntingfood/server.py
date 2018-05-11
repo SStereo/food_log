@@ -36,21 +36,20 @@ from functools import wraps
 # Required to identify the path within an URL, for referrer after login
 from urllib.parse import urlparse, parse_qs
 
-from datetime import date, datetime, timedelta
-from flask import Flask, render_template, request, url_for, redirect, \
+from datetime import datetime
+from flask import render_template, request, url_for, redirect, \
     flash, jsonify, send_from_directory, abort
 from werkzeug.utils import secure_filename  # required for file upload
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import exc
 
 # Import own modules
 from huntingfood import tools
-from huntingfood.food_database import Base, User, UserGroup, UOM, Meal, Ingredient, Food
-from huntingfood.food_database import FoodComposition, Nutrient, ShoppingOrder
-from huntingfood.food_database import ShoppingOrderItem, FoodMainGroup
-from huntingfood.food_database import InventoryItem, Inventory, DietPlan, DietPlanItem
-from huntingfood.food_database import TradeItem, Place
+from huntingfood import db
+from huntingfood.models import User, UserGroup, UOM, Meal, Ingredient, Food
+from huntingfood.models import FoodComposition, Nutrient, ShoppingOrder
+from huntingfood.models import ShoppingOrderItem, FoodMainGroup
+from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
+from huntingfood.models import TradeItem, Place
 
 
 # Setup Basic Authenntication handler
@@ -65,12 +64,11 @@ logger.setLevel(logging.INFO)
 # User data settings
 FUTURE_DIET_PLANS = 52
 
-# Database connection
-DB_CONNECTION = app.config['DB_CONNECTION']
-engine = create_engine(DB_CONNECTION)
-Base.metadata.bind = engine
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
+# TODO: not really required but just to ease the migration to flask-sqlalchemy
+session = db.session
+
+db.create_all()
+db.session.commit()
 
 # Google Cloud Connection
 PK_escaped = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
@@ -118,12 +116,12 @@ NDB_KEY = os.environ.get('NDB_KEY')
 # TODO: Validate if there is a better way in sqlAlchemy ot achieve that
 # TODO: Ensure reload of dictionary when uom table changes
 nutrientDict = {}
-items = session.query(Nutrient)
+items = Nutrient.query
 for i in items:
     nutrientDict.update({i.titleEN: i.id})
 
 uomDict = {}
-items = session.query(UOM)
+items = UOM.query
 for i in items:
     uomDict.update({i.uom: i.type})
 
@@ -200,7 +198,7 @@ def createUserGroup(user_id):
 
     newUserGroup = UserGroup(name="Group1")
     a = UserGroupAssociation(is_owner=True)
-    a.user = session.query(User).filter_by(id=user_id).one()
+    a.user = User.query.filter_by(id=user_id).one()
     newUserGroup.users.append(a)
 
     session.add(newUserGroup)
@@ -210,21 +208,21 @@ def createUserGroup(user_id):
 
 
 def listUsersInGroup(group_id):
-    g = session.query(UserGroup).filter_by(id=group_id).one()
+    g = UserGroup.query.filter_by(id=group_id).one()
 
     for assoc in g.users:
         print(assoc.user.name)
 
 # Retrieves the user object
 def getUserInfo(user_id):
-    user = session.query(User).filter_by(id=user_id).one()
+    user = User.query.filter_by(id=user_id).one()
     return user
 
 # Retrieves the user id based on an email
 # TODO: Is this function redundant cause of getUser?
 def getUserID(email):
     try:
-        user = session.query(User).filter_by(email=email).one()
+        user = User.query.filter_by(email=email).one()
         return user.id
     except:
         return None
@@ -232,7 +230,7 @@ def getUserID(email):
 # Retrieves the user id based on an email
 def getUserGroupID(user_id):
     try:
-        user_group = session.query(UserGroup).filter_by(owner=user_id).one()
+        user_group = UserGroup.query.filter_by(owner=user_id).one()
         return user_group.id
     except:
         return None
@@ -240,7 +238,7 @@ def getUserGroupID(user_id):
 # Retrieves the user based on an email
 def getUser(email):
     try:
-        user = session.query(User).filter_by(email=email).one()
+        user = User.query.filter_by(email=email).one()
         return user
     except:
         return None
@@ -643,7 +641,7 @@ def showHome():
 
 @app.route('/meals')
 def showMeals():
-    meals = session.query(Meal).all()
+    meals = Meal.query.all()
     return render_template(
         "meals.html",
         meals=meals,
@@ -660,11 +658,11 @@ def showFoodFacts():
 @login_required
 def showShoppingList():
     # TODO: If member of a group filter by group and not by creator
-    meals = session.query(Meal).filter_by(
+    meals = Meal.query.filter_by(
         owner_id=login_session['user_id']).all()
-    diet_plan = session.query(DietPlan).filter_by(
+    diet_plan = DietPlan.query.filter_by(
         id=login_session['default_diet_plan_id']).first()
-    inventory = session.query(Inventory).filter_by(
+    inventory = Inventory.query.filter_by(
         id=login_session['default_inventory_id']).first()
 
     # TODO: Eliminate creation of inventory and diet plan because this
@@ -703,7 +701,7 @@ def all_shopping_items_handler():
         return jsonify(inventory_items = [i.serialize for i in inventory_items])
 
     elif request.method == 'GET':
-        inventory_items = session.query(InventoryItem).all()
+        inventory_items = InventoryItem.query.all()
         # TODO: return nested structures including inventory header and user information
         # with https://flask-marshmallow.readthedocs.io/en/latest/
         return jsonify(inventory_items = [i.serialize for i in inventory_items])
@@ -716,7 +714,7 @@ def shopping_item_handler():
     inventory_items = []
 
     id = request.form.get('id')
-    inventory_item = session.query(InventoryItem).filter_by(id=id).one()
+    inventory_item = InventoryItem.query.filter_by(id=id).one()
 
     if request.method == 'GET':
         inventory_items.append(inventory_item)
@@ -746,7 +744,7 @@ def shopping_item_handler():
 @app.route('/api/v1/meals', methods=['GET'])
 def api_v1_meals():
     if request.method == 'GET':
-        meals = session.query(Meal).filter_by(owner_id=login_session['user_id']).all()
+        meals = Meal.query.filter_by(owner_id=login_session['user_id']).all()
         return jsonify(meals=[m.serialize for m in meals])
 
 
@@ -756,11 +754,11 @@ def api_v1_dietplan(diet_plan_id):
     if request.method == 'GET':
         plan_date = request.args.get('plan_date')
         if plan_date:
-            dp_items = session.query(DietPlanItem).filter_by(
+            dp_items = DietPlanItem.query.filter_by(
                 diet_plan_id=diet_plan_id,
                 plan_date=plan_date).all()
         else:
-            dp_items = session.query(DietPlanItem).filter_by(
+            dp_items = DietPlanItem.query.filter_by(
                 diet_plan_id=diet_plan_id).all()
         return jsonify(diet_plan_items=[i.serialize for i in dp_items])
 
@@ -786,7 +784,7 @@ def api_v1_dietplan(diet_plan_id):
             # Create INVENTORY ITEMS per food item refernced in the
             # meal ingredients
             try:
-                goods_items = session.query(Food).\
+                goods_items = Food.query.\
                     join(Food.referencedIn).\
                     filter(Ingredient.meal_id == meal_id).all()
                 if len(goods_items) == 0:
@@ -815,7 +813,7 @@ def api_v1_dietplan(diet_plan_id):
                     session.add(inventory_item)
                     session.commit()
 
-            dp_item = session.query(DietPlanItem).filter_by(
+            dp_item = DietPlanItem.query.filter_by(
                 id=diet_plan_item.id).all()
             return jsonify(diet_plan_item=[i.serialize for i in dp_item])
         else:
@@ -831,8 +829,7 @@ def api_v1_dietplan(diet_plan_id):
         consumed = request.form.get('consumed')
         portions = request.form.get('portions')
 
-        diet_plan_item = session.query(
-            DietPlanItem).filter_by(id=id).one_or_none()
+        diet_plan_item = DietPlanItem.query.filter_by(id=id).one_or_none()
 
         if (id) and (diet_plan_item):
             diet_plan_item.plan_date = plan_date
@@ -852,8 +849,7 @@ def api_v1_dietplan(diet_plan_id):
 
     if request.method == 'DELETE':
         id = request.form.get('id')
-        diet_plan_item = session.query(
-            DietPlanItem).filter_by(id=id).one_or_none()
+        diet_plan_item = DietPlanItem.query.filter_by(id=id).one_or_none()
 
         if (id) and (diet_plan_item):
             session.delete(diet_plan_item)
@@ -873,7 +869,7 @@ def api_v1_dietplan(diet_plan_id):
 def api_v1_inventory(inventory_id):
     inventory_items = []
     if request.method == 'GET':
-        inventory_items = session.query(InventoryItem).filter_by(
+        inventory_items = InventoryItem.query.filter_by(
                 inventory_id=inventory_id).all()
         return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
@@ -907,7 +903,7 @@ def api_v1_inventory(inventory_id):
             session.commit()
             # TODO: avoid calling again the database when all data is in the
             # session, solve problem that object is not iterable
-            inventory_item = session.query(InventoryItem).filter_by(
+            inventory_item = InventoryItem.query.filter_by(
                 id=inventory_item.id).all()
             return jsonify(inventory_item=[i.serialize for i in inventory_item])
         else:
@@ -929,8 +925,7 @@ def api_v1_inventory(inventory_id):
         re_order_level = request.form.get('re_order_level')
         re_order_quantity = request.form.get('re_order_quantity')
 
-        inventory_item = session.query(
-            InventoryItem).filter_by(id=id).one_or_none()
+        inventory_item = InventoryItem.query.filter_by(id=id).one_or_none()
 
         if (id) and (inventory_item):
             inventory_item.titleEN = titleEN,
@@ -957,8 +952,7 @@ def api_v1_inventory(inventory_id):
 
     if request.method == 'DELETE':
         id = request.form.get('id')
-        inventory_item = session.query(
-            InventoryItem).filter_by(id=id).one_or_none()
+        inventory_item = InventoryItem.query.filter_by(id=id).one_or_none()
 
         if (id) and (inventory_item):
             session.delete(inventory_item)
@@ -983,7 +977,7 @@ def map_places_handler():
         return 'not yet implemented'
 
     elif request.method == 'GET':
-        places = session.query(Place).all()
+        places = Place.query.all()
         return jsonify(places = [i.serialize for i in places])
 
 
@@ -1081,12 +1075,12 @@ def addMeals():
 
     elif request.method == 'POST' and request.form['button'] == "Cancel":
         print("POST button = Cancel")
-        meals = session.query(Meal)
+        meals = Meal.query
         return render_template("meals.html",meals=meals,getIngredients=getIngredients)
     else:  # 'GET':
         print("GET")
-        uoms = session.query(UOM)
-        foods = session.query(Food)
+        uoms = UOM.query
+        foods = Food.query
         return render_template("meals_add.html",uoms=uoms,foods=foods)
 
 
@@ -1094,7 +1088,7 @@ def addMeals():
 @login_required
 def deleteMeal(meal_id):
 
-    o = session.query(Meal).filter_by(id=meal_id).one()
+    o = Meal.query.filter_by(id=meal_id).one()
     if request.method == 'POST' and request.form['button'] == "Delete":
         session.delete(o)
         session.commit()
@@ -1109,7 +1103,7 @@ def deleteMeal(meal_id):
 
 @app.route('/meals/view/<int:meal_id>')
 def showMeal(meal_id):
-    o = session.query(Meal).filter_by(id=meal_id).one()
+    o = Meal.query.filter_by(id=meal_id).one()
     return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
 
 
@@ -1159,7 +1153,7 @@ def getFood(keyword, keyword_local_language):
             print("Found NDB item: "+i.get_name())
 
             # Create Food Main Group
-            foodMainGroup = session.query(FoodMainGroup).filter_by(titleEN=i.get_group()).first()
+            foodMainGroup = FoodMainGroup.query.filter_by(titleEN=i.get_group()).first()
             if not foodMainGroup:
                 #print("Create new group: "+i.get_group())
                 foodMainGroup = FoodMainGroup(titleEN=i.get_group())
@@ -1167,7 +1161,7 @@ def getFood(keyword, keyword_local_language):
                 session.commit()
 
             # Create Food
-            food = session.query(Food).filter_by(titleEN=i.get_name()).first()
+            food = Food.query.filter_by(titleEN=i.get_name()).first()
             if not food:
                 food = Food(
                     titleEN=i.get_name(),
@@ -1319,7 +1313,7 @@ def analyze_ingredient(ingredient_text, **kwargs):
 
 def getIngredients(meal_id):
     if meal_id:
-        items = session.query(Ingredient).filter_by(meal_id=meal_id)
+        items = Ingredient.query.filter_by(meal_id=meal_id)
         return items
     else:
         return false

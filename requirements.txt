@@ -10,4 +10,5 @@ google-cloud
 google-cloud-language
 passlib
 flask-httpauth
+flask-sqlalchemy
 flask-migrate

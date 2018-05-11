@@ -1,56 +1,40 @@
-from food_database import (Base,
-                   UOM,
-                   Meal,
-                   Ingredient,
-                   Food,
-                   FoodComposition,
-                   Nutrient,
-                   ShoppingOrderItem,
-                   User,
-                   PlaningPeriodTemplate,
-                   DietPlanItem,
-                   DietPlan,
-                   Place)
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-from datetime import date, datetime, timedelta
+from huntingfood.models import User, UserGroup, UOM, Meal, Ingredient, Food
+from huntingfood.models import FoodComposition, Nutrient, ShoppingOrder
+from huntingfood.models import ShoppingOrderItem, FoodMainGroup
+from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
+from huntingfood.models import TradeItem, Place
 
-#engine = create_engine('postgresql://vagrant:vagrant@127.0.0.1:5432/np')
-engine = create_engine('postgres://njxqkgsvotldpo:0091ec1051866196d42e608aadc421ef9bb58c37d9fcfe0e7bac4e9ce63929f8@ec2-54-228-182-57.eu-west-1.compute.amazonaws.com:5432/ddjblvctcusagj')
-Base.metadata.bind = engine
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
-
+from huntingfood import db
 
 # Deletes existing records in the tables
-num_rows_deleted = session.query(Ingredient).delete()
-session.commit()
+num_rows_deleted = Ingredient.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(FoodComposition).delete()
-session.commit()
+num_rows_deleted = FoodComposition.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(Nutrient).delete()
-session.commit()
+num_rows_deleted = Nutrient.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(DietPlanItem).delete()
-session.commit()
+num_rows_deleted = DietPlanItem.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(DietPlan).delete()
-session.commit()
+num_rows_deleted = DietPlan.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(Food).delete()
-session.commit()
+num_rows_deleted = Food.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(Meal).delete()
-session.commit()
+num_rows_deleted = Meal.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(UOM).delete()
-session.commit()
+num_rows_deleted = UOM.query.delete()
+db.session.commit()
 
-num_rows_deleted = session.query(User).delete()
-session.commit()
+num_rows_deleted = User.query.delete()
+db.session.commit()
 
 # Create default user
 
@@ -82,22 +66,6 @@ obj_uoms = [
            UOM(uom="kcal",longEN="kilocalories",shortDE="kcal",type="3"),
            UOM(uom="x",longEN="unknown",shortDE="x",type="3")
 ]
-
-
-NUMBER_TIME_PERIODS_GENERATED = 52
-current_date = date.today() # datetime.now()
-current_weekday = current_date.weekday()
-d_start = current_date - timedelta(days=current_weekday)
-obj_time_periods = []
-
-for x in range(0, NUMBER_TIME_PERIODS_GENERATED):
-    d_from = d_start + timedelta(days=(x*7))
-    d_to = d_start + timedelta(days=(6 + (x*7)))
-    week_no = d_from.isocalendar()[1]
-    obj_time_periods.append(
-        PlaningPeriodTemplate(start_date=d_from,end_date=d_to,week_no=week_no)
-    )
-
 
 
 # TODO: change field to say ndb nutrient mapping or so because other database have other terms for lookup
@@ -406,12 +374,11 @@ obj_places = [
             ]
 
 
-session.add_all(obj_users)
-session.add_all(obj_uoms)
-session.add_all(obj_nutrients)
-session.add_all(obj_foods)
-session.add_all(obj_meals)
-session.add_all(obj_ingredients)
-session.add_all(obj_time_periods)
-session.add_all(obj_places)
-session.commit()
+db.session.add_all(obj_users)
+db.session.add_all(obj_uoms)
+db.session.add_all(obj_nutrients)
+db.session.add_all(obj_foods)
+db.session.add_all(obj_meals)
+db.session.add_all(obj_ingredients)
+db.session.add_all(obj_places)
+db.session.commit()
