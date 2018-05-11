@@ -6,7 +6,7 @@ class Config(object):
     DEBUG = True # Turns on debugging features in Flask
     BCRYPT_LOG_ROUNDS = 12 # Configuration for the Flask-Bcrypt extension
     MAIL_FROM_EMAIL = 'info@example.com' # For use in application emails
-    UPLOAD_FOLDER = 'huntingfood\\upload'
+    UPLOAD_FOLDER = 'huntingfood/upload'
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # limit to 2MB
     ALLOWED_EXTENSIONS = {'png', 'png', 'jpg', 'jpeg', 'gif'}
     SQLALCHEMY_DATABASE_URI = os.environ.get('DB_CONNECTION') or \
