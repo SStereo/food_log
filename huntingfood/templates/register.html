@@ -28,7 +28,7 @@
       <div class="card">
           <div class="card-body mx-4">
             <form action="{{ url_for('showRegister') }}" method="POST" enctype="multipart/form-data">
-              <input name="_csrf_token" type="hidden" value="{{ csrf_token }}">
+              <input name="_csrf_token" type="hidden" value="{{ csrf_token() }}">
               <p class="h5 text-center mb-4">Sign up</p>
 
               <div class="md-form">

@@ -222,6 +222,9 @@ var dpViewModel = function() {
         'meal_id' : data.meal_id(),
         'plan_date' : data.plan_date(),
       },
+      headers: {
+        'X-CSRFTOKEN' : csrf_token
+      },
       success: function(response) {
         parent.dietPlanItems.remove(data);
       }
@@ -237,7 +240,7 @@ var dpViewModel = function() {
       type: 'POST',
       url: url_api_dietplan,
       headers: {
-        'X-CSRF-TOKEN' : csrf_token
+        'X-CSRFTOKEN' : csrf_token
       },
       dataType: 'json',
       data: {
@@ -314,6 +317,9 @@ function saveDietPlanItem(newValue) {
       'plan_date' : this.plan_date(),
       'consumed' : this.consumed(),
       'portions' : this.portions()
+    },
+    headers: {
+      'X-CSRFTOKEN' : csrf_token
     },
     success: function(response) {
       //TODO: undo changes in case of failure
@@ -442,6 +448,9 @@ function saveInventoryItem(newValue) {
       're_order_level' : '',
       're_order_quantity' : ''
     },
+    headers: {
+      'X-CSRFTOKEN' : csrf_token
+    },
     success: function(response) {
       //TODO: undo changes in case of failure
       console.log('saveInventoryItem: success');
@@ -552,6 +561,9 @@ var invViewModel = function() {
       data: {
         'id' : data.id()
       },
+      headers: {
+        'X-CSRFTOKEN' : csrf_token
+      },
       success: function(response) {
         self.inventoryItems.remove(data);
       }
@@ -578,7 +590,7 @@ var invViewModel = function() {
         type: 'POST',
         url: url_api_inventory,
         headers: {
-          'X-CSRF-TOKEN' : csrf_token
+          'X-CSRFTOKEN' : csrf_token
         },
         dataType: 'json',
         data: {

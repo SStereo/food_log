@@ -77,7 +77,7 @@
         <p class="font-small dark-grey-text text-right d-flex justify-content-center mb-3 pt-2"> or Sign in with Email:</p>
         <!--Body-->
         <form action="{{ url_for('showLogin') }}" method="POST" name="login_user_form">
-          <input name="_csrf_token" type="hidden" value="{{ csrf_token }}">
+          <input name="_csrf_token" type="hidden" value="{{ csrf_token() }}">
           <div class="md-form">
             <input type="text" name="email" class="form-control" id="email">
             <label for="email">Email</label>
@@ -118,6 +118,8 @@
 {% block script %}
 <script>
 
+  var csrf_token = "{{ csrf_token() }}";
+
   window.fbAsyncInit = function() {
     FB.init({
       appId      : '{{ F_APP_ID }}',
@@ -147,9 +149,12 @@
       console.log('Successful login for: ' + response.name);
      $.ajax({
       type: 'POST',
-      url: '/fbconnect?state={{ csrf_token }}',
+      url: '/fbconnect',
       processData: false,
       data: access_token,
+      headers: {
+        'X-CSRFTOKEN' : csrf_token
+      },
       contentType: 'application/octet-stream; charset=utf-8',
       success: function(result) {
         // Handle or verify the server response if necessary.
@@ -176,9 +181,12 @@
       // Send the one-time-use code to the server, if the server responds, write a 'login successful' message to the web page and then redirect back to the main restaurants page
       $.ajax({
         type: 'POST',
-        url: '/gconnect?state={{ csrf_token }}',
+        url: '/gconnect',
         processData: false,
         data: authResult['code'],
+        headers: {
+          'X-CSRFTOKEN' : csrf_token
+        },
         contentType: 'application/octet-stream; charset=utf-8',
         success: function(result) {
           // Handle or verify the server response if necessary.

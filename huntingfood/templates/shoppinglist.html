@@ -132,7 +132,7 @@
   var dp_id = {{ diet_plan.id }};
   var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
   var inv_id = {{ inventory.id }};
-  var csrf_token = "{{ csrf_token }}";
+  var csrf_token = "{{ csrf_token() }}";
 </script>
 <script src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>

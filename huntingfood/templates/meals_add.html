@@ -9,7 +9,7 @@
         <h4 class="card-title"><strong>New Meal</strong></h4>
 
         <form action="{{ url_for('addMeals') }}" method="POST" enctype="multipart/form-data">
-          <input name="_csrf_token" type="hidden" value="{{ csrf_token }}">
+          <input name="_csrf_token" type="hidden" value="{{ csrf_token() }}">
           <div class="file-field">
             <div class="btn btn-primary btn-sm">
                 <span>Choose Image</span>

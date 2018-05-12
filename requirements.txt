@@ -12,3 +12,4 @@ passlib
 flask-httpauth
 flask-sqlalchemy
 flask-migrate
+flask-wtf

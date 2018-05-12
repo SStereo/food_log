@@ -18,7 +18,7 @@
     <article class="meal">
 
       <form data-ajax="false" action="{{ url_for('deleteMeal',meal_id=meal.id) }}" method="POST" enctype="multipart/form-data">
-        <input name="_csrf_token" type="hidden" value="{{ csrf_token }}">
+        <input name="_csrf_token" type="hidden" value="{{ csrf_token() }}">
         <!-- TODO: It seems that JQuery mobile requires form fields with id -->
         <div>
           Are you sure you want to delete the meal <b>{{ meal.title }}</b>

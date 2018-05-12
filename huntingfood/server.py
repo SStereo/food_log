@@ -1,4 +1,5 @@
 from huntingfood import app
+from huntingfood.users import authentication
 
 import os  # required to have access to the Port environment variable
 import json
@@ -24,7 +25,6 @@ import string
 from flask import session as login_session  # a dictionary to store information
 
 # used to protect endpoints to require an authenticated user first
-from flask import g  # variable valid for the reuquest only
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth, MultiAuth
 
 # National Nutrient Database - United States Department of Agriculture
@@ -51,18 +51,9 @@ from huntingfood.models import ShoppingOrderItem, FoodMainGroup
 from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
 from huntingfood.models import TradeItem, Place
 
-
-# Setup Basic Authenntication handler
-basic_auth = HTTPBasicAuth()
-token_auth = HTTPTokenAuth('Bearer')  # TODO:Enable for Google/FB tokens
-multi_auth = MultiAuth(basic_auth, token_auth)
-
 # Set Logging level
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# User data settings
-FUTURE_DIET_PLANS = 52
 
 # TODO: not really required but just to ease the migration to flask-sqlalchemy
 session = db.session
@@ -71,7 +62,7 @@ db.create_all()
 db.session.commit()
 
 # Google Cloud Connection
-PK_escaped = os.environ.get('GOOGLE_CLOUD_CREDENTIALS_PK')
+PK_escaped = app.config['GOOGLE_CLOUD_CREDENTIALS_PK']
 PK_raw = PK_escaped.replace('\\n', '\n')
 service_account_info = dict(
     type='service_account',
@@ -99,20 +90,6 @@ translate_client = translate.Client(target_language='en',
 language_client = language.LanguageServiceClient(
     credentials=google_cloud_credentials)
 
-# Google oauth credentials
-GOOGLE_WEB_CLIENT_ID = os.environ.get('GOOGLE_WEB_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-
-# Google api key (used for maps), "WTF" required to resolve bug in h.terminal
-GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY_WTF')
-
-# Facebook oauth credentials
-FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID')
-FACEBOOK_SECRET_KEY = os.environ.get('FACEBOOK_SECRET_KEY')
-
-# NDB connection
-NDB_KEY = os.environ.get('NDB_KEY')
-
 # TODO: Validate if there is a better way in sqlAlchemy ot achieve that
 # TODO: Ensure reload of dictionary when uom table changes
 nutrientDict = {}
@@ -131,35 +108,10 @@ def login_required(func):
     @wraps(func)
     def decorated_view(*args, **kwargs):
         if 'user_id' not in login_session:
-            return login()
+            return authentication.login()
         else:
             return func(*args, **kwargs)
     return decorated_view
-
-
-def login(*args):
-    if args:
-        message = args[0]
-    else:
-        message = None
-
-    # Generate a new CSRF token
-    app.jinja_env.globals['csrf_token'] = generate_csrf_token()
-
-    if request.referrer:
-        previous_url = urlparse(request.referrer)[2]
-    else:
-        previous_url = '/'
-    target_url = request.url
-    if not target_url or previous_url == '/':
-        target_url = '/'
-    return render_template(
-        "login.html",
-        G_CLIENT_ID=GOOGLE_WEB_CLIENT_ID,
-        F_APP_ID=FACEBOOK_APP_ID,
-        redirect_next=target_url,
-        message=message)
-
 
 # User Functions
 def createUser(login_session, password):
@@ -268,7 +220,7 @@ def validateUser(login_session):
         login_session['default_inventory_id'] = user.default_inventory_id
         return True  # user is authorized
 
-@app.before_request
+# @app.before_request
 def csrf_protect():
     '''
     Aborts any post request if csrf token in the form does not match the
@@ -380,7 +332,7 @@ def upload_static(filename):
 @app.route('/login', methods=['GET', 'POST'])
 def showLogin():
     if request.method == 'GET':
-        return login()
+        return authentication.login()
     elif request.method == 'POST':
         login_session['email'] = request.form['email']
         password = request.form['password']
@@ -419,19 +371,15 @@ def showRegister():
 
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
-    # Validate state token
-    if request.args.get('state') != login_session['_csrf_token']:
-        response = make_response(json.dumps('Invalid state parameter.'), 401)
-        response.headers['Content-Type'] = 'application/json'
-        return response
+
     # Obtain authorization code
     code = request.data
 
     try:
         # Upgrade the authorization code into a credentials object
         oauth_flow = OAuth2WebServerFlow(
-            client_id=GOOGLE_WEB_CLIENT_ID,
-            client_secret=GOOGLE_CLIENT_SECRET,
+            client_id=app.config['GOOGLE_WEB_CLIENT_ID'],
+            client_secret=app.config['GOOGLE_CLIENT_SECRET'],
             scope='',
             redirect_uri='postmessage')
 
@@ -464,7 +412,7 @@ def gconnect():
         return response
 
     # Verify that the access token is valid for this app.
-    if result['issued_to'] != GOOGLE_WEB_CLIENT_ID:
+    if result['issued_to'] != app.config['GOOGLE_WEB_CLIENT_ID']:
         response = make_response(
             json.dumps("Token's client ID does not match app's."), 401)
         print("Token's client ID does not match app's.")
@@ -536,17 +484,13 @@ def gdisconnect():
 
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
-    if request.args.get('state') != login_session['_csrf_token']:
-        response = make_response(json.dumps(
-            'Invalid state parameter.'), 401)
-        response.headers['Content-Type'] = 'application/json'
-        return response
+
     access_token = request.data.decode("utf-8")
     print("access token: %s" % access_token)
     url = 'https://graph.facebook.com/oauth/access_token?' \
         'grant_type=fb_exchange_token&client_id=%s&' \
-        'client_secret=%s&fb_exchange_token=%s' % (FACEBOOK_APP_ID,
-                                                   FACEBOOK_SECRET_KEY,
+        'client_secret=%s&fb_exchange_token=%s' % (app.config['FACEBOOK_APP_ID'],
+                                                   app.config['FACEBOOK_SECRET_KEY'],
                                                    access_token)
     h = httplib2.Http()
     result = h.request(url, 'GET')[1].decode("utf-8")
@@ -684,7 +628,7 @@ def showShoppingList():
         inventory=inventory,
         getIngredients=getIngredients,
         loginSession=login_session,  # TODO: is that necessary to pass it to the client?
-        g_api_key=GOOGLE_API_KEY)
+        g_api_key=app.config['GOOGLE_API_KEY'])
 
 
 @app.route('/shoppinglist/items', methods = ['GET','POST'])
@@ -1124,19 +1068,6 @@ def createInventory(user_id):
     session.commit()
 
     return obj_inventory
-
-
-@token_auth.verify_token
-def verify_token(token):
-    g.user = None
-    try:
-        data = jwt.loads(token)
-    except:
-        return False
-    if 'username' in data:
-        g.user = data['username']
-        return True
-    return False
 
 
 # Food database helper functions
