@@ -437,16 +437,16 @@ function saveInventoryItem(newValue) {
     data: {
       'id' : this.id(),
       'inventory_id' : inv_id,
-      'titleEN' : '',
+      'titleEN' : this.titleEN(),
       'titleDE' : this.title(),
       'status' : this.status(),
-      'food_id' : '',
-      'good_id' : '',
-      'level' : '',
-      'need_from_diet_plan' : '',
-      'need_additional' : '',
-      're_order_level' : '',
-      're_order_quantity' : ''
+      'food_id' : this.food_id(),
+      'good_id' : this.good_id(),
+      'level' : this.level(),
+      'need_from_diet_plan' : this.need_from_diet_plan(),
+      'need_additional' : this.need_additional(),
+      're_order_level' : this.re_order_level(),
+      're_order_quantity' : this.re_order_quantity()
     },
     headers: {
       'X-CSRFTOKEN' : csrf_token
@@ -464,6 +464,9 @@ var InventoryItem = function(data) {
 
   this.title = ko.observable(data.titleDE);  // TODO: Enable multi-language support
   this.title.subscribe(saveInventoryItem, this);
+
+  this.titleEN = ko.observable(data.titleEN);  // TODO: Enable multi-language support
+  this.titleEN.subscribe(saveInventoryItem, this);
 
   this.status = ko.observable(data.status);
   this.status.subscribe(saveInventoryItem, this);
@@ -485,6 +488,9 @@ var InventoryItem = function(data) {
 
   this.good_id = ko.observable(data.good_id);
   this.good_id.subscribe(saveInventoryItem, this);
+
+  this.food_id = ko.observable(data.food_id);
+  this.food_id.subscribe(saveInventoryItem, this);
 
   this.need_from_diet_plan = ko.observable(data.need_from_diet_plan);
 

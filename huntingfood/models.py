@@ -139,14 +139,14 @@ class Ingredient(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     quantity = db.Column(db.Float, nullable = False)
     uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable = False)
-    meal_id = db.Column(db.Integer, db.ForeignKey('meals.id'), nullable = False)
+    meal_id = db.Column(db.Integer, db.ForeignKey('meals.id'), nullable = False, index = True)
     title = db.Column(db.String(80), nullable = False) #gehackte Dosentomaten
     titleEN = db.Column(db.String(80), nullable = True) #chopped canned tomatoes
     processing_part = db.Column(db.String(80), nullable = True) # chopped canned
     preparation_part = db.Column(db.String(80), nullable = True) # empty
     base_food_part = db.Column(db.String(80), nullable = True) # Tomatoe
 
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True)
+    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True, index = True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     food = db.relationship("Food")
@@ -199,6 +199,7 @@ class Food(db.Model):
     food_processing_type = db.relationship("FoodProcessingType")
     food_preparation_type = db.relationship("FoodPreparationType")
     referencedIn = db.relationship("Ingredient")
+    referencedInventoryItem = db.relationship("InventoryItem", back_populates="food")
 
 
 class Goods(db.Model):
@@ -276,8 +277,8 @@ class InventoryItem(db.Model):
     titleEN = db.Column(db.String(160), nullable = True)  # TODO: remove those fields later and replace with good/food_id
     titleDE = db.Column(db.String(160), nullable = True)
     status = db.Column(db.SmallInteger, nullable = True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True)
-    good_id = db.Column(db.Integer, db.ForeignKey('goods.id'), nullable = True)
+    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True, index = True)
+    good_id = db.Column(db.Integer, db.ForeignKey('goods.id'), nullable = True, index = True)
     level = db.Column(db.Integer, nullable = True)
     need_from_diet_plan = db.Column(db.Integer, nullable = True)  # TODO: enhance? flat need from dietplans does not provide visibility and time clarity to dp elements
     need_additional = db.Column(db.Integer, nullable = True)

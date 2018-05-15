@@ -1,0 +1,5 @@
+SELECT foods.id AS "f.id", foods."titleDE" AS "f.title", inventory_items."id" AS "inv.id", inventory_items."food_id" AS "inv.food_id", ingredients."meal_id" as "ing.meal_id", ingredients.id as "ing.id", ingredients.quantity as "ing.qty"
+FROM foods
+LEFT JOIN inventory_items ON foods.id = inventory_items.food_id
+LEFT JOIN ingredients ON foods.id = ingredients.food_id
+WHERE (inventory_items."food_id" IS NULL) and (ingredients."meal_id" = 11)

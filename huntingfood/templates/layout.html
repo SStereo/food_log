@@ -80,7 +80,7 @@
                     <a class="nav-link" href="{{ url_for('showShoppingList') }}">Shopping List</a>
                 </li>
                 <li id="nav-4" class="nav-item{{ suffix5 }}">
-                  {% if 'username' in loginSession %}
+                  {% if 'name' in loginSession %}
                     <a class="nav-link" href="{{ url_for('disconnect') }}">Logout</a>
                   {% else %}
                     <a class="nav-link" href="{{ url_for('showLogin') }}">Login</a>

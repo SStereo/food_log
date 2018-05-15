@@ -57,12 +57,7 @@
     <!--/.Card Regular-->
 
   {% endfor %}
-
-  <div class="fixed-action-btn" style="bottom: 45px; right: 24px;">
-      <a href="{{ url_for('addMeals') }}" class="btn-floating btn-lg red">
-          <i class="fa fa-pencil"></i>
-      </a>
-  </div>
+  <a href="{{ url_for('addMeals') }}" class="position-fixed btn-primary btn-lg" style="bottom: 45px; right: 24px;"><i class="fa fa-plus"></i></a></button>
 
 </main>
 {% endblock %}

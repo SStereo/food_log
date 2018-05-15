@@ -25,7 +25,7 @@ app.register_blueprint(errors_bp)
 # http://flask-wtf.readthedocs.io/en/stable/csrf.html
 csrf = CSRFProtect(app)
 
-from huntingfood import server, models
+from huntingfood import server, models, users
 
 
 if not app.debug:
