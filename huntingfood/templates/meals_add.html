@@ -10,14 +10,9 @@
 
         <form action="{{ url_for('addMeals') }}" method="POST" enctype="multipart/form-data">
           <input name="_csrf_token" type="hidden" value="{{ csrf_token() }}">
-          <div class="file-field">
-            <div class="btn btn-primary btn-sm">
-                <span>Choose Image</span>
-                <input type="file" name="file">
-            </div>
-            <div class="file-path-wrapper">
-               <input class="file-path validate" name="filepath" type="text" placeholder="Upload your file">
-            </div>
+          <div class="custom-file">
+            <input type="file" name="file" class="custom-file-input" id="customFile">
+            <label class="custom-file-label" for="customFile">Choose file</label>
           </div>
 
           <div class="md-form">

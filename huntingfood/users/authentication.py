@@ -1,5 +1,5 @@
 import json
-from flask import render_template, request, redirect, abort, make_response, flash
+from flask import render_template, request, redirect, abort, make_response, flash, url_for, jsonify
 from huntingfood import app
 from huntingfood import db
 from huntingfood.models import User, UserGroup, UserGroupAssociation, Inventory, DietPlan
@@ -133,7 +133,7 @@ def listUsersInGroup(group_id):
 
 # Retrieves the user object
 def getUserInfo(user_id):
-    user = User.query.filter_by(id=user_id).one()
+    user = User.query.filter_by(id=user_id).first_or_404()
     return user
 
 
@@ -174,20 +174,27 @@ def validateUser(login_session):
     # Validates if user exists and creates if necessary
     print("ValidateUser with login_session[email] = " + login_session['email'])
     user = getUser(login_session['email'])
+    # response values
+    # 0 = not authorized
+    # 1 = existing user authorized
+    # 2 = newly created user authorized
+    response = 0
     if not user:
         password = None
         print("Create a new user ...")
         user = createUser(login_session, password)
-
+        response = 1
     if not user.active:
-        return False  # user is not authorized
+        response = 0
+        return response  # user is not authorized
     else:
         login_session['user_id'] = user.id
         login_session['provider'] = user.provider
         login_session['language'] = user.language
         login_session['default_diet_plan_id'] = user.default_diet_plan_id
         login_session['default_inventory_id'] = user.default_inventory_id
-        return True  # user is authorized
+        response = response + 1
+        return response  # user is authorized
 
 
 def welcome():
@@ -214,7 +221,7 @@ def showLogin():
         if not user:
             return login("Unknown username or incorrect password")
         else:
-            if user.verify_password(password) and validateUser(login_session):
+            if user.verify_password(password) and (validateUser(login_session) > 0):
                 return redirect('/')
             else:
                 return login("Unknown username or incorrect password")
@@ -238,7 +245,36 @@ def showRegister():
             login_session['email'] = email
             login_session['provider'] = 'local'
             user = createUser(login_session, password)
-            validateUser(login_session)
+            status = validateUser(login_session)
+            if (status == 2):
+                return redirect(url_for("showSettings"))
+            else:
+                return redirect('/')
+    return redirect('/')
+
+
+@app.route('/user/settings', methods=['GET', 'POST'])
+@login_required
+def showSettings():
+    user_id = login_session['user_id']
+    user = getUserInfo(user_id)
+    if request.method == 'GET':
+        return render_template(
+            "settings.html",
+            user=user,
+            data_portions=app.config['DATA_PORTIONS'])
+    elif request.method == 'POST':
+        default_portions = request.form['default_portions']
+        city = request.form['city']
+        zip = request.form['zip']
+        street = request.form['street']
+        state = request.form['state']
+        user.default_portions = default_portions
+        user.city = city
+        user.zip = zip
+        user.street = street
+        user.state = state
+        db.session.commit()
     return redirect('/')
 
 
@@ -317,10 +353,16 @@ def gconnect():
     login_session['provider'] = 'google'
 
     # Validate user against database
-    if validateUser(login_session):
+    status = validateUser(login_session)
+    print('user status = ' + str(status))
+    if (status == 1):
         output = welcome()
         flash("Now logged in as %s" % login_session['name'])
-        return output
+        return jsonify(status='1', output=output)
+    elif (status == 2):
+        output = welcome()
+        flash("Now logged in as %s" % login_session['name'])
+        return jsonify(status='2', output=output)
     else:
         flash('User is not authorized to access this application')
         return False
@@ -402,10 +444,15 @@ def fbconnect():
     login_session['picture'] = data["data"]["url"]
 
     # Validate user against database
-    if validateUser(login_session):
+    status = validateUser(login_session)
+    if (status == 1):
         output = welcome()
         flash("Now logged in as %s" % login_session['name'])
-        return output
+        return jsonify(status='1', output=output)
+    elif (status == 2):
+        output = welcome()
+        flash("Now logged in as %s" % login_session['name'])
+        return jsonify(status='2', output=output)
     else:
         flash('User is not authorized to access this application')
         return False

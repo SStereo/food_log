@@ -1,0 +1,6 @@
+SELECT materials.id AS materials_id, ingredients.quantity AS ingredients_quantity, ingredients.uom_id AS ingredients_uom_id, meals.portions AS meals_portions, material_forecasts.quantity AS material_forecasts_quantity, material_forecasts.quantity_uom AS material_forecasts_quantity_uom
+FROM materials 
+LEFT JOIN ingredients ON materials.id = ingredients.material_id 
+LEFT JOIN material_forecasts ON materials.id = material_forecasts.material_id
+LEFT JOIN meals ON meals.id = ingredients.meal_id
+WHERE ingredients.meal_id = 6 AND material_forecasts.plan_date = '2018-05-16' AND material_forecasts.inventory_id = 1

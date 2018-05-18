@@ -29,13 +29,20 @@ class User(db.Model):
     confirmed_at = db.Column(db.DateTime())
     password_hash = db.Column(db.String(255))
     language = db.Column(db.String(6), nullable=False)
-    default_diet_plan_id = db.Column(db.Integer, db.ForeignKey('diet_plans.id'), nullable=True)
-    default_inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'), nullable=True)
+    default_diet_plan_id = db.Column(db.Integer, db.ForeignKey('diet_plans.id'), nullable=True, unique=True)  # TODO: fix this when multiple users share one diet_plan and inventory
+    default_inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'), nullable=True, unique=True)
+    default_portions = db.Column(db.SmallInteger, nullable = True)
+    street = db.Column(db.String(120), nullable=True)
+    city = db.Column(db.String(120), nullable=True)
+    state = db.Column(db.String(120), nullable=True)
+    zip = db.Column(db.String(120), nullable=True)
 
     groups = db.relationship("UserGroupAssociation", back_populates="user")
-    meals = db.relationship("Meal", cascade="all, delete-orphan")
+    meals = db.relationship("Meal", cascade="all, delete-orphan", back_populates="owner")
     inventories = db.relationship("Inventory", primaryjoin='User.id == Inventory.creator_id', cascade="all, delete-orphan")
     diet_plans = db.relationship("DietPlan", primaryjoin='User.id == DietPlan.creator_id', cascade="all, delete-orphan", back_populates="creator")
+    default_diet_plan = db.relationship("DietPlan", primaryjoin='User.default_diet_plan_id == DietPlan.id', cascade="all, delete-orphan", single_parent=True)
+    default_inventory = db.relationship("Inventory", primaryjoin='User.default_inventory_id == Inventory.id', cascade="all, delete-orphan", single_parent=True)
     shopping_order = db.relationship("ShoppingOrder", cascade="all, delete-orphan")
 
     def hash_password(self, password):
@@ -76,6 +83,7 @@ class UserGroupAssociation(db.Model):
 
     group = db.relationship("UserGroup", back_populates="users")
     user = db.relationship("User", back_populates="groups")
+
 
 # Required to provide access for the whole family on shopping lists
 # Every user gets their own group unless their are added to another Group
@@ -118,7 +126,7 @@ class Meal(db.Model):
 
     owner = db.relationship("User", back_populates="meals", foreign_keys=[owner_id])
     user_group = db.relationship("UserGroup")
-    ingredients = db.relationship("Ingredient", cascade="all, delete-orphan")
+    ingredients = db.relationship("Ingredient", back_populates="meal", cascade="all, delete-orphan")
     diet_plans = db.relationship("DietPlanItem", back_populates="meal", cascade="all, delete-orphan")
 
     @property
@@ -134,6 +142,7 @@ class Meal(db.Model):
             'created' : self.created,
         }
 
+
 class Ingredient(db.Model):
     __tablename__ = 'ingredients'
     id = db.Column(db.Integer, primary_key = True)
@@ -146,10 +155,10 @@ class Ingredient(db.Model):
     preparation_part = db.Column(db.String(80), nullable = True) # empty
     base_food_part = db.Column(db.String(80), nullable = True) # Tomatoe
 
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True, index = True)
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True, index = True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
-    food = db.relationship("Food")
+    material = db.relationship("Material")
     meal = db.relationship("Meal", back_populates="ingredients")
     uom = db.relationship("UOM")
 
@@ -165,6 +174,7 @@ class FoodMainGroup(db.Model):
     titleDE = db.Column(db.String(80), nullable = True)
     bls_code_part = db.Column(db.String(1), nullable = True)
 
+
 class FoodSubGroup(db.Model):
     __tablename__ = 'food_subgroup'
     id = db.Column(db.Integer, primary_key = True)
@@ -173,8 +183,9 @@ class FoodSubGroup(db.Model):
     food_maingroup_id = db.Column(db.Integer, db.ForeignKey('food_maingroup.id'), nullable = False)
     bls_code_part = db.Column(db.String(2), nullable = True)
 
-class Food(db.Model):
-    __tablename__ = 'foods'
+
+class Material(db.Model):
+    __tablename__ = 'materials'
     id = db.Column(db.Integer, primary_key = True)
     private = db.Column(db.Boolean, unique = False, default = False)  # user specific food that is not refered to a NDB or similar
     user_group_id = db.Column(db.Integer,db.ForeignKey('user_groups.id'), nullable = True)  # only required for private food items, for example home made foods
@@ -183,7 +194,7 @@ class Food(db.Model):
     bls_code = db.Column(db.String(7), nullable = True)
     ndb_code = db.Column(db.String(7), nullable = True)
     isBaseFood = db.Column(db.Boolean, unique = False, default = False)
-    parentBaseFood = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True)
+    parentBaseFood = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True)
     # Standard values
     uom_nutrient_value = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable = True)
     # Classification
@@ -199,64 +210,23 @@ class Food(db.Model):
     food_processing_type = db.relationship("FoodProcessingType")
     food_preparation_type = db.relationship("FoodPreparationType")
     referencedIn = db.relationship("Ingredient")
-    referencedInventoryItem = db.relationship("InventoryItem", back_populates="food")
+    referencedInventoryItem = db.relationship("InventoryItem", back_populates="material")
+    referencedMaterialForecast = db.relationship("MaterialForecast", back_populates="material")
 
 
-class Goods(db.Model):
-    __tablename__ = 'goods'
-    id = db.Column(db.Integer, primary_key = True)
-    private = db.Column(db.Boolean, unique = False, default = False)  # user specific food that is not refered to a NDB or similar
-    user_group_id = db.Column(db.Integer,db.ForeignKey('user_groups.id'), nullable = True)
-    titleEN = db.Column(db.String(160), nullable = True)
-    titleDE = db.Column(db.String(160), nullable = True)
+# Forecast material consumption for a given inventory (e.g. household, warehouse)
+# TODO: Consider link to InventoryItem (SKU) directly rather than to inventory and material_id
+class MaterialForecast(db.Model):
+    __tablename__ = 'material_forecasts'
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
+    plan_date = db.Column(db.DateTime, nullable=True)
+    quantity = db.Column(db.Float, nullable=True)
+    quantity_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
 
-    user_group = db.relationship("UserGroup")
-
-
-class FoodProcessingType(db.Model):
-    __tablename__ = 'food_processing_type'
-    id = db.Column(db.Integer, primary_key = True)
-    bls_code_part = db.Column(db.String(1), nullable = True)
-    food_subgroup_id = db.Column(db.Integer, db.ForeignKey('food_subgroup.id'), nullable = True) # Some foods to have specific processing types
-    titleEN = db.Column(db.String(80), nullable = False)
-    titleDE = db.Column(db.String(80), nullable = False)
-
-
-class FoodPreparationType(db.Model):
-    __tablename__ = 'food_preparation_type'
-    id = db.Column(db.Integer, primary_key = True)
-    bls_code_part = db.Column(db.String(1), nullable = True)
-    food_maingroup_id = db.Column(db.Integer, db.ForeignKey('food_maingroup.id'), nullable = True)
-    titleEN = db.Column(db.String(80), nullable = False)
-    titleDE = db.Column(db.String(80), nullable = False)
-
-
-class FoodEdibleWeight(db.Model):
-    __tablename__ = 'food_weight_reference'
-    id = db.Column(db.Integer, primary_key = True)
-    bls_code_part = db.Column(db.String(1), nullable = True)
-
-
-# ++++++++++++++++++++++++
-
-class FoodComposition(db.Model):
-    __tablename__ = 'food_composition'
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), primary_key = True)
-    nutrient_id = db.Column(db.Integer, db.ForeignKey('nutrients.id'), primary_key = True)
-    per_qty_uom = db.Column(db.String(length=5, convert_unicode=True), db.ForeignKey('units_of_measures.uom')) # example per grams of quantity
-    per_qty = db.Column(db.Float)  # example per 100 of uom (grams)
-    value = db.Column(db.Float)
-
-    uom = db.relationship("UOM")
-
-
-class Nutrient(db.Model):
-    __tablename__ = 'nutrients'
-    id = db.Column(db.Integer, primary_key = True)
-    value_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'))  # example calories, or milligrams
-    titleEN = db.Column(db.String(80), nullable = False)
-    titleDE = db.Column(db.String(80), nullable = True)
-
+    inventory = db.relationship("Inventory", foreign_keys=[inventory_id], back_populates="material_forecasts")
+    material = db.relationship("Material")
     uom = db.relationship("UOM")
 
 
@@ -269,25 +239,25 @@ class Inventory(db.Model):
     creator = db.relationship("User", primaryjoin='User.id == Inventory.creator_id')
     user_group = db.relationship("UserGroup", foreign_keys=[user_group_id])
     items = db.relationship("InventoryItem", back_populates="inventory", cascade="all, delete-orphan")
+    material_forecasts = db.relationship("MaterialForecast", back_populates="inventory", cascade="all, delete-orphan")
+
 
 class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
-    id = db.Column(db.Integer, primary_key = True)
+    id = db.Column(db.Integer, primary_key = True)  # TODO: Each item is per definition a SKU (Stock keeping unit), consider renaming
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
     titleEN = db.Column(db.String(160), nullable = True)  # TODO: remove those fields later and replace with good/food_id
     titleDE = db.Column(db.String(160), nullable = True)
     status = db.Column(db.SmallInteger, nullable = True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True, index = True)
-    good_id = db.Column(db.Integer, db.ForeignKey('goods.id'), nullable = True, index = True)
-    level = db.Column(db.Integer, nullable = True)
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True, index = True)
+    level = db.Column(db.Integer, nullable = True)  # TODO: should be renamed to stock (on hand)
     need_from_diet_plan = db.Column(db.Integer, nullable = True)  # TODO: enhance? flat need from dietplans does not provide visibility and time clarity to dp elements
     need_additional = db.Column(db.Integer, nullable = True)
     re_order_level = db.Column(db.Integer, nullable = True)
     re_order_quantity = db.Column(db.Integer, nullable = True)
 
     inventory = db.relationship("Inventory", foreign_keys=[inventory_id], back_populates="items")
-    food = db.relationship("Food")
-    good = db.relationship("Goods")
+    material = db.relationship("Material")
 
     @property
     def serialize(self):
@@ -298,8 +268,7 @@ class InventoryItem(db.Model):
             'titleEN' : self.titleEN,
             'titleDE' : self.titleDE,
             'status' : self.status,
-            'food_id' : self.food_id,
-            'good_id' : self.good_id,
+            'material_id' : self.material_id,
             'level' : self.level,
             'need_from_diet_plan' : self.need_from_diet_plan,
             'need_additional' : self.need_additional,
@@ -329,8 +298,7 @@ class ShoppingOrderItem(db.Model):
     titleEN = db.Column(db.String(80), nullable = True)  # TODO: remove those fields later and replace with good/food_id
     titleDE = db.Column(db.String(80), nullable = True)
     shopping_order_id = db.Column(db.Integer, db.ForeignKey('shopping_orders.id'))
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable = True)
-    good_id = db.Column(db.Integer, db.ForeignKey('goods.id'), nullable = True)
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True)
     quantity = db.Column(db.Float, nullable = True)
     quantity_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable = True)
     in_basket = db.Column(db.Boolean, default = False)
@@ -343,8 +311,7 @@ class ShoppingOrderItem(db.Model):
     ingredients_photo = db.Column(db.String, nullable = True)
     trade_item_id = db.Column(db.Integer, db.ForeignKey('trade_items.id'), nullable = True)
 
-    food = db.relationship("Food")
-    good = db.relationship("Goods")
+    material = db.relationship("Material")
     shopping_order = db.relationship("ShoppingOrder")
     trade_item = db.relationship("TradeItem")
 
@@ -376,6 +343,7 @@ class DietPlanItem(db.Model):
     plan_date = db.Column(db.Date, nullable=False)
     portions = db.Column(db.SmallInteger, nullable=True)
     consumed = db.Column(db.Boolean, nullable=True)
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True)  # TODO: Allow individual food items to be placed in a dietplan, like an apple a day keeps the doctor away
 
     dietplan = db.relationship("DietPlan")
     meal = db.relationship("Meal", back_populates="diet_plans")
@@ -388,10 +356,12 @@ class DietPlanItem(db.Model):
             'diet_plan_id' : self.diet_plan_id,
             'plan_date' : self.plan_date,
             'meal_id' : self.meal_id,
+            'material_id' : self.material_id,
             'meal' : self.meal.title,
             'portions' : self.portions,
             'consumed' : self.consumed,
         }
+
 
 # Items that relate to real products bought in the retail / grocery stores
 class TradeItem(db.Model):
@@ -424,3 +394,49 @@ class Place(db.Model):
             'geo_lat' : self.geo_lat,
             'geo_lng' : self.geo_lng
         }
+
+class FoodProcessingType(db.Model):
+    __tablename__ = 'food_processing_type'
+    id = db.Column(db.Integer, primary_key = True)
+    bls_code_part = db.Column(db.String(1), nullable = True)
+    food_subgroup_id = db.Column(db.Integer, db.ForeignKey('food_subgroup.id'), nullable = True) # Some foods to have specific processing types
+    titleEN = db.Column(db.String(80), nullable = False)
+    titleDE = db.Column(db.String(80), nullable = False)
+
+
+class FoodPreparationType(db.Model):
+    __tablename__ = 'food_preparation_type'
+    id = db.Column(db.Integer, primary_key = True)
+    bls_code_part = db.Column(db.String(1), nullable = True)
+    food_maingroup_id = db.Column(db.Integer, db.ForeignKey('food_maingroup.id'), nullable = True)
+    titleEN = db.Column(db.String(80), nullable = False)
+    titleDE = db.Column(db.String(80), nullable = False)
+
+
+class FoodEdibleWeight(db.Model):
+    __tablename__ = 'food_weight_reference'
+    id = db.Column(db.Integer, primary_key = True)
+    bls_code_part = db.Column(db.String(1), nullable = True)
+
+
+# ++++++++++++++++++++++++
+
+class FoodComposition(db.Model):
+    __tablename__ = 'food_composition'
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), primary_key = True)
+    nutrient_id = db.Column(db.Integer, db.ForeignKey('nutrients.id'), primary_key = True)
+    per_qty_uom = db.Column(db.String(length=5, convert_unicode=True), db.ForeignKey('units_of_measures.uom')) # example per grams of quantity
+    per_qty = db.Column(db.Float)  # example per 100 of uom (grams)
+    value = db.Column(db.Float)
+
+    uom = db.relationship("UOM")
+
+
+class Nutrient(db.Model):
+    __tablename__ = 'nutrients'
+    id = db.Column(db.Integer, primary_key = True)
+    value_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'))  # example calories, or milligrams
+    titleEN = db.Column(db.String(80), nullable = False)
+    titleDE = db.Column(db.String(80), nullable = True)
+
+    uom = db.relationship("UOM")

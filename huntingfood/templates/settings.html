@@ -1,0 +1,82 @@
+{% set activeMenuItem = 5 %}
+{% extends "layout.html" %}
+
+
+{% block style %}
+<style>
+
+
+  .card {
+    width: 350px;
+    margin-left: auto;
+    margin-right: auto;
+    display: inline-block;
+    @include media-breakpoint-up(md);
+  }
+</style>
+{% endblock %}
+
+
+{% block body %}
+<main>
+  <div style="height: 68px"></div>
+
+  <!-- Form register -->
+
+    <form action="{{ url_for('showSettings', user_id=user.id) }}" method="POST" enctype="multipart/form-data">
+      <div class="card">
+        <div class="card-body">
+          <h2>Konto Informationen</h2>
+          <input name="_csrf_token" type="hidden" value="{{ csrf_token() }}">
+
+          <div class="form-group">
+            <label for="staticEmail">{{ user.email }}</label>
+            <input type="email" class="form-control-plaintext" id="staticEmail" placeholder="Email">
+          </div>
+
+          <div class="form-group">
+            <label for="inputAddress">Adresse</label>
+            <input type="text" class="form-control" id="inputAddress" name="street" placeholder="1234 Main St" value="{{ user.street }}">
+            <input type="text" class="form-control" id="inputAddress2" name="street2" placeholder="Stockwerk, Flur, etc.">
+          </div>
+
+          <div class="form-group">
+            <label for="inputCity">Stadt</label>
+            <input type="text" class="form-control" name="city" id="inputCity" value="{{ user.city }}">
+            <label for="inputState">Bundesland</label>
+            <select id="inputState" name="state" class="form-control" value="{{ user.state }}">
+              <option selected>Choose...</option>
+              <option>...</option>
+            </select>
+            <label for="inputZip">Postleitzahl</label>
+            <input type="text" class="form-control" name="zip" id="inputZip" value="{{ user.zip }}">
+          </div>
+
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <h2>Speiseplan Einstellungen</h2>
+          <label for="inputPortions">Standard Anzahl an Portionen</label>
+          <select id="inputPortions" class="form-control" name="default_portions">
+            {% for p in data_portions %}
+            <option value="{{ p }}">{{ p }} Portionen</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>
+
+
+
+
+
+</main>
+{% endblock %}
+
+{% block script %}
+<script>
+
+</script>
+{% endblock %}

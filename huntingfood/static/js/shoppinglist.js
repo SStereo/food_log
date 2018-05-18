@@ -107,6 +107,7 @@ var dpViewModel = function() {
   self.meals = ko.observableArray([]);
   self.week_selected = ko.observable('');
   self.week_range = ko.observableArray([]);
+  self.portions = ko.observableArray([1,2,3,4,5,6,7,8,9,10,11,12])
 
   self.loadMeals = function() {
     $.ajax({
@@ -247,6 +248,7 @@ var dpViewModel = function() {
         'diet_plan_id' : dp_id,
         'meal_id' : data.meal_id_select2add(),
         'plan_date' : data.date(),
+        'portions' : 2 // TODO: fix! data.portions()
       },
       success: function(response) {
 
@@ -354,6 +356,12 @@ var GridDay = function(data) {
   }, this);
   this.dietPlanItems = ko.observableArray([]);
   this.meal_id_select2add = ko.observable();
+  this.select2add_portions = ko.computed(function() {
+    // return ko.utils.arrayFilter(self.meals(), function(item) {
+      // return item.meal_id == this.meal_id_select2add();
+    // });
+    return 2  // TODO: return value of meal instead of a fixed 2
+  }, this);
 }
 
 var DietPlanItem = function(data) {
@@ -440,8 +448,7 @@ function saveInventoryItem(newValue) {
       'titleEN' : this.titleEN(),
       'titleDE' : this.title(),
       'status' : this.status(),
-      'food_id' : this.food_id(),
-      'good_id' : this.good_id(),
+      'material_id' : this.material_id(),
       'level' : this.level(),
       'need_from_diet_plan' : this.need_from_diet_plan(),
       'need_additional' : this.need_additional(),
@@ -486,11 +493,8 @@ var InventoryItem = function(data) {
   this.re_order_quantity = ko.observable(data.re_order_quantity);
   this.re_order_quantity.subscribe(saveInventoryItem, this);
 
-  this.good_id = ko.observable(data.good_id);
-  this.good_id.subscribe(saveInventoryItem, this);
-
-  this.food_id = ko.observable(data.food_id);
-  this.food_id.subscribe(saveInventoryItem, this);
+  this.material_id = ko.observable(data.material_id);
+  this.material_id.subscribe(saveInventoryItem, this);
 
   this.need_from_diet_plan = ko.observable(data.need_from_diet_plan);
 

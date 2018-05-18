@@ -29,7 +29,7 @@ from sqlalchemy import exc
 # Import own modules
 from huntingfood import tools
 from huntingfood import db
-from huntingfood.models import UOM, Meal, Ingredient, Food
+from huntingfood.models import UOM, Meal, Ingredient, Material, MaterialForecast
 from huntingfood.models import FoodComposition, Nutrient
 from huntingfood.models import FoodMainGroup
 from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
@@ -272,32 +272,29 @@ def api_v1_dietplan(diet_plan_id):
             # for each food item refernced in the meal ingredients
             # if the item does not yet exist in the inventory
             try:
-                goods_items = Food.query.\
-                    select_from(Food).\
-                    outerjoin(Food.referencedIn).\
-                    outerjoin(Food.referencedInventoryItem).\
+                missing_inventory_items = Material.query.\
+                    select_from(Material).\
+                    outerjoin(Material.referencedIn).\
+                    outerjoin(Material.referencedInventoryItem).\
                     filter(Ingredient.meal_id == meal_id).\
-                    filter(InventoryItem.food_id == None).all()
-                if len(goods_items) == 0:
-                    raise NoRecordsError(
-                        'Generate Inventory: No goods found from diet plan')
+                    filter(InventoryItem.material_id == None).all()
             except NoRecordsError:
                 logging.info('No records found')
             except exc.SQLAlchemyError:
                 logging.exception('Some problem occurred')
 
-            logging.info('Missing Inventory items = ' + str(len(goods_items)) + ' for Meal Id = ' + meal_id)
+            logging.info('Missing Inventory items = ' + str(len(missing_inventory_items)) + ' for Meal Id = ' + meal_id)
 
             # Step 3: Create INVENTORY_ITEM that are missing
-            for row in goods_items:
+            for row in missing_inventory_items:
                 logging.info("Generate inventory items: " + str(row.titleEN))
                 if (row.titleEN):
                     inventory_item = InventoryItem(
-                        inventory_id=login_session['default_inventory_id'],
+                        inventory_id=login_session['default_inventory_id'],  # TODO: what if the user wants to update another inventory?
                         titleEN=row.titleEN,
                         titleDE=row.titleDE,
                         status=1,
-                        food_id=row.id,
+                        material_id=row.id,
                         level=0,
                         need_from_diet_plan=99,  # TODO: Add calculation based on portions and uom of ingredients
                         need_additional=0,
@@ -307,6 +304,40 @@ def api_v1_dietplan(diet_plan_id):
                     session.add(inventory_item)
                     session.commit()
 
+            # Step 4: Add material forecast
+            # TODO: Combine with query to identify missing inventory items
+            try:
+                # 4.1 Get all existing forecasts first to update them
+                logging.info('Determine existing material forecasts ...')
+                planned_materials = db.session.query(Material, Ingredient, Meal, MaterialForecast).\
+                    join(Material.referencedIn).\
+                    join(Material.referencedMaterialForecast).\
+                    join(Ingredient.meal).\
+                    filter(Ingredient.meal_id == meal_id).\
+                    filter(MaterialForecast.plan_date == plan_date).\
+                    filter(MaterialForecast.inventory_id == login_session['default_inventory_id']).all()
+            except NoRecordsError:
+                logging.info('No existing material forecasts')
+            except exc.SQLAlchemyError:
+                logging.exception('Some problem occurred')
+
+                                #with_entities(
+                                    #Material.id,
+                                    #Ingredient.quantity,
+                                    #Ingredient.uom_id,
+                                    #Meal.portions,
+                                    #MaterialForecast.quantity,
+                                    #MaterialForecast.quantity_uom).\
+
+            for row in planned_materials:
+                #print('MaterialForecast.quantity = ' + MaterialForecast.quantity)
+                logging.info("Old MaterialForecast (" + str(row.Material.id) + ") = " + str(row.MaterialForecast.quantity))
+                row.MaterialForecast.quantity = row.MaterialForecast.quantity + (portions/row.Meal.portions) * row.Ingredient.quantity
+                logging.info("New MaterialForecast (" + str(row.Material.id) + ") = " + str(row.MaterialForecast.quantity))
+            session.commit()
+            # 4.2 Create new forecast entries for material/plan date combinations
+
+            # Step 5: Return Response
             dp_item = DietPlanItem.query.filter_by(
                 id=diet_plan_item.id).all()
             return jsonify(diet_plan_item=[i.serialize for i in dp_item])
@@ -371,8 +402,7 @@ def api_v1_inventory(inventory_id):
         titleEN = request.form.get('titleEN')
         titleDE = request.form.get('titleDE')
         status = request.form.get('status')
-        food_id = request.form.get('food_id')
-        good_id = request.form.get('good_id')
+        material_id = request.form.get('material_id')
         level = request.form.get('level')
         need_from_diet_plan = request.form.get('need_from_diet_plan')
         need_additional = request.form.get('need_additional')
@@ -385,8 +415,7 @@ def api_v1_inventory(inventory_id):
                 titleEN=titleEN,
                 titleDE=titleDE,
                 status=tools.str_to_numeric(status),
-                food_id=tools.str_to_numeric(food_id),
-                good_id=tools.str_to_numeric(good_id),
+                material_id=tools.str_to_numeric(material_id),
                 level=tools.str_to_numeric(level),
                 need_from_diet_plan=tools.str_to_numeric(need_from_diet_plan),
                 need_additional=tools.str_to_numeric(need_additional),
@@ -411,8 +440,7 @@ def api_v1_inventory(inventory_id):
         titleEN = request.form.get('titleEN')
         titleDE = request.form.get('titleDE')
         status = request.form.get('status')
-        food_id = request.form.get('food_id')
-        good_id = request.form.get('good_id')
+        material_id = request.form.get('material_id')
         level = request.form.get('level')
         need_from_diet_plan = request.form.get('need_from_diet_plan')
         need_additional = request.form.get('need_additional')
@@ -425,8 +453,7 @@ def api_v1_inventory(inventory_id):
             inventory_item.titleEN = titleEN,
             inventory_item.titleDE = titleDE,
             inventory_item.status = tools.str_to_numeric(status),
-            inventory_item.food_id = tools.str_to_numeric(food_id),
-            inventory_item.good_id = tools.str_to_numeric(good_id),
+            inventory_item.material_id = tools.str_to_numeric(material_id),
             inventory_item.level = tools.str_to_numeric(level),
             inventory_item.need_from_diet_plan = tools.str_to_numeric(need_from_diet_plan),
             inventory_item.need_additional = tools.str_to_numeric(need_additional),
@@ -547,9 +574,9 @@ def addMeals():
             # Query a food database (e.g. NDB) to retrieve nutrient information
             # and to create a food master data record. The id of such a record
             # is returned if a match in the food database was found.
-            foodID = getFood(ingredient_text_EN, ingredient_text)
-            if not foodID:
-                foodID = None
+            material_id = getFood(ingredient_text_EN, ingredient_text)
+            if not material_id:
+                material_id = None
 
             # Add new ingredient into database
             newIngredient = Ingredient(quantity=request.form['quantity'+row],
@@ -558,7 +585,7 @@ def addMeals():
                                        title=request.form['ingredient'+row],
                                        titleEN=translation['translatedText'],
                                        base_food_part=food_entity,
-                                       food_id=foodID)
+                                       material_id=material_id)
 
             session.add(newIngredient)
             session.commit()
@@ -574,8 +601,8 @@ def addMeals():
     else:  # 'GET':
         print("GET")
         uoms = UOM.query
-        foods = Food.query
-        return render_template("meals_add.html",uoms=uoms,foods=foods)
+        materials = Material.query
+        return render_template("meals_add.html",uoms=uoms,materials=materials)
 
 
 @app.route('/meals/delete/<int:meal_id>', methods=['GET', 'POST'])
@@ -611,21 +638,22 @@ def getFood(keyword, keyword_local_language):
         results = n.search_keyword(keyword)
         if results:
 
-            i = list(results['items'])[0]  #TODO: identify relevant item, for now take the first one
+            i = list(results['items'])[0]  # TODO: identify relevant item, for now take the first one
             print("Found NDB item: "+i.get_name())
 
             # Create Food Main Group
             foodMainGroup = FoodMainGroup.query.filter_by(titleEN=i.get_group()).first()
             if not foodMainGroup:
-                #print("Create new group: "+i.get_group())
+                logging.info('Create FoodMainGroup: ' + i.get_group())
                 foodMainGroup = FoodMainGroup(titleEN=i.get_group())
                 session.add(foodMainGroup)
                 session.commit()
 
             # Create Food
-            food = Food.query.filter_by(titleEN=i.get_name()).first()
+            food = Material.query.filter_by(titleEN=i.get_name()).first()
             if not food:
-                food = Food(
+                logging.info('Create Material: ' + i.get_name())
+                food = Material(
                     titleEN=i.get_name(),
                     titleDE=keyword_local_language,
                     ndb_code=i.get_ndbno(),
@@ -640,29 +668,32 @@ def getFood(keyword, keyword_local_language):
                 for n in nutrients:
                     # use existing nutrient object if exists
                     if n.get_name() in nutrientDict:
-                        nutriendID = nutrientDict[n.get_name()] # retreive internal id based on the titleEN
+                        nutriendID = nutrientDict[n.get_name()]  # retreive internal id based on the titleEN
 
                     # create new nutrient object
                     else:
-                        translated_text = translate_client.translate(n.get_name(),
-                                                                    target_language='de')['translatedText']
+                        logging.info('Create Nutrient: ' + n.get_name())
+                        translated_text = translate_client.translate(
+                            n.get_name(), target_language='de')['translatedText']
                         newNutrient = Nutrient(value_uom=n.get_unit(),
-                                            titleEN=n.get_name(),
-                                            titleDE=translated_text)
+                                               titleEN=n.get_name(),
+                                               titleDE=translated_text)
                         session.add(newNutrient)
                         session.commit()
-                        nutriendID = newNutrient.id
 
-                        # TODO: all get into unknown atm
-                    #print(n.get_unit())
+                        nutriendID = newNutrient.id
+                        # TODO: Improve caching of nutrients via dictionnary overall
+                        nutrientDict[n.get_name()] = nutriendID
+
+                    # TODO: all get into unknown atm
                     if n.get_unit() in uomDict:
                         uomID = n.get_unit()
                     else:
-                        print("unknown unit of measure")
-                        uomID = "x" #TODO: improve later
+                        logging.info('unknown unit of measure of nutrient')
+                        uomID = "x"  # TODO: improve later
 
-                    #print("Create new food composition")
-                    fc = FoodComposition(food_id=food.id,
+                    logging.info('Create FoodComposition')
+                    fc = FoodComposition(material_id=food.id,
                                         nutrient_id=nutriendID,
                                         per_qty_uom=uomID,
                                         per_qty=100,

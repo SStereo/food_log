@@ -69,6 +69,7 @@
               <div data-bind="foreach: $data.dietPlanItems">
                 <div class="card-body">
                   <select class="custom-select" data-bind="options: $root.meals, optionsText: 'title', optionsValue: 'id', value: meal_id"></select>
+                  <select class="custom-select" data-bind="options: $root.portions, value: portions"></select>
                   <img class="dp-meal-image" data-bind="attr: { src: '/upload/' + $root.getMealImageURL(meal_id) }">
                   <button type="button" class="btn btn-light" data-bind="click: function(data, event) { $root.removeDietPlanItem($parent, data, event) }">remove</button>
                 </div>

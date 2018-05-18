@@ -36,3 +36,5 @@ class Config(object):
     FACEBOOK_SECRET_KEY = os.environ.get('FACEBOOK_SECRET_KEY')
     # NDB connection
     NDB_KEY = os.environ.get('NDB_KEY')
+    # Data settings
+    DATA_PORTIONS = [1, 2, 3, 4, 5, 6]
