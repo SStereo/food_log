@@ -123,11 +123,56 @@
                 <td data-bind="text: title()"></td>
                 <td data-bind="text: level()"></td>
                 <td data-bind="text: plannedQuantity() + uom()"></td>
-                <td><button class="btn">details..</button></td>
+                <td><button class="btn btn-secondary" data-bind="click: $root.EditItem">details..</button></td>
               </tr>
             </tbody>
           </table>
         </section>
+
+        <!-- Modal view START -->
+        <div data-bind="modal: ItemBeingEdited" class="fade" role="dialog" tabindex="-1">
+          <form data-bind="submit: $root.SaveItem">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <a class="close" data-dismiss="modal">×</a>
+                  <h3>Item Details</h3>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label for="TitleInput">Title</label>
+                    <input type="text" class="form-control" id="TitleInput" placeholder="title of item .."
+                           data-bind="value: ItemBeingEdited() && ItemBeingEdited().title, valueUpdate: 'afterkeydown'">
+                  </div>
+                  <div class="form-group">
+                    <label for="LevelInput">Level</label>
+                    <input type="text" class="form-control" id="LevelInput" placeholder="0"
+                           data-bind="value: ItemBeingEdited() && ItemBeingEdited().level, valueUpdate: 'afterkeydown'">
+                  </div>
+                  <div class="form-group">
+                    <label for="ReOrderLevelInput">Level</label>
+                    <input type="text" class="form-control" id="ReOrderLevelInput" placeholder="99"
+                           data-bind="value: ItemBeingEdited() && ItemBeingEdited().re_order_level, valueUpdate: 'afterkeydown'">
+                  </div>
+                  <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
+                  <div class="alert alert-danger" style="margin: 20px 0 0">
+                    Please correct the following errors:
+                    <ul data-bind="foreach: { data: ValidationErrors, as: 'errorMessage' }">
+                      <li data-bind="text: errorMessage"></li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <!-- Modal view END -->
+
       </div>
     </div>
 

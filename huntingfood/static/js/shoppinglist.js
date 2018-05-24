@@ -454,6 +454,31 @@ ko.bindingHandlers.selectAndFocus = {
 	}
 };
 
+// Custom binding for a modal bootstrap
+
+ko.bindingHandlers['modal'] = {
+  init: function(element, valueAccessor, allBindingsAccessor) {
+    var allBindings = allBindingsAccessor();
+    var $element = $(element);
+    $element.addClass('hide modal');
+
+    if (allBindings.modalOptions && allBindings.modalOptions.beforeClose) {
+      $element.on('hide', function() {
+        var value = ko.utils.unwrapObservable(valueAccessor());
+        return allBindings.modalOptions.beforeClose(value);
+      });
+    }
+  },
+  update: function(element, valueAccessor) {
+    var value = ko.utils.unwrapObservable(valueAccessor());
+    if (value) {
+      $(element).removeClass('hide').modal('show');
+    } else {
+      $(element).modal('hide');
+    }
+  }
+};
+
 
 function saveInventoryItem(newValue) {
   $.ajax({
@@ -498,6 +523,7 @@ var invViewModel = function() {
 
   // store the new Inventory value being entered
 	this.current = ko.observable();
+  this.ValidationErrors = ko.observableArray([]);
 
   this.filterStatus = ko.observable('all');
 
@@ -524,17 +550,15 @@ var invViewModel = function() {
 			}
 		});
 
+  // Loads inventory items from Rest API
   self.loadInventoryItems = function() {
     self.inventoryItems.removeAll();
-    // Loads data from the REST API
     $.ajax({
       type: 'GET',
       url: url_api_inventory,
       dataType: 'json',
       success: function(response) {
         var parsed = response['inventory_items']
-        // for each iterable item create a new InventoryItem observable
-
         parsed.forEach( function(item) {
           self.inventoryItems.push( new InventoryItem(item) );
         });
@@ -542,9 +566,8 @@ var invViewModel = function() {
     });
   };
 
+  // Removes inventory items via Rest API
   self.removeInventoryItem = function(data, event) {
-    console.log('removeInventoryItem(id=' + data.id() + ')');
-
     $.ajax({
       type: 'DELETE',
       url: url_api_inventory,
@@ -605,7 +628,7 @@ var invViewModel = function() {
   };
 
   // edit an item
-	this.editItem = function (item) {
+	this.editItemOld = function (item) {
 		item.editing(true);
 		item.previousTitle = item.title();
 	}.bind(this);
@@ -634,6 +657,95 @@ var invViewModel = function() {
 		item.editing(false);
 		item.title(item.previousTitle);
 	}.bind(this);
+
+  // Required for modal: Validate data
+  self.ValidateInventoryItem = function(item) {
+    if (!item) {
+      return false;
+    }
+
+    var currentItem = ko.utils.unwrapObservable(item);
+    var currentLevel = ko.utils.unwrapObservable(currentItem.level);
+    var currentTitle = ko.utils.unwrapObservable(currentItem.title);
+    var currentReOrderLevel = ko.utils.unwrapObservable(currentItem.re_order_level);
+
+    self.ValidationErrors.removeAll(); // Clear out any previous errors
+
+    if (!currentLevel) {
+      self.ValidationErrors.push("Stock level is required.");
+    } else { // Just some arbitrary checks here...
+      if (Number(currentLevel) == currentLevel && currentLevel % 1 === 0) { // is a whole number
+        if (currentLevel < 0) {
+          self.ValidationErrors.push("The stock level must be zero or greater.");
+        }
+      } else {
+        self.ValidationErrors.push("Please enter a valid whole number for the stock level.");
+      }
+    }
+
+    if (!currentTitle) {
+      self.ValidationErrors.push("Please enter a title for the item");
+    }
+
+    return self.ValidationErrors().length <= 0;
+  };
+
+  // Required for modal: The instance of the item currently being edited.
+  self.ItemBeingEdited = ko.observable();
+
+  // Required for modal: Used to keep a reference back to the original user record being edited
+  self.OriginalItemInstance = ko.observable();
+
+  // Required for modal: add new item, TODO: combine with existing approach
+  self.AddNewItem = function() {
+    // Load up a new user instance to be edited
+    self.ItemBeingEdited(new InventoryItem());
+    self.OriginalItemInstance(undefined);
+  };
+
+  // Required for modal: Edit item in the modal window
+  self.EditItem = function(item) {
+    // Keep a copy of the original instance so we don't modify it's values in the editor
+    self.OriginalItemInstance(item);
+    console.log('click');
+    // Copy the user data into a new instance for editing. TODO: this does not work
+
+    var data = {
+      'titleDE': item.title(),
+      'level': item.level(),
+      're_order_quantity': item.re_order_quantity()
+    }
+
+    self.ItemBeingEdited(new InventoryItem(data));
+  };
+
+  // Save the changes back to the original instance in the collection.
+  self.SaveItem = function() {
+    var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited);
+
+    if (!self.ValidateInventoryItem(updatedItem)) {
+      // Don't allow users to save items that aren't valid
+      return false;
+    }
+
+    var itemTitle = ko.utils.unwrapObservable(updatedItem.title);
+    var itemLevel = ko.utils.unwrapObservable(updatedItem.level);
+    var itemReOrderLevel = ko.utils.unwrapObservable(updatedItem.re_order_level);
+
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      // Updating an existing user
+      self.OriginalItemInstance().title(itemTitle);
+      self.OriginalItemInstance().level(itemLevel);
+      self.OriginalItemInstance().re_order_level(itemReOrderLevel);
+    }
+
+    // Clear out any reference to a user being edited
+    self.ItemBeingEdited(undefined);
+    self.OriginalItemInstance(undefined);
+  };
+
 
   self.loadInventoryItems();
 
