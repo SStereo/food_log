@@ -278,6 +278,15 @@ def showSettings():
     return redirect('/')
 
 
+@app.route('/api/v1/users', methods=['GET'])
+def api_v1_users():
+    if request.method == 'GET':
+        if 'user_id' in login_session:
+            user_id = login_session['user_id']
+            user = getUserInfo(user_id)
+        return jsonify(users=[user.serialize])
+
+
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
 

@@ -1,12 +1,12 @@
-
-
 from huntingfood.models import User, UserGroup, UOM, Meal, Ingredient, Material, MaterialForecast
 from huntingfood.models import FoodComposition, Nutrient, ShoppingOrder
 from huntingfood.models import ShoppingOrderItem, FoodMainGroup
 from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
-from huntingfood.models import TradeItem, Place
+from huntingfood.models import TradeItem, Place, Country, State
 
 from huntingfood import db
+
+import json
 
 # Deletes existing records in the tables
 
@@ -46,6 +46,51 @@ db.session.commit()
 num_rows_deleted = UOM.query.delete()
 db.session.commit()
 
+num_rows_deleted = State.query.delete()
+db.session.commit()
+
+num_rows_deleted = Country.query.delete()
+db.session.commit()
+
+
+# Load country master data
+# source: https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.json
+obj_countries = []
+with open('data/countries.json') as f:
+    countries = json.load(f)
+for c in countries:
+    obj_countries.append(
+        Country(
+            name=c['name'],
+            alpha2=c['alpha-2'],
+            alpha3=c['alpha-3'],
+            country_code=c['country-code'],
+            region=c['region'],
+            sub_region=c['sub-region'],
+            intermediate_region=c['intermediate-region'],
+            region_code=c['region-code'],
+            sub_region_code=c['sub-region-code'],
+            intermediate_region_code=c['intermediate-region-code'],
+        )
+    )
+db.session.add_all(obj_countries)
+db.session.commit()
+
+
+# Load country master data
+# source: https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.json
+obj_states = []
+with open('data/countries_states.json') as f:
+    states = json.load(f)
+for c in states['countries']:
+    country_name = c['country']
+    for s in c['states']:
+        obj_states.append(
+            State(
+                name=s,
+                country_name=country_name
+            )
+        )
 
 
 # Create default user
@@ -116,34 +161,34 @@ obj_nutrients = [
            Nutrient(value_uom="mg",titleEN="Caffeine",titleDE="Koffein")
 ]
 
-obj_foods = [
-           Material(titleDE="Zwiebel"),
-           Material(titleDE="Curry"),
-           Material(titleDE="rote Linsen"),
-           Material(titleDE="Gemüsebrühe"),
-           Material(titleDE="Tomatenmark"),
-           Material(titleDE="gehackte Tomaten"),
-           Material(titleDE="Blumenkohl"),
-           Material(titleDE="grüne Bohnen"),
-           Material(titleDE="frischer Koriander"),
-           Material(titleDE="griechischer Joghurt"),
-           Material(titleDE="Knoblauchzehe"),
-           Material(titleDE="Olivenöl"),
-           Material(titleDE="Salz"),
-           Material(titleDE="schwarzer Pfeffer"),
-           Material(titleDE="Zucker"),
-           Material(titleDE="Wasser"),
-           Material(titleDE="Stange Lauch"),
-           Material(titleDE="Karotte"),
-           Material(titleDE="Knollensellerie, mittelgroß"),
-           Material(titleDE="Linsen"),
-           Material(titleDE="Räucherbauch"),
-           Material(titleDE="Kartoffel"),
-           Material(titleDE="Wienerle"),
-           Material(titleDE="Öl"),
-           Material(titleDE="Muskat"),
-           Material(titleDE="Rotweinessig"),
-           Material(titleDE="Spätzle"),
+obj_materials = [
+           Material(titleDE="Zwiebel", standard_uom_id="pc"),
+           Material(titleDE="Curry", standard_uom_id="g"),
+           Material(titleDE="rote Linsen", standard_uom_id="g"),
+           Material(titleDE="Gemüsebrühe", standard_uom_id="g"),
+           Material(titleDE="Tomatenmark", standard_uom_id="g"),
+           Material(titleDE="gehackte Tomaten", standard_uom_id="g"),
+           Material(titleDE="Blumenkohl", standard_uom_id="pc"),
+           Material(titleDE="grüne Bohnen", standard_uom_id="g"),
+           Material(titleDE="frischer Koriander", standard_uom_id="g"),
+           Material(titleDE="griechischer Joghurt", standard_uom_id="g"),
+           Material(titleDE="Knoblauchzehe", standard_uom_id="pc"),
+           Material(titleDE="Olivenöl", standard_uom_id="l"),
+           Material(titleDE="Salz", standard_uom_id="g"),
+           Material(titleDE="schwarzer Pfeffer", standard_uom_id="g"),
+           Material(titleDE="Zucker", standard_uom_id="g"),
+           Material(titleDE="Wasser", standard_uom_id="l"),
+           Material(titleDE="Stange Lauch", standard_uom_id="pc"),
+           Material(titleDE="Karotte", standard_uom_id="pc"),
+           Material(titleDE="Knollensellerie, mittelgroß", standard_uom_id="g"),
+           Material(titleDE="Linsen", standard_uom_id="g"),
+           Material(titleDE="Räucherbauch", standard_uom_id="g"),
+           Material(titleDE="Kartoffel", standard_uom_id="pc"),
+           Material(titleDE="Wienerle", standard_uom_id="pc"),
+           Material(titleDE="Öl", standard_uom_id="l"),
+           Material(titleDE="Muskat", standard_uom_id="g"),
+           Material(titleDE="Rotweinessig", standard_uom_id="l"),
+           Material(titleDE="Spätzle", standard_uom_id="g"),
 ]
 
 obj_meals = [
@@ -182,181 +227,181 @@ obj_ingredients = [
                       uom=obj_uoms[0],
                       meal=obj_meals[0],
                       title="Zwiebel",
-                      material=obj_foods[0]
+                      material=obj_materials[0]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[4],
                       meal=obj_meals[0],
                       title="Curry",
-                      material=obj_foods[1]
+                      material=obj_materials[1]
                       ),
            Ingredient(quantity=100,
                       uom=obj_uoms[0],
                       meal=obj_meals[0],
                       title="rote Linsen",
-                      material=obj_foods[2]
+                      material=obj_materials[2]
                       ),
            Ingredient(quantity=200,
                       uom=obj_uoms[3],
                       meal=obj_meals[0],
                       title="Gemüsebrühe",
-                      material=obj_foods[3]
+                      material=obj_materials[3]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[4],
                       meal=obj_meals[0],
                       title="Tomatenmark",
-                      material=obj_foods[4]
+                      material=obj_materials[4]
                       ),
            Ingredient(quantity=400,
                       uom=obj_uoms[0],
                       meal=obj_meals[0],
                       title="gehackte Tomaten",
-                      material=obj_foods[5]
+                      material=obj_materials[5]
                       ),
            Ingredient(quantity=2,
                       uom=obj_uoms[7],
                       meal=obj_meals[0],
                       title="Blumenkohl",
-                      material=obj_foods[6]
+                      material=obj_materials[6]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[7],
                       meal=obj_meals[0],
                       title="grüne Bohnen",
-                      material=obj_foods[7]
+                      material=obj_materials[7]
                       ),
            Ingredient(quantity=2,
                       uom=obj_uoms[4],
                       meal=obj_meals[0],
                       title="frischer Koriander",
-                      material=obj_foods[8]
+                      material=obj_materials[8]
                       ),
            Ingredient(quantity=5,
                       uom=obj_uoms[4],
                       meal=obj_meals[0],
                       title="griechischer Joghurt",
-                      material=obj_foods[9]
+                      material=obj_materials[9]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[9],
                       meal=obj_meals[0],
                       title="Knoblauchzehe",
-                      material=obj_foods[10]
+                      material=obj_materials[10]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[4],
                       meal=obj_meals[0],
                       title="Olivenöl",
-                      material=obj_foods[11]
+                      material=obj_materials[11]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[6],
                       meal=obj_meals[0],
                       title="Salz",
-                      material=obj_foods[12]
+                      material=obj_materials[12]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[6],
                       meal=obj_meals[0],
                       title="schwarzer Pfeffer",
-                      material=obj_foods[13]
+                      material=obj_materials[13]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[5],
                       meal=obj_meals[0],
                       title="Zucker",
-                      material=obj_foods[14]
+                      material=obj_materials[14]
                       ),
            Ingredient(quantity=200,
                       uom=obj_uoms[3],
                       meal=obj_meals[0],
                       title="Wasser",
-                      material=obj_foods[15]
+                      material=obj_materials[15]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[9],
                       meal=obj_meals[1],
                       title="Zwiebel",
-                      material=obj_foods[0]
+                      material=obj_materials[0]
                       ),
            Ingredient(quantity=0.5,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Stange Lauch",
-                      material=obj_foods[16]
+                      material=obj_materials[16]
                       ),
            Ingredient(quantity=50,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Karotte",
-                      material=obj_foods[17]
+                      material=obj_materials[17]
                       ),
            Ingredient(quantity=50,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Knollensellerie, mittelgroß",
-                      material=obj_foods[18]
+                      material=obj_materials[18]
                       ),
            Ingredient(quantity=50,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Linsen",
-                      material=obj_foods[19]
+                      material=obj_materials[19]
                       ),
            Ingredient(quantity=50,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Räucherbauch",
-                      material=obj_foods[20]
+                      material=obj_materials[20]
                       ),
            Ingredient(quantity=50,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Gemüsebrühe",
-                      material=obj_foods[3]
+                      material=obj_materials[3]
                       ),
            Ingredient(quantity=1,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Kartoffel",
-                      material=obj_foods[21]
+                      material=obj_materials[21]
                       ),
            Ingredient(quantity=4,
                       uom=obj_uoms[9],
                       meal=obj_meals[1],
                       title="Wienerle",
-                      material=obj_foods[22]
+                      material=obj_materials[22]
                       ),
            Ingredient(quantity=2,
                       uom=obj_uoms[4],
                       meal=obj_meals[1],
                       title="Öl",
-                      material=obj_foods[23]
+                      material=obj_materials[23]
                       ),
            Ingredient(quantity=2,
                       uom=obj_uoms[4],
                       meal=obj_meals[1],
                       title="Salz",
-                      material=obj_foods[12]
+                      material=obj_materials[12]
                       ),
            Ingredient(quantity=2,
                       uom=obj_uoms[4],
                       meal=obj_meals[1],
                       title="schwarzer Pfeffer",
-                      material=obj_foods[13]
+                      material=obj_materials[13]
                       ),
            Ingredient(quantity=2,
                       uom=obj_uoms[4],
                       meal=obj_meals[1],
                       title="Rotweinessig",
-                      material=obj_foods[24]
+                      material=obj_materials[24]
                       ),
            Ingredient(quantity=250,
                       uom=obj_uoms[0],
                       meal=obj_meals[1],
                       title="Spätzle",
-                      material=obj_foods[25]
+                      material=obj_materials[25]
                       ),
 ]
 
@@ -386,10 +431,11 @@ obj_places = [
             ]
 
 
+db.session.add_all(obj_states)
 db.session.add_all(obj_users)
 db.session.add_all(obj_uoms)
 db.session.add_all(obj_nutrients)
-db.session.add_all(obj_foods)
+db.session.add_all(obj_materials)
 db.session.add_all(obj_meals)
 db.session.add_all(obj_ingredients)
 db.session.add_all(obj_places)

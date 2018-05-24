@@ -78,12 +78,22 @@ input[type="text"].sl-item {
 	margin: 0;
 	padding: 0;
 	list-style: none;
+  font-size: 12px;
 }
 
 .inv-list li {
 	position: relative;
 	font-size: 24px;
 	border-bottom: 1px solid #ededed;
+  height: 60px;
+}
+
+.inv-list button {
+	font-size: 12px;
+}
+
+.inv-list > input {
+  height: 60px;
 }
 
 .inv-list li:last-child {
@@ -130,16 +140,21 @@ input[type="text"].sl-item {
 .inv-list li label {
 	word-break: break-all;
 	padding: 15px 15px 15px 95px;
-	display: block;
+	display:inline;
 	line-height: 1.2;
 	transition: color 0.4s;
   margin-bottom: 0px;
   border-radius: .25rem;
 }
 
-.inv-list li.no-need label {
+.inv-list li.no-need label, .inv-list tr.no-need {
 	color: #ffffff;
 	text-decoration: none;
+  background-color: #bfbfbf;
+}
+
+tr.no-need {
+	color: #ffffff;
   background-color: #bfbfbf;
 }
 
@@ -149,15 +164,30 @@ input[type="text"].sl-item {
   background-color: #6c180f;
 }
 
-.inv-list li.insufficient-stock label {
+tr.no-stock {
+	color: #ffffff;
+  background-color: #6c180f;
+}
+
+.inv-list li.lack-stock label {
 	color: #ffffff;
 	text-decoration: none;
   background-color: #d28805;
 }
 
-.inv-list li.on-stock label {
+tr.lack-stock {
+	color: #ffffff;
+  background-color: #d28805;
+}
+
+.inv-list li.on-stock label, .inv-list tr.on-stock {
 	color: #005911;
 	text-decoration: none;
+  background-color: #7eaa89
+}
+
+tr.on-stock {
+	color: #ffffff;
   background-color: #7eaa89
 }
 
@@ -220,4 +250,9 @@ input[type="text"].sl-item {
 	border: none;
 	background: rgba(0, 0, 0, 0.003);
 	box-shadow: inset 0 -2px 1px rgba(0,0,0,0.03);
+}
+
+.inv-datepicker {
+  width: 150px;
+  display: block;
 }

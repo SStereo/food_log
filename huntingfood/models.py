@@ -1,4 +1,6 @@
 from huntingfood import db
+from huntingfood import ma
+from marshmallow import fields
 
 # password encryption into hash
 from passlib.apps import custom_app_context as pwd_context
@@ -74,6 +76,26 @@ class User(db.Model):
     def get_id(self):
             return str(self.id)
 
+    @property
+    def serialize(self):
+        #Returns object data in easily serializable format
+        return {
+            'user_id': self.id,
+            'name': self.name,
+            'email': self.email,
+            'picture': self.picture,
+            'provider': self.provider,
+            'active': self.active,
+            'language': self.language,
+            'default_diet_plan_id': self.default_diet_plan_id,
+            'default_inventory_id': self.default_inventory_id,
+            'default_portions': self.default_portions,
+            'street': self.street,
+            'city': self.city,
+            'state': self.state,
+            'zip': self.zip,
+        }
+
 
 class UserGroupAssociation(db.Model):
     __tablename__ = 'user_group_association'
@@ -147,7 +169,7 @@ class Ingredient(db.Model):
     __tablename__ = 'ingredients'
     id = db.Column(db.Integer, primary_key = True)
     quantity = db.Column(db.Float, nullable = False)
-    uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable = False)
+    uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     meal_id = db.Column(db.Integer, db.ForeignKey('meals.id'), nullable = False, index = True)
     title = db.Column(db.String(80), nullable = False) #gehackte Dosentomaten
     titleEN = db.Column(db.String(80), nullable = True) #chopped canned tomatoes
@@ -191,18 +213,19 @@ class Material(db.Model):
     user_group_id = db.Column(db.Integer,db.ForeignKey('user_groups.id'), nullable = True)  # only required for private food items, for example home made foods
     titleEN = db.Column(db.String(160), nullable = True)
     titleDE = db.Column(db.String(160), nullable = True)
+    standard_uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     bls_code = db.Column(db.String(7), nullable = True)
     ndb_code = db.Column(db.String(7), nullable = True)
     isBaseFood = db.Column(db.Boolean, unique = False, default = False)
-    parentBaseFood = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True)
+    parentBaseFood = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)
     # Standard values
-    uom_nutrient_value = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable = True)
+    uom_nutrient_value = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     # Classification
-    food_maingroup_id = db.Column(db.Integer, db.ForeignKey('food_maingroup.id'), nullable = True)
-    food_subgroup_id = db.Column(db.Integer, db.ForeignKey('food_subgroup.id'), nullable = True)
-    food_processing_type_id = db.Column(db.Integer, db.ForeignKey('food_processing_type.id'), nullable = True)
-    food_preparation_type_id = db.Column(db.Integer, db.ForeignKey('food_preparation_type.id'), nullable = True)
-    food_edible_weight_id = db.Column(db.Integer, db.ForeignKey('food_weight_reference.id'), nullable = True)
+    food_maingroup_id = db.Column(db.Integer, db.ForeignKey('food_maingroup.id'), nullable=True)
+    food_subgroup_id = db.Column(db.Integer, db.ForeignKey('food_subgroup.id'), nullable=True)
+    food_processing_type_id = db.Column(db.Integer, db.ForeignKey('food_processing_type.id'), nullable=True)
+    food_preparation_type_id = db.Column(db.Integer, db.ForeignKey('food_preparation_type.id'), nullable=True)
+    food_edible_weight_id = db.Column(db.Integer, db.ForeignKey('food_weight_reference.id'), nullable=True)
 
     user_group = db.relationship("UserGroup")
     food_main_group = db.relationship("FoodMainGroup")
@@ -212,6 +235,7 @@ class Material(db.Model):
     referencedIn = db.relationship("Ingredient")
     referencedInventoryItem = db.relationship("InventoryItem", back_populates="material")
     referencedMaterialForecast = db.relationship("MaterialForecast", back_populates="material")
+    standard_uom = db.relationship("UOM", foreign_keys=[standard_uom_id])
 
 
 # Forecast material consumption for a given inventory (e.g. household, warehouse)
@@ -229,12 +253,27 @@ class MaterialForecast(db.Model):
     material = db.relationship("Material")
     uom = db.relationship("UOM")
 
+    inventory_item = db.relationship("InventoryItem", foreign_keys=[inventory_id, material_id],
+        primaryjoin="and_(MaterialForecast.inventory_id==InventoryItem.inventory_id, MaterialForecast.material_id==InventoryItem.material_id)", backref='forecasts')
+
+
+    @property
+    def serialize(self):
+        return {
+            'id': self.id,
+            'inventory_id': self.inventory_id,
+            'material_id': self.material_id,
+            'plan_date': self.plan_date,
+            'quantity': self.quantity,
+            'quantity_uom': self.quantity_uom
+        }
+
 
 class Inventory(db.Model):
     __tablename__ = 'inventories'
     id = db.Column(db.Integer, primary_key = True)
-    creator_id = db.Column(db.Integer,db.ForeignKey('users.id'), nullable = False)
-    user_group_id = db.Column(db.Integer,db.ForeignKey('user_groups.id'), nullable = True)
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable = False)
+    user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable = True)
 
     creator = db.relationship("User", primaryjoin='User.id == Inventory.creator_id')
     user_group = db.relationship("UserGroup", foreign_keys=[user_group_id])
@@ -244,37 +283,37 @@ class Inventory(db.Model):
 
 class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
-    id = db.Column(db.Integer, primary_key = True)  # TODO: Each item is per definition a SKU (Stock keeping unit), consider renaming
+    id = db.Column(db.Integer, primary_key=True)  # TODO: Each item is per definition a SKU (Stock keeping unit), consider renaming
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
-    titleEN = db.Column(db.String(160), nullable = True)  # TODO: remove those fields later and replace with good/food_id
-    titleDE = db.Column(db.String(160), nullable = True)
-    status = db.Column(db.SmallInteger, nullable = True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
-    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True, index = True)
-    level = db.Column(db.Integer, nullable = True)  # TODO: should be renamed to stock (on hand)
-    need_from_diet_plan = db.Column(db.Integer, nullable = True)  # TODO: enhance? flat need from dietplans does not provide visibility and time clarity to dp elements
-    need_additional = db.Column(db.Integer, nullable = True)
-    re_order_level = db.Column(db.Integer, nullable = True)
-    re_order_quantity = db.Column(db.Integer, nullable = True)
+    titleEN = db.Column(db.String(160), nullable=True)  # TODO: remove those fields later and replace with good/food_id
+    titleDE = db.Column(db.String(160), nullable=True)
+    status = db.Column(db.SmallInteger, nullable=True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
+    sku_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
+    level = db.Column(db.Integer, nullable=True)  # TODO: should be renamed to stock (on hand)
+    re_order_level = db.Column(db.Integer, nullable=True)
+    re_order_quantity = db.Column(db.Integer, nullable=True)
+    ignore_forecast = db.Column(db.Boolean, unique=False, default=False)  # Any forecast is ignored so the status will calculate to 0: No Need
 
     inventory = db.relationship("Inventory", foreign_keys=[inventory_id], back_populates="items")
     material = db.relationship("Material")
+    uom = db.relationship("UOM")
 
     @property
     def serialize(self):
-        #Returns object data in easily serializable format
         return {
-            'id' : self.id,
-            'inventory_id' : self.inventory_id,
-            'titleEN' : self.titleEN,
-            'titleDE' : self.titleDE,
-            'status' : self.status,
-            'material_id' : self.material_id,
-            'level' : self.level,
-            'need_from_diet_plan' : self.need_from_diet_plan,
-            'need_additional' : self.need_additional,
-            're_order_level' : self.re_order_level,
-            're_order_quantity' : self.re_order_quantity
+            'id': self.id,
+            'inventory_id': self.inventory_id,
+            'titleEN': self.titleEN,
+            'titleDE': self.titleDE,
+            'status': self.status,
+            'material_id': self.material_id,
+            'level': self.level,
+            'ignore_forecast': self.ignore_forecast,
+            're_order_level': self.re_order_level,
+            're_order_quantity': self.re_order_quantity
         }
+
 
 # The shopping list or order with access to a group
 class ShoppingOrder(db.Model):
@@ -436,7 +475,51 @@ class Nutrient(db.Model):
     __tablename__ = 'nutrients'
     id = db.Column(db.Integer, primary_key = True)
     value_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'))  # example calories, or milligrams
-    titleEN = db.Column(db.String(80), nullable = False)
-    titleDE = db.Column(db.String(80), nullable = True)
+    titleEN = db.Column(db.String(80), nullable=False)
+    titleDE = db.Column(db.String(80), nullable=True)
 
     uom = db.relationship("UOM")
+
+
+class Country(db.Model):
+    __tablename__ = 'countries'
+    name = db.Column(db.String(60), primary_key=True)
+    alpha2 = db.Column(db.String(2), nullable=False)
+    alpha3 = db.Column(db.String(3), nullable=True)
+    country_code = db.Column(db.String(3), nullable=True)
+    region = db.Column(db.String(60), nullable=True)
+    sub_region = db.Column(db.String(60), nullable=True)
+    intermediate_region = db.Column(db.String(60), nullable=True)
+    region_code = db.Column(db.String(3), nullable=True)
+    sub_region_code = db.Column(db.String(3), nullable=True)
+    intermediate_region_code = db.Column(db.String(3), nullable=True)
+
+    states = db.relationship("State", cascade="all, delete-orphan")
+
+
+class State(db.Model):
+    __tablename__ = 'states'
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String(60), nullable = True)
+    country_name = db.Column(db.String(60), db.ForeignKey('countries.name'), nullable = True)
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Marshmallow Schema Definitions
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+class MaterialForecastSchema(ma.ModelSchema):
+    class Meta:
+        model = MaterialForecast
+
+
+class InventoryItemSchema(ma.ModelSchema):
+    class Meta:
+        model = InventoryItem
+    forecasts = fields.Nested(MaterialForecastSchema,
+                              many=True,
+                              only=[
+                                'id',
+                                'plan_date',
+                                'quantity',
+                                'quantity_uom'])

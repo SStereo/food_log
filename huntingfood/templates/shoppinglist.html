@@ -45,8 +45,8 @@
                         <span class="sr-only">Previous</span>
                     </a>
                 </li>
-                <!-- ko foreach: week_range -->
-                <li class="page-item" data-bind="css: { active: $data.week_number() == $parent.week_selected() }"><a class="page-link" data-bind="click: $parent.changeWeek, text: 'Woche ' + $data.week_number()" href="#"></a></li>
+                <!-- ko foreach: weekRange -->
+                <li class="page-item" data-bind="css: { active: $data.week_number() == $parent.weekSelected() }"><a class="page-link" data-bind="click: $parent.changeWeek, text: 'Woche ' + $data.week_number()" href="#"></a></li>
                 <!-- /ko -->
                 <li class="page-item">
                     <a class="page-link" aria-label="Next">
@@ -91,20 +91,43 @@
     <div class="tab-pane fade" id="inventory" role="tabpanel" aria-labelledby="inventory-tab">
       <div class="container">
         <header>
+          <!-- Date Picker Start -->
+          <div class="input-group">
+            <div class="form-group">
+              <label for="formControlRange" data-bind="text: planForecastDays() + ' days'"></label>
+              <input type="range" class="form-control-range" id="formControlRange" data-bind="value: planForecastDays">
+            </div>
+            <!-- <input type="text" class="datepicker" data-bind="value: plan_date_start"> -->
+            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">
+
+            </p>
+          </div>
+          <!-- Date Picker End -->
 				  <input class="new-inv" data-bind="value: current, valueUpdate: 'afterkeydown', enterKey: addInventoryItem" placeholder="Neue Zutat/Gegenstand" autofocus>
 			  </header>
+
         <section data-bind="visible: inventoryItems().length">
-  				<ul class="inv-list" data-bind="foreach: filteredInventoryItems">
-  					<li data-bind="css: statusText">
-  						<div class="view">
-                <button class="toggle btn btn-primary" data-bind="text: statusText, click: $root.toogleStatus"></button>
-  							<label data-bind="text: title, event: { dblclick: $root.editItem }"></label>
-  							<button class="destroy" data-bind="click: $root.removeInventoryItem"></button>
-  						</div>
-  						<input class="edit" data-bind="value: title, valueUpdate: 'afterkeydown', enterKey: $root.saveEditing, escapeKey: $root.cancelEditing, selectAndFocus: editing, event: { blur: $root.saveEditing }">
-  					</li>
-  				</ul>
-			  </section>
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="Status"><i class="fas fa-question-circle"></i></th>
+                <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
+                <th scope="Bestand"><i class="fas fa-warehouse"></i></th>
+                <th scope="Bedarf"><i class="fas fa-utensils"></i></th>
+                <th scope="Details"><i class="fas fa-info-circle"></i></th>
+              </tr>
+            </thead>
+            <tbody data-bind="foreach: filteredInventoryItems">
+              <tr class="inv-list" data-bind="css: statusText">
+                <td><button class="toggle btn btn-primary" data-bind="text: statusText"></button></td>
+                <td data-bind="text: title()"></td>
+                <td data-bind="text: level()"></td>
+                <td data-bind="text: plannedQuantity() + uom()"></td>
+                <td><button class="btn">details..</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
       </div>
     </div>
 
@@ -130,8 +153,9 @@
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
   var url_api_meals = "{{ url_for('api_v1_meals') }}";
   var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
-  var dp_id = {{ diet_plan.id }};
   var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
+  var url_api_users = "{{ url_for('api_v1_users') }}";
+  var dp_id = {{ diet_plan.id }};
   var inv_id = {{ inventory.id }};
   var csrf_token = "{{ csrf_token() }}";
 </script>
@@ -141,6 +165,17 @@
   $(function () {
 
     slLoadItems();
+
+    var today = new Date();
+    $('.datepicker').datepicker({
+      weekStart: 1,
+      language: 'de',
+      calendarWeeks: true,
+      autoclose: true,
+      todayHighlight: true
+    });
+
+    moment().format();
 
   })
 </script>

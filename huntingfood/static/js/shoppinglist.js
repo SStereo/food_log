@@ -105,9 +105,10 @@ var dpViewModel = function() {
   var self = this;
 
   self.meals = ko.observableArray([]);
-  self.week_selected = ko.observable('');
-  self.week_range = ko.observableArray([]);
-  self.portions = ko.observableArray([1,2,3,4,5,6,7,8,9,10,11,12])
+  self.weekSelected = ko.observable('');
+  self.weekRange = ko.observableArray([]);
+  self.portions = ko.observableArray([1,2,3,4,5,6,7,8,9,10,11,12]);
+  self.userSettings = ko.observable('');
 
   self.loadMeals = function() {
     $.ajax({
@@ -123,8 +124,22 @@ var dpViewModel = function() {
     });
   }
 
+  self.loadUserData = function() {
+    $.ajax({
+      type: 'GET',
+      url: url_api_users,
+      dataType: 'json',
+      success: function(response) {
+        var parsed = response['users']
+        parsed.forEach( function(item) {
+          self.userSettings( new User(item) );
+        });
+      }
+    });
+  }
+
   self.changeWeek = function(data, event) {
-    self.week_selected(data.week_index());
+    self.weekSelected(data.week_index());
     self.loadDietPlanItems();
   }
 
@@ -142,7 +157,7 @@ var dpViewModel = function() {
     d.setDate(today.getDate() - today_weekday);
 
     // Make first week the default selected one
-    self.week_selected(0);  // TODO: Find a better way for filtering
+    self.weekSelected(0);  // TODO: Find a better way for filtering
 
     // ++++++ Generate Week Objects +++++
     var d2 = new Date(d.getTime());
@@ -173,7 +188,7 @@ var dpViewModel = function() {
         date_range: date_range
       }
       var grid_week = new GridWeek(item);
-      self.week_range.push(grid_week);
+      self.weekRange.push(grid_week);
 
       // Create GridDay objects for each day in the date range
       grid_week.date_range().forEach( function(item) {
@@ -186,8 +201,8 @@ var dpViewModel = function() {
   }
 
   self.loadDietPlanItems = function() {
-    var index = self.week_selected();
-    self.week_range()[index].grid_days().forEach( function(item) {
+    var index = self.weekSelected();
+    self.weekRange()[index].grid_days().forEach( function(item) {
       // Deletes all dietPlanObjects prior of loading them fresh from the server
       item.dietPlanItems.removeAll();
       // Loads data from the REST API
@@ -248,7 +263,7 @@ var dpViewModel = function() {
         'diet_plan_id' : dp_id,
         'meal_id' : data.meal_id_select2add(),
         'plan_date' : data.date(),
-        'portions' : 2 // TODO: fix! data.portions()
+        'portions' : self.userSettings().default_portions()
       },
       success: function(response) {
 
@@ -278,20 +293,21 @@ var dpViewModel = function() {
   }
 
   // Initialization
+  self.loadUserData();
   self.loadMeals();
   self.initGrid();
   self.loadDietPlanItems();
 
   self.selectedGridWeek = ko.computed(function() {
     // Sets the selected week by filtering on the index
-    var index = self.week_selected();
-    return ko.utils.arrayFilter(self.week_range()[index].grid_days(), function(item) {
+    var index = self.weekSelected();
+    return ko.utils.arrayFilter(self.weekRange()[index].grid_days(), function(item) {
       return true;
     });
 
     // TODO: This is NOT WORKING
-    var array = ko.utils.arrayFilter(self.week_range(), function(item) {
-      if (item.week_number() == self.week_selected()) {
+    var array = ko.utils.arrayFilter(self.weekRange(), function(item) {
+      if (item.week_number() == self.weekSelected()) {
         return true;
       } else {
         return false;
@@ -331,6 +347,16 @@ function saveDietPlanItem(newValue) {
 
 }
 
+var User = function(data) {
+  this.user_id = ko.observable(data.user_id);
+  this.name = ko.observable(data.name);
+  this.picture = ko.observable(data.picture);
+  this.default_portions = ko.observable(data.default_portions);
+  this.default_diet_plan_id = ko.observable(data.default_diet_plan_id);
+  this.default_inventory_id = ko.observable(data.default_inventory_id);
+}
+
+
 var Meal = function(data) {
   this.id = ko.observable(data.id);
   this.title = ko.observable(data.title);
@@ -356,12 +382,6 @@ var GridDay = function(data) {
   }, this);
   this.dietPlanItems = ko.observableArray([]);
   this.meal_id_select2add = ko.observable();
-  this.select2add_portions = ko.computed(function() {
-    // return ko.utils.arrayFilter(self.meals(), function(item) {
-      // return item.meal_id == this.meal_id_select2add();
-    // });
-    return 2  // TODO: return value of meal instead of a fixed 2
-  }, this);
 }
 
 var DietPlanItem = function(data) {
@@ -436,8 +456,6 @@ ko.bindingHandlers.selectAndFocus = {
 
 
 function saveInventoryItem(newValue) {
-  console.log('saveInventoryItem: newValue = ' + newValue + ', id = ' + this.id());
-
   $.ajax({
     type: 'PUT',
     url: url_api_inventory,
@@ -450,8 +468,6 @@ function saveInventoryItem(newValue) {
       'status' : this.status(),
       'material_id' : this.material_id(),
       'level' : this.level(),
-      'need_from_diet_plan' : this.need_from_diet_plan(),
-      'need_additional' : this.need_additional(),
       're_order_level' : this.re_order_level(),
       're_order_quantity' : this.re_order_quantity()
     },
@@ -465,56 +481,20 @@ function saveInventoryItem(newValue) {
   });
 }
 
-var InventoryItem = function(data) {
-  this.id = ko.observable(data.id);
-  this.inventory_id = ko.observable(data.inventory_id);
-
-  this.title = ko.observable(data.titleDE);  // TODO: Enable multi-language support
-  this.title.subscribe(saveInventoryItem, this);
-
-  this.titleEN = ko.observable(data.titleEN);  // TODO: Enable multi-language support
-  this.titleEN.subscribe(saveInventoryItem, this);
-
-  this.status = ko.observable(data.status);
-  this.status.subscribe(saveInventoryItem, this);
-
-  this.level = ko.observable(data.level);
-  this.level.subscribe(saveInventoryItem, this);
-
-  this.consumed = ko.observable(data.consumed);
-  this.consumed.subscribe(saveInventoryItem, this);
-
-  this.need_additional = ko.observable(data.need_additional);
-  this.need_additional.subscribe(saveInventoryItem, this);
-
-  this.re_order_level = ko.observable(data.re_order_level);
-  this.re_order_level.subscribe(saveInventoryItem, this);
-
-  this.re_order_quantity = ko.observable(data.re_order_quantity);
-  this.re_order_quantity.subscribe(saveInventoryItem, this);
-
-  this.material_id = ko.observable(data.material_id);
-  this.material_id.subscribe(saveInventoryItem, this);
-
-  this.need_from_diet_plan = ko.observable(data.need_from_diet_plan);
-
-  this.editing = ko.observable(false);
-
-  this.statusText = ko.computed(function() {
-    switch (this.status()) {
-      case 0: return 'no-need';
-      case 1: return 'no-stock';
-      case 2: return 'insufficient-stock';
-      case 3: return 'on-stock';
-    };
-  }, this);
-
-}
-
 
 var invViewModel = function() {
   var self = this;
   this.inventoryItems = ko.observableArray([]);
+  const default_forecast_days = 7;
+  this.planForecastDays = ko.observable(default_forecast_days);
+
+  // TODO: Avoid start date contains h:m:s
+  this.plan_date_start = ko.observable( new Date() );
+  this.plan_date_end = ko.computed( function() {
+    var dateTo = new Date(self.plan_date_start()); //new Date();
+    dateTo.setDate(dateTo.getDate() + parseInt(self.planForecastDays()));
+    return dateTo;
+  } );
 
   // store the new Inventory value being entered
 	this.current = ko.observable();
@@ -554,8 +534,9 @@ var invViewModel = function() {
       success: function(response) {
         var parsed = response['inventory_items']
         // for each iterable item create a new InventoryItem observable
-        parsed.forEach( function(object) {
-          self.inventoryItems.push( new InventoryItem(object) );
+
+        parsed.forEach( function(item) {
+          self.inventoryItems.push( new InventoryItem(item) );
         });
       }
     });
@@ -657,6 +638,90 @@ var invViewModel = function() {
   self.loadInventoryItems();
 
 }
+
+var InventoryItem = function(data) {
+  this.id = ko.observable(data.id);
+  this.inventory_id = ko.observable(data.inventory_id);
+
+  this.title = ko.observable(data.titleDE);  // TODO: Enable multi-language support
+  this.title.subscribe(saveInventoryItem, this);
+
+  this.titleEN = ko.observable(data.titleEN);  // TODO: Enable multi-language support
+  this.titleEN.subscribe(saveInventoryItem, this);
+
+  this.level = ko.observable(data.level);
+  this.level.subscribe(saveInventoryItem, this);
+
+  this.ignoreForecast = ko.observable(data.ignoreForecast);
+  this.ignoreForecast.subscribe(saveInventoryItem, this);
+
+  this.consumed = ko.observable(data.consumed);
+  this.consumed.subscribe(saveInventoryItem, this);
+
+  this.need_additional = ko.observable(data.need_additional);
+  this.need_additional.subscribe(saveInventoryItem, this);
+
+  this.re_order_level = ko.observable(data.re_order_level);
+  this.re_order_level.subscribe(saveInventoryItem, this);
+
+  this.re_order_quantity = ko.observable(data.re_order_quantity);
+  this.re_order_quantity.subscribe(saveInventoryItem, this);
+
+  this.material_id = ko.observable(data.material);
+  this.material_id.subscribe(saveInventoryItem, this);
+
+  this.editing = ko.observable(false);
+
+  this.uom = ko.observable(data.uom);
+  this.uom.subscribe(saveInventoryItem, this);
+
+  this.forecasts = ko.observableArray(ko.utils.arrayMap(data.forecasts, function(forecast) {
+    return new MaterialForecast(forecast);
+  }));
+
+  this.plannedQuantity = ko.computed( function() {
+    var totalPlannedQuantity = 0;
+    var d1 = new Date(invVM.plan_date_start());
+    var d2 = new Date(invVM.plan_date_end());
+    this.forecasts().forEach( function(element) {
+      var planDate = new Date(element.plan_date());
+      if (planDate >= d1 && planDate <= d2) {
+        totalPlannedQuantity += element.quantity();
+      }
+    });
+    return totalPlannedQuantity
+  }, this);
+
+  this.status = ko.computed(function() {
+    if (this.plannedQuantity() == 0 || this.ignoreForecast()) {
+      return 0;
+    } else if (this.plannedQuantity() > 0 && this.level() == 0) {
+      return 1;
+    } else if (this.level() < this.plannedQuantity()) {
+      return 2;
+    } else if (this.level() >= this.plannedQuantity()) {
+      return 3;
+    }
+  }, this);
+
+  this.statusText = ko.computed(function() {
+    switch (this.status()) {
+      case 0: return 'no-need';
+      case 1: return 'no-stock';
+      case 2: return 'lack-stock';
+      case 3: return 'on-stock';
+    };
+  }, this);
+
+}
+
+var MaterialForecast = function(data) {
+  this.id = ko.observable(data.id);
+  this.plan_date = ko.observable(data.plan_date);
+  this.quantity = ko.observable(data.quantity);
+  this.quantity_uom = ko.observable(data.quantity_uom);
+}
+
 
 var dpVM = new dpViewModel();
 ko.applyBindings(dpVM, document.getElementById('diet_plan'));

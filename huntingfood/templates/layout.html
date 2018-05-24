@@ -14,7 +14,7 @@
     <!-- STATIC folder version -->
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-    <!-- <link href="{{ url_for('static', filename='main_styles.css') }}" rel="stylesheet"> -->
+    <link href="{{ url_for('static', filename='node_modules/bootstrap-datepicker/dist/css/bootstrap-datepicker3.css') }}" rel="stylesheet">
 
 
     <Style>
@@ -108,6 +108,8 @@
     <script type=text/javascript src="{{ url_for('static', filename='js/jquery-3.2.1.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/popper.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/bootstrap.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/bootstrap-datepicker/dist/js/bootstrap-datepicker.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/moment/moment.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     <!-- Modification of fixed floating button to allow standard click event instead of opening the child items

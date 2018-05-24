@@ -4,6 +4,8 @@ from huntingfood.users.authentication import login_required
 import os  # required to have access to the Port environment variable
 import json
 
+import pprint  # for debugging purposes
+
 # Enable logging of events
 import logging
 
@@ -24,7 +26,7 @@ from datetime import datetime
 from flask import render_template, request, url_for, redirect, \
     jsonify, send_from_directory
 from werkzeug.utils import secure_filename  # required for file upload
-from sqlalchemy import exc
+from sqlalchemy import exc, and_, or_
 
 # Import own modules
 from huntingfood import tools
@@ -34,18 +36,24 @@ from huntingfood.models import FoodComposition, Nutrient
 from huntingfood.models import FoodMainGroup
 from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
 from huntingfood.models import Place
+# Marshmallow Schemas
+from huntingfood.models import InventoryItemSchema, MaterialForecastSchema
 
 # Set Logging level
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-#logger2 = logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
-
+pp = pprint.PrettyPrinter(indent=1)
 
 # TODO: not really required but just to ease the migration to flask-sqlalchemy
 session = db.session
 
 db.create_all()
 db.session.commit()
+
+# Create Marshmallow schema dumpers
+inventory_item_schema = InventoryItemSchema(many=True)
+material_forecast_schema = MaterialForecastSchema(many=True)
+
 
 # Google Cloud Connection
 PK_escaped = app.config['GOOGLE_CLOUD_CREDENTIALS_PK']
@@ -296,18 +304,27 @@ def api_v1_dietplan(diet_plan_id):
                         status=1,
                         material_id=row.id,
                         level=0,
-                        need_from_diet_plan=99,  # TODO: Add calculation based on portions and uom of ingredients
-                        need_additional=0,
+                        sku_uom=row.standard_uom_id,
                         re_order_level=99,
                         re_order_quantity=99
                         )
                     session.add(inventory_item)
                     session.commit()
 
-            # Step 4: Add material forecast
-            # TODO: Combine with query to identify missing inventory items
+            # Step 4: Determine all materials related to the meal
             try:
-                # 4.1 Get all existing forecasts first to update them
+                logging.info('Determine all materials ...')
+                materials = db.session.query(Material, Ingredient, Meal).\
+                    join(Material.referencedIn).\
+                    join(Ingredient.meal).\
+                    filter(Ingredient.meal_id == meal_id).all()
+            except NoRecordsError:
+                logging.info('No materials found')
+            except exc.SQLAlchemyError:
+                logging.exception('Some problem occurred')
+
+            # Step 5: Determine all materials with forecast and update them
+            try:
                 logging.info('Determine existing material forecasts ...')
                 planned_materials = db.session.query(Material, Ingredient, Meal, MaterialForecast).\
                     join(Material.referencedIn).\
@@ -321,23 +338,37 @@ def api_v1_dietplan(diet_plan_id):
             except exc.SQLAlchemyError:
                 logging.exception('Some problem occurred')
 
-                                #with_entities(
-                                    #Material.id,
-                                    #Ingredient.quantity,
-                                    #Ingredient.uom_id,
-                                    #Meal.portions,
-                                    #MaterialForecast.quantity,
-                                    #MaterialForecast.quantity_uom).\
-
             for row in planned_materials:
-                #print('MaterialForecast.quantity = ' + MaterialForecast.quantity)
-                logging.info("Old MaterialForecast (" + str(row.Material.id) + ") = " + str(row.MaterialForecast.quantity))
-                row.MaterialForecast.quantity = row.MaterialForecast.quantity + (portions/row.Meal.portions) * row.Ingredient.quantity
-                logging.info("New MaterialForecast (" + str(row.Material.id) + ") = " + str(row.MaterialForecast.quantity))
-            session.commit()
-            # 4.2 Create new forecast entries for material/plan date combinations
+                logging.info("Old MaterialForecast ("
+                             + str(row.Material.id) + ") = "
+                             + str(row.MaterialForecast.quantity))
+                row.MaterialForecast.quantity = row.MaterialForecast.quantity + (float(portions)/row.Meal.portions) * row.Ingredient.quantity
+                logging.info("New MaterialForecast ("
+                             + str(row.Material.id) + ") = "
+                             + str(row.MaterialForecast.quantity))
 
-            # Step 5: Return Response
+                # for materials with forecast remove the records from
+                # the all material list
+                for m in materials:
+                    if (m.Material.id == row.Material.id):
+                        materials.remove(m)
+
+            session.commit()
+
+            # Step 6: Create new forecast for all remaining materials in the
+            # materials list
+            for row in materials:
+                new_material_forecast = MaterialForecast(
+                    inventory_id=login_session['default_inventory_id'],
+                    material_id=row.Material.id,
+                    plan_date=plan_date,
+                    quantity=row.Ingredient.quantity,
+                    quantity_uom=row.Ingredient.uom_id
+                )
+                session.add(new_material_forecast)
+            session.commit()
+
+            # Step 6: Return Response
             dp_item = DietPlanItem.query.filter_by(
                 id=diet_plan_item.id).all()
             return jsonify(diet_plan_item=[i.serialize for i in dp_item])
@@ -362,6 +393,9 @@ def api_v1_dietplan(diet_plan_id):
             diet_plan_item.consumed = tools.str_to_bool(consumed)
             diet_plan_item.portions = tools.str_to_numeric(portions)
             session.commit()
+
+            # TODO: Create UpdateMaterialForecast function
+
             response = make_response(json.dumps(
                 'Item successfully updated'), 200)
             response.headers['Content-Type'] = 'application/json'
@@ -393,10 +427,11 @@ def api_v1_dietplan(diet_plan_id):
 @app.route('/api/v1/inventory/<int:inventory_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
 def api_v1_inventory(inventory_id):
     inventory_items = []
+
     if request.method == 'GET':
-        inventory_items = InventoryItem.query.filter_by(
-                inventory_id=inventory_id).all()
-        return jsonify(inventory_items=[i.serialize for i in inventory_items])
+        inventory_items = db.session.query(InventoryItem).all()
+        result = inventory_item_schema.dump(inventory_items).data
+        return jsonify({'inventory_items': result})
 
     if request.method == 'POST':
         titleEN = request.form.get('titleEN')
@@ -489,7 +524,7 @@ def api_v1_inventory(inventory_id):
             return response
 
 
-@app.route('/shoppinglist/map/places', methods = ['GET','POST'])
+@app.route('/shoppinglist/map/places', methods=['GET', 'POST'])
 def map_places_handler():
 
     places = []
@@ -553,6 +588,7 @@ def addMeals():
         while request.form['ingredient'+str(x)]:
             row = str(x)
             ingredient_text = request.form['ingredient'+row]
+            ingredient_uom = request.form['uom'+row]
             user_language = login_session['language']
 
             if (user_language != 'en'):
@@ -574,15 +610,15 @@ def addMeals():
             # Query a food database (e.g. NDB) to retrieve nutrient information
             # and to create a food master data record. The id of such a record
             # is returned if a match in the food database was found.
-            material_id = getFood(ingredient_text_EN, ingredient_text)
+            material_id = getFood(ingredient_text_EN, ingredient_text, ingredient_uom)
             if not material_id:
                 material_id = None
 
             # Add new ingredient into database
             newIngredient = Ingredient(quantity=request.form['quantity'+row],
-                                       uom_id=request.form['uom'+row],
+                                       uom_id=ingredient_uom,
                                        meal_id=newMeal.id,
-                                       title=request.form['ingredient'+row],
+                                       title=ingredient_text,
                                        titleEN=translation['translatedText'],
                                        base_food_part=food_entity,
                                        material_id=material_id)
@@ -629,7 +665,8 @@ def showMeal(meal_id):
 
 
 # Food database helper functions
-def getFood(keyword, keyword_local_language):
+# TODO: Rework material creation
+def getFood(keyword, keyword_local_language, standard_uom):
     # Account Email: mailboxsoeren@gmail.com
     # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
 
@@ -656,6 +693,7 @@ def getFood(keyword, keyword_local_language):
                 food = Material(
                     titleEN=i.get_name(),
                     titleDE=keyword_local_language,
+                    standard_uom_id=standard_uom,
                     ndb_code=i.get_ndbno(),
                     food_maingroup_id=foodMainGroup.id)
                 session.add(food)
@@ -816,6 +854,116 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in \
            app.config['ALLOWED_EXTENSIONS']
+
+
+# TODO: Improve by running this in the database using joints, group by and sum
+def updateMaterialForecast(diet_plan_id, inventory_id, plan_date):
+
+    # Step 1: Determine meals in dietplan
+    try:
+        diet_plan_items = DietPlanItem.query.\
+            select_from(DietPlanItem).\
+            filter(DietPlanItem.diet_plan_id == diet_plan_id).\
+            filter(DietPlanItem.plan_date == plan_date).all()
+    except NoRecordsError:
+        logging.info('No records found')
+    except exc.SQLAlchemyError:
+        logging.exception('Some problem occurred')
+
+    for dp_item in diet_plan_items:
+        # Step 2: Identify INVENTORY_ITEMS that are missing
+        # for each food item refernced in the meal ingredients
+        # if the item does not yet exist in the inventory
+        try:
+            missing_inventory_items = Material.query.\
+                select_from(Material).\
+                outerjoin(Material.referencedIn).\
+                outerjoin(Material.referencedInventoryItem).\
+                filter(Ingredient.meal_id == dp_item.meal_id).\
+                filter(InventoryItem.material_id == None).all()
+        except NoRecordsError:
+            logging.info('No records found')
+        except exc.SQLAlchemyError:
+            logging.exception('Some problem occurred')
+
+        logging.info('Missing Inventory items = ' + str(len(missing_inventory_items)) + ' for Meal Id = ' + dp_item.meal_id)
+
+        # Step 3: Create INVENTORY_ITEM that are missing
+        for inv_item in missing_inventory_items:
+            logging.info("Generate inventory items: " + str(inv_item.titleEN))
+            if (inv_item.titleEN):
+                inventory_item = InventoryItem(
+                    inventory_id=login_session['default_inventory_id'],  # TODO: what if the user wants to update another inventory?
+                    titleEN=inv_item.titleEN,
+                    titleDE=inv_item.titleDE,
+                    status=1,
+                    material_id=inv_item.id,
+                    level=0,
+                    sku_uom=inv_item.standard_uom_id,
+                    re_order_level=99,
+                    re_order_quantity=99
+                    )
+                session.add(inventory_item)
+                session.commit()
+
+        # Step 4: Determine all materials related to the meal
+        try:
+            logging.info('Determine all materials ...')
+            materials = db.session.query(Material, Ingredient, Meal).\
+                join(Material.referencedIn).\
+                join(Ingredient.meal).\
+                filter(Ingredient.meal_id == meal_id).all()
+        except NoRecordsError:
+            logging.info('No materials found')
+        except exc.SQLAlchemyError:
+            logging.exception('Some problem occurred')
+
+        # Step 5: Determine all materials with forecast and update them
+        try:
+            logging.info('Determine existing material forecasts ...')
+            planned_materials = db.session.query(Material, Ingredient, Meal, MaterialForecast).\
+                join(Material.referencedIn).\
+                join(Material.referencedMaterialForecast).\
+                join(Ingredient.meal).\
+                filter(Ingredient.meal_id == meal_id).\
+                filter(MaterialForecast.plan_date == plan_date).\
+                filter(MaterialForecast.inventory_id == login_session['default_inventory_id']).all()
+        except NoRecordsError:
+            logging.info('No existing material forecasts')
+        except exc.SQLAlchemyError:
+            logging.exception('Some problem occurred')
+
+        for row in planned_materials:
+            logging.info("Old MaterialForecast ("
+                         + str(row.Material.id) + ") = "
+                         + str(row.MaterialForecast.quantity))
+            row.MaterialForecast.quantity = row.MaterialForecast.quantity + (float(portions)/row.Meal.portions) * row.Ingredient.quantity
+            logging.info("New MaterialForecast ("
+                         + str(row.Material.id) + ") = "
+                         + str(row.MaterialForecast.quantity))
+
+            # for materials with forecast remove the records from
+            # the all material list
+            for m in materials:
+                if (m.Material.id == row.Material.id):
+                    materials.remove(m)
+
+        session.commit()
+
+        # Step 6: Create new forecast for all remaining materials in the
+        # materials list
+        for row in materials:
+            new_material_forecast = MaterialForecast(
+                inventory_id=login_session['default_inventory_id'],
+                material_id=row.Material.id,
+                plan_date=plan_date,
+                quantity=row.Ingredient.quantity,
+                quantity_uom=row.Ingredient.uom_id
+            )
+            session.add(new_material_forecast)
+        session.commit()
+
+
 
 
 class Error(Exception):

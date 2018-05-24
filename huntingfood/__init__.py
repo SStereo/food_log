@@ -6,6 +6,7 @@ import os
 from flask import Flask
 from config import Config
 from flask_sqlalchemy import SQLAlchemy
+from flask_marshmallow import Marshmallow
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 
@@ -15,6 +16,7 @@ app.config.from_object(Config)
 
 # Database Initialization
 db = SQLAlchemy(app)
+ma = Marshmallow(app)
 migrate = Migrate(app, db)
 
 # Register blueprints

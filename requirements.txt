@@ -13,3 +13,5 @@ flask-httpauth
 flask-sqlalchemy
 flask-migrate
 flask-wtf
+marshmallow-sqlalchemy
+flask-marshmallow
