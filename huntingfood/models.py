@@ -269,12 +269,14 @@ class MaterialForecast(db.Model):
         }
 
 
+# The location from where the materials are taken for consumption
+# Examples: home, holiday home, boat
+# TODO: Link to a location table
 class Inventory(db.Model):
     __tablename__ = 'inventories'
     id = db.Column(db.Integer, primary_key = True)
     creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable = False)
     user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable = True)
-
     creator = db.relationship("User", primaryjoin='User.id == Inventory.creator_id')
     user_group = db.relationship("UserGroup", foreign_keys=[user_group_id])
     items = db.relationship("InventoryItem", back_populates="inventory", cascade="all, delete-orphan")
@@ -285,12 +287,12 @@ class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
     id = db.Column(db.Integer, primary_key=True)  # TODO: Each item is per definition a SKU (Stock keeping unit), consider renaming
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
-    titleEN = db.Column(db.String(160), nullable=True)  # TODO: remove those fields later and replace with good/food_id
+    titleEN = db.Column(db.String(160), nullable=True)  # TODO: why is a title required here
     titleDE = db.Column(db.String(160), nullable=True)
     status = db.Column(db.SmallInteger, nullable=True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
     sku_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
-    level = db.Column(db.Integer, nullable=True)  # TODO: should be renamed to stock (on hand)
+    level = db.Column(db.Float, nullable=True)  # TODO: should be renamed to stock (on hand)
     re_order_level = db.Column(db.Integer, nullable=True)
     re_order_quantity = db.Column(db.Integer, nullable=True)
     ignore_forecast = db.Column(db.Boolean, unique=False, default=False)  # Any forecast is ignored so the status will calculate to 0: No Need

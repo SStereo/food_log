@@ -147,21 +147,27 @@ var dpViewModel = function() {
     var date_range = [];
     var item = '';
     var d_string = '';
-    var today = new Date();
-    var d = new Date();
+    var now = new Date();  // current date & time local time zone
+    var today = new Date(now.getFullYear(),now.getMonth(), now.getDate(), 0, 0, 0, 0); // returns current date in UTC
+    today.setHours(0,0,0,0);
+    var d = new Date(today.getTime());  // create a copy of today
     const week_range_max = 3;
     const num_days = 7;
+
+    console.log('now (UTC) = ' + now.toUTCString());
+    console.log('today (local) = ' + today);
+    console.log('today (UTC) = ' + today.toJSON());
 
     // Determine date of first day of the current week
     var today_weekday = (today.getDay() + 6) % 7; // monday is fist not sunday
     d.setDate(today.getDate() - today_weekday);
-
+    console.log('today.getDate() = ' + today.getDate());
+    console.log('d = ' + d);
     // Make first week the default selected one
     self.weekSelected(0);  // TODO: Find a better way for filtering
 
     // ++++++ Generate Week Objects +++++
     var d2 = new Date(d.getTime());
-    var d3 = new Date();
     for (var i = 0; i < week_range_max; i++) {
       date_range = [];
       // after the first week increment the start day by 7 days
@@ -170,16 +176,21 @@ var dpViewModel = function() {
       }
 
       // Copy start date into other variable
-      d3 = new Date(d2.getTime());
+      var d3 = new Date(d2.getTime());
 
       // Determine all days of week
       d3.setDate(d3.getDate() - 1);
       for (var y = 0; y < num_days; y++) {
         d3.setDate(d3.getDate() + 1);
+        console.log('Days of Week = ' + d3);
+
+        // TODO: Why a string?
         d_string = d3.getFullYear() + '-' + (d3.getMonth() + 1) + '-' + d3.getDate();
         date_range.push(d_string);
+        // date_range.push(d3);
       }
 
+      console.log('d2.getTime() = ' + d2.getTime())
       // Create a new GridWeek object with initial meta data (item)
       item = {
         week_number: DateGetWeek(d2),
@@ -250,7 +261,9 @@ var dpViewModel = function() {
   // adds a diet plan item into a day within the timeGrid
   self.addDietPlanItem = function(data, event) {
 
-    console.log('addDietPlanItem(meal_id=' + data.meal_id_select2add() + ')');
+    console.log('addDietPlanItem(plan_date=' + data.date() + ')');
+
+    var plan_date = new Date(data.date())
 
     $.ajax({
       type: 'POST',
@@ -262,7 +275,7 @@ var dpViewModel = function() {
       data: {
         'diet_plan_id' : dp_id,
         'meal_id' : data.meal_id_select2add(),
-        'plan_date' : data.date(),
+        'plan_date' : plan_date.toJSON(),
         'portions' : self.userSettings().default_portions()
       },
       success: function(response) {
@@ -324,6 +337,8 @@ var dpViewModel = function() {
 function saveDietPlanItem(newValue) {
   console.log('saveDietPlanItem: newValue = ' + newValue + ', id = ' + this.id());
 
+  var plan_date = new Date(this.plan_date())
+
   $.ajax({
     type: 'PUT',
     url: url_api_dietplan,
@@ -332,7 +347,7 @@ function saveDietPlanItem(newValue) {
       'id' : this.id(),
       'diet_plan_id' : dp_id,
       'meal_id' : this.meal_id(),
-      'plan_date' : this.plan_date(),
+      'plan_date' : plan_date.toJSON(),
       'consumed' : this.consumed(),
       'portions' : this.portions()
     },
@@ -481,29 +496,34 @@ ko.bindingHandlers['modal'] = {
 
 
 function saveInventoryItem(newValue) {
-  $.ajax({
-    type: 'PUT',
-    url: url_api_inventory,
-    dataType: 'json',
-    data: {
-      'id' : this.id(),
-      'inventory_id' : inv_id,
-      'titleEN' : this.titleEN(),
-      'titleDE' : this.title(),
-      'status' : this.status(),
-      'material_id' : this.material_id(),
-      'level' : this.level(),
-      're_order_level' : this.re_order_level(),
-      're_order_quantity' : this.re_order_quantity()
-    },
-    headers: {
-      'X-CSRFTOKEN' : csrf_token
-    },
-    success: function(response) {
-      //TODO: undo changes in case of failure
-      console.log('saveInventoryItem: success');
-    }
-  });
+  // avoid sending ajax call when values are changed in the model window by
+  // validating if the id exists
+  if (this.id()) {
+    $.ajax({
+      type: 'PUT',
+      url: url_api_inventory,
+      dataType: 'json',
+      data: {
+        'id' : this.id(),
+        'inventory_id' : inv_id,
+        'titleEN' : this.titleEN(),
+        'titleDE' : this.title(),
+        'status' : this.status(),
+        'material_id' : this.material_id(),
+        'level' : this.level(),
+        'ignore_forecast' : this.ignoreForecast(),
+        're_order_level' : this.re_order_level(),
+        're_order_quantity' : this.re_order_quantity()
+      },
+      headers: {
+        'X-CSRFTOKEN' : csrf_token
+      },
+      success: function(response) {
+        //TODO: undo changes in case of failure
+        console.log('saveInventoryItem: success');
+      }
+    });
+  }
 }
 
 
@@ -585,12 +605,24 @@ var invViewModel = function() {
   };
 
   self.toogleStatus = function(data, event) {
-    console.log('toggle');
-    if (data.status() < 3) {
-      data.status(data.status() + 1);
-    } else {
-      data.status(0);
-    }
+    console.log('toggleStatus');
+    switch (data.status()) {
+      case 0:
+        data.ignoreForecast(false);
+        data.level(0);
+        if (data.plannedQuantity() == 0) {
+          // TODO: add manual forecast to minimum order quantity
+        }
+      case 1:
+        // TODO: add manual forecast to minimum order quantity
+        data.level(data.plannedQuantity()/2);
+      case 2:
+        // TODO: add manual forecast to minimum order quantity
+        data.level(data.plannedQuantity());
+      case 3:
+        data.ignoreForecast(true);
+    };
+
   };
 
   // adds a inventory item

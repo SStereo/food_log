@@ -119,7 +119,7 @@
             </thead>
             <tbody data-bind="foreach: filteredInventoryItems">
               <tr class="inv-list" data-bind="css: statusText">
-                <td><button class="toggle btn btn-primary" data-bind="text: statusText"></button></td>
+                <td><button class="toggle btn btn-primary" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
                 <td data-bind="text: title()"></td>
                 <td data-bind="text: level()"></td>
                 <td data-bind="text: plannedQuantity() + uom()"></td>
