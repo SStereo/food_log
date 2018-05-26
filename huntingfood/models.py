@@ -245,7 +245,7 @@ class MaterialForecast(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
-    plan_date = db.Column(db.DateTime, nullable=True)
+    plan_date = db.Column(db.DateTime(timezone=True), nullable=True)
     quantity = db.Column(db.Float, nullable=True)
     quantity_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
 
@@ -357,14 +357,6 @@ class ShoppingOrderItem(db.Model):
     trade_item = db.relationship("TradeItem")
 
 
-class PlaningPeriodTemplate(db.Model):
-    __tablename__ = 'planing_period_templates'
-    id = db.Column(db.Integer, primary_key = True)
-    start_date = db.Column(db.Date, nullable = True)
-    end_date = db.Column(db.Date, nullable = True)
-    week_no = db.Column(db.SmallInteger, nullable = True)
-
-
 class DietPlan(db.Model):
     __tablename__ = 'diet_plans'
     id = db.Column(db.Integer, primary_key = True)
@@ -381,7 +373,7 @@ class DietPlanItem(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     diet_plan_id = db.Column(db.Integer, db.ForeignKey('diet_plans.id'), nullable=False)
     meal_id = db.Column(db.Integer, db.ForeignKey('meals.id'), nullable=False)
-    plan_date = db.Column(db.Date, nullable=False)
+    plan_date = db.Column(db.DateTime(timezone=True), nullable=False)
     portions = db.Column(db.SmallInteger, nullable=True)
     consumed = db.Column(db.Boolean, nullable=True)
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable = True)  # TODO: Allow individual food items to be placed in a dietplan, like an apple a day keeps the doctor away

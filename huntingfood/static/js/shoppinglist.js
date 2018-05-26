@@ -185,9 +185,9 @@ var dpViewModel = function() {
         console.log('Days of Week = ' + d3);
 
         // TODO: Why a string?
-        d_string = d3.getFullYear() + '-' + (d3.getMonth() + 1) + '-' + d3.getDate();
-        date_range.push(d_string);
-        // date_range.push(d3);
+        // d_string = d3.getFullYear() + '-' + (d3.getMonth() + 1) + '-' + d3.getDate();
+        // date_range.push(d_string);
+        date_range.push(d3.toJSON());
       }
 
       console.log('d2.getTime() = ' + d2.getTime())
@@ -198,6 +198,7 @@ var dpViewModel = function() {
         date_first_day: d2.getTime(),
         date_range: date_range
       }
+
       var grid_week = new GridWeek(item);
       self.weekRange.push(grid_week);
 
@@ -216,13 +217,15 @@ var dpViewModel = function() {
     self.weekRange()[index].grid_days().forEach( function(item) {
       // Deletes all dietPlanObjects prior of loading them fresh from the server
       item.dietPlanItems.removeAll();
+
+      var plan_date = new Date(item.date())
       // Loads data from the REST API
       $.ajax({
         type: 'GET',
         url: url_api_dietplan,
         dataType: 'json',
         data: {
-          'plan_date' : item.date()
+          'plan_date' : plan_date.toJSON()
         },
         success: function(response) {
           // turn the json string into a javascript object
@@ -239,6 +242,8 @@ var dpViewModel = function() {
   self.removeDietPlanItem = function(parent, data, event) {
     console.log('removeDietPlanItem(meal_id=' + data.meal_id() + ')');
 
+    var plan_date = new Date(data.plan_date())
+
     $.ajax({
       type: 'DELETE',
       url: url_api_dietplan,
@@ -247,7 +252,7 @@ var dpViewModel = function() {
         'id' : data.id(),
         'diet_plan_id' : dp_id,
         'meal_id' : data.meal_id(),
-        'plan_date' : data.plan_date(),
+        'plan_date' : plan_date.toJSON()
       },
       headers: {
         'X-CSRFTOKEN' : csrf_token
@@ -261,10 +266,10 @@ var dpViewModel = function() {
   // adds a diet plan item into a day within the timeGrid
   self.addDietPlanItem = function(data, event) {
 
-    console.log('addDietPlanItem(plan_date=' + data.date() + ')');
+    console.log('addDietPlanItem: plan_date = ' + data.date() + ')');
 
-    var plan_date = new Date(data.date())
-
+    var plan_date = new Date(data.date());
+    console.log(' var plan_date = ' + plan_date);
     $.ajax({
       type: 'POST',
       url: url_api_dietplan,
@@ -335,7 +340,7 @@ var dpViewModel = function() {
 // This callback function is called whenever a subscription event on observables are triggered
 // TODO: this is the only CRUD function sitting outside of the ViewModel -> fix
 function saveDietPlanItem(newValue) {
-  console.log('saveDietPlanItem: newValue = ' + newValue + ', id = ' + this.id());
+  console.log('saveDietPlanItem: plan_date = ' + this.plan_date());
 
   var plan_date = new Date(this.plan_date())
 

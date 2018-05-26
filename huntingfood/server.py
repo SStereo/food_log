@@ -262,7 +262,7 @@ def api_v1_dietplan(diet_plan_id):
         return jsonify(diet_plan_items=[i.serialize for i in dp_items])
 
     if request.method == 'POST':
-        plan_date = dateutil.parser.parse(request.form.get('plan_date')).date()
+        plan_date = dateutil.parser.parse(request.form.get('plan_date'))
         meal_id = request.form.get('meal_id')
         consumed = request.form.get('consumed')
         portions = request.form.get('portions')
@@ -383,7 +383,7 @@ def api_v1_dietplan(diet_plan_id):
             return response
 
     if request.method == 'PUT':
-        plan_date = dateutil.parser.parse(request.form.get('plan_date')).date()
+        plan_date = dateutil.parser.parse(request.form.get('plan_date'))
         meal_id = request.form.get('meal_id')
         id = request.form.get('id')
         consumed = request.form.get('consumed')
