@@ -258,3 +258,7 @@ tr.on-stock {
 }
 
 /* Modal window styles */
+
+.hide-link {
+  display: none;
+}

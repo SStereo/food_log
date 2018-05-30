@@ -1,0 +1,5 @@
+SELECT materials.id AS "m.id", materials."titleDE" AS "m.title", users_inventory_items."id" AS "inv.id", users_inventory_items."material_id" AS "inv.material_id", ingredients."meal_id" as "ing.meal_id", ingredients.id as "ing.id", ingredients.quantity as "ing.qty"
+FROM materials
+LEFT JOIN (SELECT * FROM inventory_items WHERE inventory_id = 3) as users_inventory_items ON materials.id = users_inventory_items.material_id
+LEFT JOIN ingredients ON materials.id = ingredients.material_id
+WHERE (users_inventory_items."material_id" IS NULL) and (ingredients."meal_id" = 9)

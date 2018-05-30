@@ -12,19 +12,22 @@
 
 
 {% block body %}
-<main class="text-center py-5">
+<main class="text-center py-0">
 
   <!-- Tab Navigation -->
   <div class="container">
     <ul class="nav nav-tabs" id="myTab" role="tablist">
       <li class="nav-item">
-        <a class="nav-link active" id="diet_plan-tab" data-toggle="tab" href="#diet_plan" role="tab" aria-controls="dietplan" aria-selected="true"><div class="sl-nav-icon"><i class="fas fa-utensils" aria-hidden="true"></i></div> Speiseplan</a>
+        <a class="nav-link active hide-link" id="diet_plan-tab" data-toggle="tab" href="#diet_plan" role="tab" aria-controls="dietplan" aria-selected="true"><div class="sl-nav-icon"><i class="fas fa-utensils" aria-hidden="true"></i></div> Speiseplan</a>
+        <!--<a href="#/diet_plan">click</a>-->
       </li>
       <li class="nav-item">
         <a class="nav-link" id="inventory-tab" data-toggle="tab" href="#inventory" role="tab" aria-controls="inventory" aria-selected="false"><div class="sl-nav-icon"><i class="fas fa-warehouse" aria-hidden="true"></i></div> Bestand</a>
+        <!--<a href="#/inventory">click</a>-->
       </li>
       <li class="nav-item">
         <a class="nav-link" id="shoppinglist-tab" data-toggle="tab" href="#shoppinglist" role="tab" aria-controls="shoppingslist" aria-selected="false"><div class="sl-nav-icon"><i class="fas fa-shopping-basket" aria-hidden="true"></i></div> Einkaufsliste</a>
+        <!--<a href="#/shoppinglist">click</a>-->
       </li>
     </ul>
   </div>
@@ -95,7 +98,7 @@
           <div class="input-group">
             <div class="form-group">
               <label for="formControlRange" data-bind="text: planForecastDays() + ' days'"></label>
-              <input type="range" class="form-control-range" id="formControlRange" data-bind="value: planForecastDays">
+              <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: planForecastDays">
             </div>
             <!-- <input type="text" class="datepicker" data-bind="value: plan_date_start"> -->
             <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">
@@ -118,7 +121,7 @@
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredInventoryItems">
-              <tr class="inv-list" data-bind="css: statusText">
+              <tr class="inv-list" data-bind="css: statusClass">
                 <td><button class="toggle btn btn-primary" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
                 <td data-bind="text: title()"></td>
                 <td data-bind="text: level()"></td>
@@ -135,24 +138,33 @@
             <div class="modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <a class="close" data-dismiss="modal">×</a>
                   <h3>Item Details</h3>
+                  <a class="close" data-dismiss="modal">×</a>
                 </div>
                 <div class="modal-body">
                   <div class="form-group">
-                    <label for="TitleInput">Title</label>
+                    <label for="TitleInput">Bezeichnung</label>
                     <input type="text" class="form-control" id="TitleInput" placeholder="title of item .."
-                           data-bind="value: ItemBeingEdited() && ItemBeingEdited().title, valueUpdate: 'afterkeydown'">
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().title">
                   </div>
                   <div class="form-group">
-                    <label for="LevelInput">Level</label>
+                    <label for="LevelInput">Wieviele Einheiten sind noch da?</label>
                     <input type="text" class="form-control" id="LevelInput" placeholder="0"
-                           data-bind="value: ItemBeingEdited() && ItemBeingEdited().level, valueUpdate: 'afterkeydown'">
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().level">
                   </div>
                   <div class="form-group">
-                    <label for="ReOrderLevelInput">Level</label>
-                    <input type="text" class="form-control" id="ReOrderLevelInput" placeholder="99"
-                           data-bind="value: ItemBeingEdited() && ItemBeingEdited().re_order_level, valueUpdate: 'afterkeydown'">
+                    <label for="cpTypeInput">Zeitraum für regelmässiger Verbrauch?</label>
+                    <select class="custom-select" data-bind="options: $root.cpTypes, optionsText: 'TextDE', optionsValue: 'id', value: ItemBeingEdited() && ItemBeingEdited().cp_type"></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="cpQuantityInput">Anzahl Einheiten pro Zeitraum?</label>
+                    <input type="text" class="form-control" id="cpQuantityInput"
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_quantity">
+                  </div>
+                  <div class="form-group">
+                    <label for="cpQuantityInput">Ab wann?</label>
+                    <input type="text" class="form-control datepicker" id="cpPlanDateStartInput"
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_plan_date_start">
                   </div>
                   <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
                   <div class="alert alert-danger" style="margin: 20px 0 0">
@@ -198,6 +210,7 @@
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
   var url_api_meals = "{{ url_for('api_v1_meals') }}";
   var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
+  var url_api_consumption_plan = "{{ url_for('api_v1_consumption_plan', consumption_plan_id = consumption_plan.id ) }}";
   var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
   var url_api_users = "{{ url_for('api_v1_users') }}";
   var dp_id = {{ diet_plan.id }};
@@ -206,6 +219,7 @@
 </script>
 <script src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>
+<script src="{{ url_for('static', filename='node_modules/director/build/director.js') }}"></script>
 <script>
   $(function () {
 
@@ -221,6 +235,20 @@
     });
 
     moment().format();
+
+    var tabLink = function (tabName) {
+        console.log('Tab Name = ' + tabName);
+        $('#myTab a[href="#' + tabName + '"]').tab('show');
+      };
+
+    Router({ '/:tab': tabLink }).init();
+
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+      console.log('newly activated tab = ' + e.target);
+      if (e.target == 'http://localhost:8000/shoppinglist#inventory') {
+        invVM.loadInventoryItems();
+      }
+    })
 
   })
 </script>

@@ -503,6 +503,10 @@ ko.bindingHandlers['modal'] = {
 function saveInventoryItem(newValue) {
   // avoid sending ajax call when values are changed in the model window by
   // validating if the id exists
+
+  var cp_plan_date_start = new Date(this.cp_plan_date_start())
+  var cp_plan_date_end = new Date(this.cp_plan_date_end())
+
   if (this.id()) {
     $.ajax({
       type: 'PUT',
@@ -513,12 +517,18 @@ function saveInventoryItem(newValue) {
         'inventory_id' : inv_id,
         'titleEN' : this.titleEN(),
         'titleDE' : this.title(),
-        'status' : this.status(),
         'material_id' : this.material_id(),
         'level' : this.level(),
         'ignore_forecast' : this.ignoreForecast(),
         're_order_level' : this.re_order_level(),
-        're_order_quantity' : this.re_order_quantity()
+        're_order_quantity' : this.re_order_quantity(),
+        'cp_type' : this.cp_type(),
+        'cp_quantity' : this.cp_quantity(),
+        'cp_plan_date_start' : cp_plan_date_start.toJSON(),
+        'cp_plan_date_end' : cp_plan_date_end.toJSON(),
+        'cp_period' : this.cp_period(),
+        'cp_weekday' : this.cp_weekday(),
+        'cp_day_in_month' : this.cp_day_in_month()
       },
       headers: {
         'X-CSRFTOKEN' : csrf_token
@@ -531,14 +541,12 @@ function saveInventoryItem(newValue) {
   }
 }
 
-
 var invViewModel = function() {
   var self = this;
   this.inventoryItems = ko.observableArray([]);
   const default_forecast_days = 7;
   this.planForecastDays = ko.observable(default_forecast_days);
 
-  // TODO: Avoid start date contains h:m:s
   this.plan_date_start = ko.observable( new Date() );
   this.plan_date_end = ko.computed( function() {
     var dateTo = new Date(self.plan_date_start()); //new Date();
@@ -549,6 +557,14 @@ var invViewModel = function() {
   // store the new Inventory value being entered
 	this.current = ko.observable();
   this.ValidationErrors = ko.observableArray([]);
+
+  this.cpTypes = ko.observableArray([
+    {'id': 0, 'TextDE': 'nein'},
+    {'id': 1, 'TextDE': 'täglich'},
+    {'id': 2, 'TextDE': 'einmal pro Woche'},
+    {'id': 3, 'TextDE': 'einmal pro Monat'},
+    {'id': 4, 'TextDE': 'einmal im Jahr'}
+  ]);
 
   this.filterStatus = ko.observable('all');
 
@@ -578,6 +594,7 @@ var invViewModel = function() {
   // Loads inventory items from Rest API
   self.loadInventoryItems = function() {
     self.inventoryItems.removeAll();
+    console.log('Loading inventory items ...');
     $.ajax({
       type: 'GET',
       url: url_api_inventory,
@@ -615,17 +632,19 @@ var invViewModel = function() {
       case 0:
         data.ignoreForecast(false);
         data.level(0);
-        if (data.plannedQuantity() == 0) {
-          // TODO: add manual forecast to minimum order quantity
-        }
+        console.log('toggle case 0');
+        break;
       case 1:
-        // TODO: add manual forecast to minimum order quantity
         data.level(data.plannedQuantity()/2);
+        console.log('toggle case 1');
+        break;
       case 2:
-        // TODO: add manual forecast to minimum order quantity
         data.level(data.plannedQuantity());
+        console.log('toggle case 2');
+        break;
       case 3:
         data.ignoreForecast(true);
+        console.log('toggle case 3');
     };
 
   };
@@ -708,7 +727,7 @@ var invViewModel = function() {
 
     self.ValidationErrors.removeAll(); // Clear out any previous errors
 
-    if (!currentLevel) {
+    if (currentLevel === null) {
       self.ValidationErrors.push("Stock level is required.");
     } else { // Just some arbitrary checks here...
       if (Number(currentLevel) == currentLevel && currentLevel % 1 === 0) { // is a whole number
@@ -744,14 +763,20 @@ var invViewModel = function() {
   self.EditItem = function(item) {
     // Keep a copy of the original instance so we don't modify it's values in the editor
     self.OriginalItemInstance(item);
-    console.log('click');
+    console.log('item.re_order_quantity() = ' + item.re_order_quantity());
     // Copy the user data into a new instance for editing. TODO: this does not work
 
     var data = {
       'titleDE': item.title(),
       'level': item.level(),
-      're_order_quantity': item.re_order_quantity()
-    }
+      're_order_quantity': item.re_order_quantity(),
+      'cp_type': item.cp_type(),
+      'cp_quantity': item.cp_quantity(),
+      'cp_period': item.cp_period(),
+      'cp_quantity': item.cp_quantity(),
+      'cp_plan_date_start': item.cp_plan_date_start(),
+      'cp_plan_date_end': item.cp_plan_date_end()
+    };
 
     self.ItemBeingEdited(new InventoryItem(data));
   };
@@ -765,20 +790,39 @@ var invViewModel = function() {
       return false;
     }
 
-    var itemTitle = ko.utils.unwrapObservable(updatedItem.title);
-    var itemLevel = ko.utils.unwrapObservable(updatedItem.level);
-    var itemReOrderLevel = ko.utils.unwrapObservable(updatedItem.re_order_level);
+    var title = ko.utils.unwrapObservable(updatedItem.title);
+    var level = ko.utils.unwrapObservable(updatedItem.level);
+    var re_order_quantity = ko.utils.unwrapObservable(updatedItem.re_order_quantity);
+    var cp_type = ko.utils.unwrapObservable(updatedItem.cp_type);
+    var cp_quantity = ko.utils.unwrapObservable(updatedItem.cp_quantity);
+    var cp_period = ko.utils.unwrapObservable(updatedItem.cp_period);
+    var cp_weekday = ko.utils.unwrapObservable(updatedItem.cp_weekday);
+    var cp_day_in_month = ko.utils.unwrapObservable(updatedItem.cp_day_in_month);
+    var cp_plan_date_start = ko.utils.unwrapObservable(updatedItem.cp_plan_date_start);
+    var cp_plan_date_end = ko.utils.unwrapObservable(updatedItem.cp_plan_date_end);
+
+    console.log('var re_order_quantity = ' + ko.utils.unwrapObservable(updatedItem.re_order_quantity));
 
     if (self.OriginalItemInstance() === undefined) {
       return false;
     } else {
-      // Updating an existing user
-      self.OriginalItemInstance().title(itemTitle);
-      self.OriginalItemInstance().level(itemLevel);
-      self.OriginalItemInstance().re_order_level(itemReOrderLevel);
+      // Updating an existing item
+      self.OriginalItemInstance().title(title);
+      self.OriginalItemInstance().level(level);
+      self.OriginalItemInstance().re_order_quantity(re_order_quantity);
+      self.OriginalItemInstance().cp_type(cp_type);
+      self.OriginalItemInstance().cp_quantity(cp_quantity);
+      self.OriginalItemInstance().cp_period(cp_period);
+      self.OriginalItemInstance().cp_weekday(cp_weekday);
+      self.OriginalItemInstance().cp_day_in_month(cp_day_in_month);
+      self.OriginalItemInstance().cp_plan_date_start(cp_plan_date_start);
+      self.OriginalItemInstance().cp_plan_date_end(cp_plan_date_end);
+
+      console.log('self.OriginalItemInstance().re_order_quantity() = ' + self.OriginalItemInstance().re_order_quantity());
+
     }
 
-    // Clear out any reference to a user being edited
+    // Clear out any reference to a item being edited
     self.ItemBeingEdited(undefined);
     self.OriginalItemInstance(undefined);
   };
@@ -792,6 +836,9 @@ var InventoryItem = function(data) {
   this.id = ko.observable(data.id);
   this.inventory_id = ko.observable(data.inventory_id);
 
+  this.material_id = ko.observable(data.material);
+  this.material_id.subscribe(saveInventoryItem, this);
+
   this.title = ko.observable(data.titleDE);  // TODO: Enable multi-language support
   this.title.subscribe(saveInventoryItem, this);
 
@@ -804,25 +851,37 @@ var InventoryItem = function(data) {
   this.ignoreForecast = ko.observable(data.ignoreForecast);
   this.ignoreForecast.subscribe(saveInventoryItem, this);
 
-  this.consumed = ko.observable(data.consumed);
-  this.consumed.subscribe(saveInventoryItem, this);
-
-  this.need_additional = ko.observable(data.need_additional);
-  this.need_additional.subscribe(saveInventoryItem, this);
-
   this.re_order_level = ko.observable(data.re_order_level);
   this.re_order_level.subscribe(saveInventoryItem, this);
 
   this.re_order_quantity = ko.observable(data.re_order_quantity);
   this.re_order_quantity.subscribe(saveInventoryItem, this);
 
-  this.material_id = ko.observable(data.material);
-  this.material_id.subscribe(saveInventoryItem, this);
-
   this.editing = ko.observable(false);
 
   this.uom = ko.observable(data.uom);
   this.uom.subscribe(saveInventoryItem, this);
+
+  this.cp_type = ko.observable(data.cp_type);
+  this.cp_type.subscribe(saveInventoryItem, this);
+
+  this.cp_quantity = ko.observable(data.cp_quantity);
+  this.cp_quantity.subscribe(saveInventoryItem, this);
+
+  this.cp_plan_date_start = ko.observable(data.cp_plan_date_start);
+  this.cp_plan_date_start.subscribe(saveInventoryItem, this);
+
+  this.cp_plan_date_end = ko.observable(data.cp_plan_date_end);
+  this.cp_plan_date_end.subscribe(saveInventoryItem, this);
+
+  this.cp_period = ko.observable(data.cp_period);
+  this.cp_period.subscribe(saveInventoryItem, this);
+
+  this.cp_weekday = ko.observable(data.cp_weekday);
+  this.cp_weekday.subscribe(saveInventoryItem, this);
+
+  this.cp_day_in_month = ko.observable(data.cp_day_in_month);
+  this.cp_day_in_month.subscribe(saveInventoryItem, this);
 
   this.forecasts = ko.observableArray(ko.utils.arrayMap(data.forecasts, function(forecast) {
     return new MaterialForecast(forecast);
@@ -830,13 +889,33 @@ var InventoryItem = function(data) {
 
   this.plannedQuantity = ko.computed( function() {
     var totalPlannedQuantity = 0;
-    var d1 = new Date(invVM.plan_date_start());
-    var d2 = new Date(invVM.plan_date_end());
+    var d0_start = new Date(invVM.plan_date_start());
+    var d0_end = new Date(invVM.plan_date_end());
     this.forecasts().forEach( function(element) {
-      var planDate = new Date(element.plan_date());
-      if (planDate >= d1 && planDate <= d2) {
-        totalPlannedQuantity += element.quantity();
-      }
+      var d1_start = new Date(element.plan_date_start());
+      var d1_end = new Date(element.plan_date_end());
+      var days = 0
+      var timeDiff = 0;
+      if (d0_start.getTime() >= d1_start.getTime() && d1_end.getTime() > d0_start.getTime()) {
+        if (d0_end.getTime() <= d1_end.getTime()) {
+          timeDiff = Math.abs(d0_end.getTime() - d0_start.getTime());
+          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        } else if (d0_end.getTime() > d2_end.getTime()) {
+          timeDiff = Math.abs(d2_end.getTime() - d0_start.getTime());
+          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        };
+      } else if (d0_start.getTime() < d1_start.getTime() && d1_start.getTime() < d0_end.getTime()) {
+        if (d0_end.getTime() <= d1_end.getTime()) {
+          timeDiff = Math.abs(d0_end.getTime() - d1_start.getTime());
+          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        } else if (d0_end.getTime() > d1_end.getTime()) {
+          timeDiff = Math.abs(d1_end.getTime() - d1_start.getTime());
+          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        };
+      } else {
+        days = 0;
+      };
+      totalPlannedQuantity += days * element.quantity_per_day();
     });
     return totalPlannedQuantity
   }, this);
@@ -855,6 +934,15 @@ var InventoryItem = function(data) {
 
   this.statusText = ko.computed(function() {
     switch (this.status()) {
+      case 0: return 'zZ';
+      case 1: return '0%';
+      case 2: return '50%';
+      case 3: return '100%';
+    };
+  }, this);
+
+  this.statusClass = ko.computed(function() {
+    switch (this.status()) {
       case 0: return 'no-need';
       case 1: return 'no-stock';
       case 2: return 'lack-stock';
@@ -866,8 +954,10 @@ var InventoryItem = function(data) {
 
 var MaterialForecast = function(data) {
   this.id = ko.observable(data.id);
-  this.plan_date = ko.observable(data.plan_date);
-  this.quantity = ko.observable(data.quantity);
+  this.type = ko.observable(data.type);
+  this.plan_date_start = ko.observable(data.plan_date_start);
+  this.plan_date_end = ko.observable(data.plan_date_end);
+  this.quantity_per_day = ko.observable(data.quantity_per_day);
   this.quantity_uom = ko.observable(data.quantity_uom);
 }
 

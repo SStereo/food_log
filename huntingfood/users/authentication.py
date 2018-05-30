@@ -2,7 +2,7 @@ import json
 from flask import render_template, request, redirect, abort, make_response, flash, url_for, jsonify
 from huntingfood import app
 from huntingfood import db
-from huntingfood.models import User, UserGroup, UserGroupAssociation, Inventory, DietPlan
+from huntingfood.models import User, UserGroup, UserGroupAssociation, Inventory, DietPlan, ConsumptionPlan
 from urllib.parse import urlparse
 from oauth2client.client import OAuth2WebServerFlow  # flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
@@ -89,6 +89,11 @@ def setUserDefaults(user_id):
         diet_plan = createDietPlan(user_id)
         user.default_diet_plan_id = diet_plan.id
 
+    if not user.default_consumption_plan_id:
+        print('No default consumption plan found')
+        consumption_plan = createConsumptionPlan(user_id)
+        user.default_consumption_plan_id = consumption_plan.id
+
     db.session.commit()
 
 
@@ -100,6 +105,16 @@ def createDietPlan(user_id):
     db.session.commit()
 
     return obj_diet_plan
+
+
+def createConsumptionPlan(user_id):
+
+    obj_consumption_plan = ConsumptionPlan(
+        creator_id=user_id)
+    db.session.add(obj_consumption_plan)
+    db.session.commit()
+
+    return obj_consumption_plan
 
 
 def createInventory(user_id):
@@ -193,6 +208,7 @@ def validateUser(login_session):
         login_session['language'] = user.language
         login_session['default_diet_plan_id'] = user.default_diet_plan_id
         login_session['default_inventory_id'] = user.default_inventory_id
+        login_session['default_consumption_plan_id'] = user.default_consumption_plan_id
         response = response + 1
         return response  # user is authorized
 
