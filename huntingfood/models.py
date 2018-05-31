@@ -644,6 +644,11 @@ class State(db.Model):
 # Marshmallow Schema Definitions
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+class MaterialSchema(ma.ModelSchema):
+    class Meta:
+        model = Material
+
+
 class MaterialForecastSchema(ma.ModelSchema):
     class Meta:
         model = MaterialForecast

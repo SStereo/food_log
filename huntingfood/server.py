@@ -43,7 +43,7 @@ from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
 from huntingfood.models import ConsumptionPlan, ConsumptionPlanItem
 from huntingfood.models import Place
 # Marshmallow Schemas
-from huntingfood.models import InventoryItemSchema, MaterialForecastSchema
+from huntingfood.models import InventoryItemSchema, MaterialForecastSchema, MaterialSchema
 
 # Set Logging level
 logger = logging.getLogger()
@@ -59,6 +59,7 @@ db.session.commit()
 # Create Marshmallow schema dumpers
 inventory_item_schema = InventoryItemSchema(many=True)
 material_forecast_schema = MaterialForecastSchema(many=True)
+material_schema = MaterialSchema(many=True)
 
 
 # Google Cloud Connection
@@ -248,6 +249,229 @@ def shopping_item_handler():
         return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
 
+@app.route('/shoppinglist/map/places', methods=['GET', 'POST'])
+def map_places_handler():
+
+    places = []
+
+    if request.method == 'POST':
+        return 'not yet implemented'
+
+    elif request.method == 'GET':
+        places = Place.query.all()
+        return jsonify(places = [i.serialize for i in places])
+
+
+@app.route('/meals/add', methods=['GET','POST'])
+@login_required
+def addMeals():
+    if request.method == 'POST' and request.form['button'] == "Save":
+        print("Start file handler")
+        # ---- FILE HANDLING -----
+        filename = ""
+        if 'file' not in request.files:
+            print("file not in request.files")
+            # TODO: Implement flash messages
+            # flash('No file part')
+
+            return redirect(request.url)
+
+        file = request.files['file']
+        # if user does not select file, browser also
+        # submit a empty part without filename
+        if file.filename == '':
+            # TODO: Implement flash
+            # flash('No selected file')
+            print("Filename == ''")
+            return redirect(request.url)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            now = datetime.datetime.now()
+            filename = "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), filename.rsplit('.', 1)[1])  #$s replaced by timestamp and file extension
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), file.filename.rsplit('.', 1)[1]))
+            print("filepath = " + filepath)
+            file.save(filepath)
+
+        # ---- MEAL CREATION -----
+        newMeal = Meal(title=request.form['title'],
+                       description=request.form['description'],
+                       portions=request.form['portions'],
+                       calories="410 - 780",
+                       image=filename,
+                       owner_id=login_session['user_id'])
+        session.add(newMeal)
+        session.commit()
+
+        #---- INGREDIENTS CREATION ----
+
+
+
+        # TODO: Optimize the creation of food and ingredient objects
+        #      by avoiding too many commits
+
+        x = 1
+        while request.form['ingredient'+str(x)]:
+            row = str(x)
+            ingredient_text = request.form['ingredient'+row]
+            ingredient_uom = request.form['uom'+row]
+            user_language = login_session['language']
+
+            if (user_language != 'en'):
+                # Translate user language to en
+                translation = translate_client.translate(
+                    ingredient_text, source_language=login_session['language'])
+                ingredient_text_EN = translation['translatedText']
+                print("newIngredient.titleEN = " + ingredient_text_EN)
+            else:
+                ingredient_text_EN = ingredient_text
+
+            # Identify food entity from entered text using language processing
+            # use en language to improve results since en splits combined
+            # german words
+            food_entity = analyze_ingredient(
+                translation['translatedText'], language='en')
+            print("Food entity: %s" % food_entity)
+
+            # Query a food database (e.g. NDB) to retrieve nutrient information
+            # and to create a food master data record. The id of such a record
+            # is returned if a match in the food database was found.
+            material_id = getFood(ingredient_text_EN, ingredient_text, ingredient_uom)
+            if not material_id:
+                material_id = None
+
+            # Add new ingredient into database
+            newIngredient = Ingredient(quantity=request.form['quantity'+row],
+                                       uom_id=ingredient_uom,
+                                       meal_id=newMeal.id,
+                                       title=ingredient_text,
+                                       titleEN=translation['translatedText'],
+                                       base_food_part=food_entity,
+                                       material_id=material_id)
+
+            session.add(newIngredient)
+            session.commit()
+
+            x += 1
+
+        return redirect(url_for("showMeals"))
+
+    elif request.method == 'POST' and request.form['button'] == "Cancel":
+        print("POST button = Cancel")
+        meals = Meal.query
+        return render_template("meals.html",meals=meals,getIngredients=getIngredients)
+    else:  # 'GET':
+        print("GET")
+        uoms = UOM.query
+        materials = Material.query
+        return render_template("meals_add.html",uoms=uoms,materials=materials)
+
+
+@app.route('/meals/delete/<int:meal_id>', methods=['GET', 'POST'])
+@login_required
+def deleteMeal(meal_id):
+
+    o = Meal.query.filter_by(id=meal_id).one()
+    if request.method == 'POST' and request.form['button'] == "Delete":
+        session.delete(o)
+        session.commit()
+        # TODO: flash("Meal deleted")
+        # TODO: Delete image file from folder
+        return redirect(url_for('showMeals'))
+    elif request.method == 'GET':
+        return render_template("meals_delete.html",meal=o)
+    else:
+        return redirect(url_for("showMeals"))
+
+
+@app.route('/meals/view/<int:meal_id>')
+def showMeal(meal_id):
+    o = Meal.query.filter_by(id=meal_id).one()
+    return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
+
+
+# Food database helper functions
+# TODO: Rework material creation
+def getFood(keyword, keyword_local_language, standard_uom):
+    # Account Email: mailboxsoeren@gmail.com
+    # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
+
+    if app.config['NDB_KEY']:
+        n = ndb.NDB(app.config['NDB_KEY'])
+        results = n.search_keyword(keyword)
+        if results:
+
+            i = list(results['items'])[0]  # TODO: identify relevant item, for now take the first one
+            print("Found NDB item: "+i.get_name())
+
+            # Create Food Main Group
+            foodMainGroup = FoodMainGroup.query.filter_by(titleEN=i.get_group()).first()
+            if not foodMainGroup:
+                logging.info('Create FoodMainGroup: ' + i.get_group())
+                foodMainGroup = FoodMainGroup(titleEN=i.get_group())
+                session.add(foodMainGroup)
+                session.commit()
+
+            # Create Food
+            food = Material.query.filter_by(titleEN=i.get_name()).first()
+            if not food:
+                logging.info('Create Material: ' + i.get_name())
+                food = Material(
+                    titleEN=i.get_name(),
+                    titleDE=keyword_local_language,
+                    standard_uom_id=standard_uom,
+                    ndb_code=i.get_ndbno(),
+                    food_maingroup_id=foodMainGroup.id)
+                session.add(food)
+                session.commit()
+
+                # Create Nutrients
+                report = n.food_report(i.get_ndbno())
+
+                nutrients = report['food'].get_nutrients()
+                for n in nutrients:
+                    # use existing nutrient object if exists
+                    if n.get_name() in nutrientDict:
+                        nutriendID = nutrientDict[n.get_name()]  # retreive internal id based on the titleEN
+
+                    # create new nutrient object
+                    else:
+                        logging.info('Create Nutrient: ' + n.get_name())
+                        translated_text = translate_client.translate(
+                            n.get_name(), target_language='de')['translatedText']
+                        newNutrient = Nutrient(value_uom=n.get_unit(),
+                                               titleEN=n.get_name(),
+                                               titleDE=translated_text)
+                        session.add(newNutrient)
+                        session.commit()
+
+                        nutriendID = newNutrient.id
+                        # TODO: Improve caching of nutrients via dictionnary overall
+                        nutrientDict[n.get_name()] = nutriendID
+
+                    # TODO: all get into unknown atm
+                    if n.get_unit() in uomDict:
+                        uomID = n.get_unit()
+                    else:
+                        logging.info('unknown unit of measure of nutrient')
+                        uomID = "x"  # TODO: improve later
+
+                    logging.info('Create FoodComposition')
+                    fc = FoodComposition(material_id=food.id,
+                                        nutrient_id=nutriendID,
+                                        per_qty_uom=uomID,
+                                        per_qty=100,
+                                        value=n.get_value())
+                    session.add(fc)
+                    session.commit()
+            return food.id
+        else:
+            print("No results in NDB found")
+            return None
+    else:
+        print("Missing API Key in Environment Variable")
+        return None
+
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # API Endpoints
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -257,6 +481,20 @@ def api_v1_meals():
     if request.method == 'GET':
         meals = Meal.query.filter_by(owner_id=login_session['user_id']).all()
         return jsonify(meals=[m.serialize for m in meals])
+
+
+@app.route('/api/v1/materials', methods=['GET'])
+def api_v1_materials():
+    materials = []
+    if request.method == 'GET':
+        search_term = request.args.get('query')
+        if search_term:
+            materials = Material.query.filter_by(
+                titleDE=search_term).all()
+        else:
+            materials = Material.query.all()
+        result = material_schema.dump(materials).data
+        return jsonify({'materials': result})
 
 
 @app.route('/api/v1/dietplan/<int:diet_plan_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
@@ -719,229 +957,6 @@ def api_v1_inventory(inventory_id):
                 'Can not delete item because item was not found'), 400)
             response.headers['Content-Type'] = 'application/json'
             return response
-
-
-@app.route('/shoppinglist/map/places', methods=['GET', 'POST'])
-def map_places_handler():
-
-    places = []
-
-    if request.method == 'POST':
-        return 'not yet implemented'
-
-    elif request.method == 'GET':
-        places = Place.query.all()
-        return jsonify(places = [i.serialize for i in places])
-
-
-@app.route('/meals/add', methods=['GET','POST'])
-@login_required
-def addMeals():
-    if request.method == 'POST' and request.form['button'] == "Save":
-        print("Start file handler")
-        # ---- FILE HANDLING -----
-        filename = ""
-        if 'file' not in request.files:
-            print("file not in request.files")
-            # TODO: Implement flash messages
-            # flash('No file part')
-
-            return redirect(request.url)
-
-        file = request.files['file']
-        # if user does not select file, browser also
-        # submit a empty part without filename
-        if file.filename == '':
-            # TODO: Implement flash
-            # flash('No selected file')
-            print("Filename == ''")
-            return redirect(request.url)
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            now = datetime.datetime.now()
-            filename = "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), filename.rsplit('.', 1)[1])  #$s replaced by timestamp and file extension
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), file.filename.rsplit('.', 1)[1]))
-            print("filepath = " + filepath)
-            file.save(filepath)
-
-        # ---- MEAL CREATION -----
-        newMeal = Meal(title=request.form['title'],
-                       description=request.form['description'],
-                       portions=request.form['portions'],
-                       calories="410 - 780",
-                       image=filename,
-                       owner_id=login_session['user_id'])
-        session.add(newMeal)
-        session.commit()
-
-        #---- INGREDIENTS CREATION ----
-
-
-
-        # TODO: Optimize the creation of food and ingredient objects
-        #      by avoiding too many commits
-
-        x = 1
-        while request.form['ingredient'+str(x)]:
-            row = str(x)
-            ingredient_text = request.form['ingredient'+row]
-            ingredient_uom = request.form['uom'+row]
-            user_language = login_session['language']
-
-            if (user_language != 'en'):
-                # Translate user language to en
-                translation = translate_client.translate(
-                    ingredient_text, source_language=login_session['language'])
-                ingredient_text_EN = translation['translatedText']
-                print("newIngredient.titleEN = " + ingredient_text_EN)
-            else:
-                ingredient_text_EN = ingredient_text
-
-            # Identify food entity from entered text using language processing
-            # use en language to improve results since en splits combined
-            # german words
-            food_entity = analyze_ingredient(
-                translation['translatedText'], language='en')
-            print("Food entity: %s" % food_entity)
-
-            # Query a food database (e.g. NDB) to retrieve nutrient information
-            # and to create a food master data record. The id of such a record
-            # is returned if a match in the food database was found.
-            material_id = getFood(ingredient_text_EN, ingredient_text, ingredient_uom)
-            if not material_id:
-                material_id = None
-
-            # Add new ingredient into database
-            newIngredient = Ingredient(quantity=request.form['quantity'+row],
-                                       uom_id=ingredient_uom,
-                                       meal_id=newMeal.id,
-                                       title=ingredient_text,
-                                       titleEN=translation['translatedText'],
-                                       base_food_part=food_entity,
-                                       material_id=material_id)
-
-            session.add(newIngredient)
-            session.commit()
-
-            x += 1
-
-        return redirect(url_for("showMeals"))
-
-    elif request.method == 'POST' and request.form['button'] == "Cancel":
-        print("POST button = Cancel")
-        meals = Meal.query
-        return render_template("meals.html",meals=meals,getIngredients=getIngredients)
-    else:  # 'GET':
-        print("GET")
-        uoms = UOM.query
-        materials = Material.query
-        return render_template("meals_add.html",uoms=uoms,materials=materials)
-
-
-@app.route('/meals/delete/<int:meal_id>', methods=['GET', 'POST'])
-@login_required
-def deleteMeal(meal_id):
-
-    o = Meal.query.filter_by(id=meal_id).one()
-    if request.method == 'POST' and request.form['button'] == "Delete":
-        session.delete(o)
-        session.commit()
-        # TODO: flash("Meal deleted")
-        # TODO: Delete image file from folder
-        return redirect(url_for('showMeals'))
-    elif request.method == 'GET':
-        return render_template("meals_delete.html",meal=o)
-    else:
-        return redirect(url_for("showMeals"))
-
-
-@app.route('/meals/view/<int:meal_id>')
-def showMeal(meal_id):
-    o = Meal.query.filter_by(id=meal_id).one()
-    return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
-
-
-# Food database helper functions
-# TODO: Rework material creation
-def getFood(keyword, keyword_local_language, standard_uom):
-    # Account Email: mailboxsoeren@gmail.com
-    # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
-
-    if app.config['NDB_KEY']:
-        n = ndb.NDB(app.config['NDB_KEY'])
-        results = n.search_keyword(keyword)
-        if results:
-
-            i = list(results['items'])[0]  # TODO: identify relevant item, for now take the first one
-            print("Found NDB item: "+i.get_name())
-
-            # Create Food Main Group
-            foodMainGroup = FoodMainGroup.query.filter_by(titleEN=i.get_group()).first()
-            if not foodMainGroup:
-                logging.info('Create FoodMainGroup: ' + i.get_group())
-                foodMainGroup = FoodMainGroup(titleEN=i.get_group())
-                session.add(foodMainGroup)
-                session.commit()
-
-            # Create Food
-            food = Material.query.filter_by(titleEN=i.get_name()).first()
-            if not food:
-                logging.info('Create Material: ' + i.get_name())
-                food = Material(
-                    titleEN=i.get_name(),
-                    titleDE=keyword_local_language,
-                    standard_uom_id=standard_uom,
-                    ndb_code=i.get_ndbno(),
-                    food_maingroup_id=foodMainGroup.id)
-                session.add(food)
-                session.commit()
-
-                # Create Nutrients
-                report = n.food_report(i.get_ndbno())
-
-                nutrients = report['food'].get_nutrients()
-                for n in nutrients:
-                    # use existing nutrient object if exists
-                    if n.get_name() in nutrientDict:
-                        nutriendID = nutrientDict[n.get_name()]  # retreive internal id based on the titleEN
-
-                    # create new nutrient object
-                    else:
-                        logging.info('Create Nutrient: ' + n.get_name())
-                        translated_text = translate_client.translate(
-                            n.get_name(), target_language='de')['translatedText']
-                        newNutrient = Nutrient(value_uom=n.get_unit(),
-                                               titleEN=n.get_name(),
-                                               titleDE=translated_text)
-                        session.add(newNutrient)
-                        session.commit()
-
-                        nutriendID = newNutrient.id
-                        # TODO: Improve caching of nutrients via dictionnary overall
-                        nutrientDict[n.get_name()] = nutriendID
-
-                    # TODO: all get into unknown atm
-                    if n.get_unit() in uomDict:
-                        uomID = n.get_unit()
-                    else:
-                        logging.info('unknown unit of measure of nutrient')
-                        uomID = "x"  # TODO: improve later
-
-                    logging.info('Create FoodComposition')
-                    fc = FoodComposition(material_id=food.id,
-                                        nutrient_id=nutriendID,
-                                        per_qty_uom=uomID,
-                                        per_qty=100,
-                                        value=n.get_value())
-                    session.add(fc)
-                    session.commit()
-            return food.id
-        else:
-            print("No results in NDB found")
-            return None
-    else:
-        print("Missing API Key in Environment Variable")
-        return None
 
 
 def analyze_ingredient(ingredient_text, **kwargs):

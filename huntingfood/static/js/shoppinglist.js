@@ -900,8 +900,8 @@ var InventoryItem = function(data) {
         if (d0_end.getTime() <= d1_end.getTime()) {
           timeDiff = Math.abs(d0_end.getTime() - d0_start.getTime());
           days = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        } else if (d0_end.getTime() > d2_end.getTime()) {
-          timeDiff = Math.abs(d2_end.getTime() - d0_start.getTime());
+        } else if (d0_end.getTime() > d1_end.getTime()) {
+          timeDiff = Math.abs(d1_end.getTime() - d0_start.getTime());
           days = Math.ceil(timeDiff / (1000 * 3600 * 24));
         };
       } else if (d0_start.getTime() < d1_start.getTime() && d1_start.getTime() < d0_end.getTime()) {
