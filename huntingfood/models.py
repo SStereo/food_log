@@ -43,7 +43,11 @@ class User(db.Model):
 
     groups = db.relationship("UserGroupAssociation", back_populates="user")
     meals = db.relationship("Meal", cascade="all, delete-orphan", back_populates="owner")
-    inventories = db.relationship("Inventory", primaryjoin='User.id == Inventory.creator_id', cascade="all, delete-orphan")
+    inventories = db.relationship(
+        "Inventory",
+        primaryjoin='User.id == Inventory.creator_id',
+        back_populates="creator",
+        cascade="all, delete-orphan")
     diet_plans = db.relationship("DietPlan", primaryjoin='User.id == DietPlan.creator_id', cascade="all, delete-orphan", back_populates="creator")
     consumption_plans = db.relationship("ConsumptionPlan", primaryjoin='User.id == ConsumptionPlan.creator_id', cascade="all, delete-orphan", back_populates="creator")
     default_diet_plan = db.relationship("DietPlan", primaryjoin='User.default_diet_plan_id == DietPlan.id', cascade="all, delete-orphan", single_parent=True)
@@ -176,8 +180,8 @@ class Ingredient(db.Model):
     quantity = db.Column(db.Float, nullable=False)
     uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     meal_id = db.Column(db.Integer, db.ForeignKey('meals.id'), nullable=False, index = True)
-    title = db.Column(db.String(80), nullable=False)  #gehackte Dosentomaten
-    titleEN = db.Column(db.String(80), nullable=True)  #chopped canned tomatoes
+    title = db.Column(db.String(80), nullable=False)  # gehackte Dosentomaten
+    titleEN = db.Column(db.String(80), nullable=True)  # TODO: obsolete
     processing_part = db.Column(db.String(80), nullable=True)  # chopped canned
     preparation_part = db.Column(db.String(80), nullable=True)  # empty
     base_food_part = db.Column(db.String(80), nullable=True)  # Tomatoe
@@ -216,10 +220,15 @@ class Material(db.Model):
     __tablename__ = 'materials'
     id = db.Column(db.Integer, primary_key=True)
     private = db.Column(db.Boolean, unique = False, default = False)  # user specific food that is not refered to a NDB or similar
-    user_group_id = db.Column(db.Integer,db.ForeignKey('user_groups.id'), nullable=True)  # only required for private food items, for example home made foods
-    titleEN = db.Column(db.String(160), nullable=True)
-    titleDE = db.Column(db.String(160), nullable=True)
-    standard_uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
+    user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable=True)  # only required for private food items, for example home made foods
+    title = db.Column(db.String(160), nullable=True)
+    language_code = db.Column(db.String(8), nullable=False)
+    titleEN = db.Column(db.String(160), nullable=True)  # TODO: obsolete
+    titleDE = db.Column(db.String(160), nullable=True)  # TODO: Best way to store other languages?
+    standard_uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
+    uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)  # Physical, e.g. g (Sugar)
+    uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)  # One updated on an inventory, updated here for future inventories
+    uom_issue_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)  # tbsp (4 table spoons of sugar)
     bls_code = db.Column(db.String(7), nullable=True)
     ndb_code = db.Column(db.String(7), nullable=True)
     isBaseFood = db.Column(db.Boolean, unique = False, default = False)
@@ -243,6 +252,28 @@ class Material(db.Model):
     referencedInventoryItem = db.relationship("InventoryItem", back_populates="material")
     referencedMaterialForecast = db.relationship("MaterialForecast", back_populates="material")
     standard_uom = db.relationship("UOM", foreign_keys=[standard_uom_id])
+    base_uom = db.relationship("UOM", foreign_keys=[uom_base_id])
+    stock_uom = db.relationship("UOM", foreign_keys=[uom_stock_id])
+    issue_uom = db.relationship("UOM", foreign_keys=[uom_issue_id])
+
+
+# Converts issue units like table spoons ore cups into base units like grams
+class MaterialUnits:
+    __tablename__ = 'material_units'
+    id = db.Column(
+        db.Integer,
+        primary_key=True)
+    material_id = db.Column(
+        db.Integer,
+        db.ForeignKey('materials.id'),
+        nullable=True, index=True)
+    uom_id = db.Column(
+        db.String(5),
+        db.ForeignKey('units_of_measures.uom'),
+        nullable=False)
+    uom_factor_to_base = db.Column(
+        db.Float,
+        nullable=True)  # e.g. 1 tbsp (issue) = 20 g (base)
 
 
 # Forecast material consumption for a given inventory (e.g. house, warehouse)
@@ -284,11 +315,11 @@ class MaterialForecast(db.Model):
     consumption_plan_item_id = db.Column(
         db.Integer,
         db.ForeignKey('consumption_plan_items.id'),
-        nullable=True, index=True)
+        nullable=True)
     diet_plan_item_id = db.Column(
         db.Integer,
         db.ForeignKey('diet_plan_items.id'),
-        nullable=True, index=True)
+        nullable=True)
     created = db.Column(
         db.DateTime,
         default=datetime.datetime.utcnow)
@@ -332,23 +363,31 @@ class Inventory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable=True)
-    creator = db.relationship("User", primaryjoin='User.id == Inventory.creator_id')
-    user_group = db.relationship("UserGroup", foreign_keys=[user_group_id])
-    items = db.relationship("InventoryItem", back_populates="inventory", cascade="all, delete-orphan")
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
+    creator = db.relationship(
+        "User",
+        back_populates="inventories",
+        primaryjoin='User.id == Inventory.creator_id')
     material_forecasts = db.relationship("MaterialForecast", back_populates="inventory", cascade="all, delete-orphan")
+    user_group = db.relationship("UserGroup", foreign_keys=[user_group_id])
+    items = db.relationship("InventoryItem", back_populates="inventory", cascade="all, delete-orphan")
 
 
 class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
     id = db.Column(db.Integer, primary_key=True)  # TODO: Each item is per definition a SKU (Stock keeping unit), consider renaming
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
-    titleEN = db.Column(db.String(160), nullable=True)  # TODO: why is a title required here
-    titleDE = db.Column(db.String(160), nullable=True)
-    status = db.Column(db.SmallInteger, nullable=True)  # 0: No Need, 1 no stock, 2: insufficient stock, 3: sufficient stock
-    sku_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
+    titleEN = db.Column(db.String(160), nullable=True)
+    titleDE = db.Column(db.String(160), nullable=True)  # TODO: obsolete
+    title = db.Column(db.String(160), nullable=True)
+    status = db.Column(db.SmallInteger, nullable=True)  # TODO: obsolete since calculated on the fly
+    uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
+    uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
+    quantity_stock = db.Column(db.Float, nullable=True)
+    quantity_base = db.Column(db.Float, nullable=True)
+    quantity_conversion_factor = db.Column(db.Float, nullable=True)  # to calculate issue units from stock units
     level = db.Column(db.Float, nullable=True)  # TODO: should be renamed to stock (on hand)
     re_order_level = db.Column(db.Integer, nullable=True)
     re_order_quantity = db.Column(db.Integer, nullable=True)
@@ -361,7 +400,7 @@ class InventoryItem(db.Model):
     # 4 = once a year
     cp_type = db.Column(db.SmallInteger, nullable=False, default=0)
     cp_quantity = db.Column(db.Float, nullable=True)
-    cp_plan_date = db.Column(db.DateTime(timezone=True), nullable=True)  # TODO: depreciated
+    cp_plan_date = db.Column(db.DateTime(timezone=True), nullable=True)  # TODO: obsolete
     cp_plan_date_start = db.Column(db.DateTime(timezone=True), nullable=True)
     cp_plan_date_end = db.Column(db.DateTime(timezone=True), nullable=True)
     cp_period = db.Column(db.SmallInteger, nullable=True)
@@ -376,7 +415,8 @@ class InventoryItem(db.Model):
 
     inventory = db.relationship("Inventory", foreign_keys=[inventory_id], back_populates="items")
     material = db.relationship("Material")
-    uom = db.relationship("UOM")
+    uom_base = db.relationship("UOM", foreign_keys=[uom_base_id])
+    uom_stock = db.relationship("UOM", foreign_keys=[uom_stock_id])
 
     @property
     def serialize(self):
@@ -384,7 +424,7 @@ class InventoryItem(db.Model):
             'id': self.id,
             'inventory_id': self.inventory_id,
             'titleEN': self.titleEN,
-            'titleDE': self.titleDE,
+            'title': self.title,
             'status': self.status,
             'material_id': self.material_id,
             'level': self.level,
@@ -416,6 +456,7 @@ class ShoppingOrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     titleEN = db.Column(db.String(80), nullable=True)  # TODO: remove those fields later and replace with good/food_id
     titleDE = db.Column(db.String(80), nullable=True)
+    title = db.Column(db.String(80), nullable=True)
     shopping_order_id = db.Column(db.Integer, db.ForeignKey('shopping_orders.id'))
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)
     quantity = db.Column(db.Float, nullable=True)
@@ -546,7 +587,8 @@ class Place(db.Model):
     __tablename__ = 'places'
     id = db.Column(db.Integer, primary_key=True)
     titleEN = db.Column(db.String(80), nullable=False)  # storing google data not allowed except place id
-    titleDE = db.Column(db.String(80), nullable=True)
+    titleDE = db.Column(db.String(80), nullable=True)  # TODO: obsolete
+    title = db.Column(db.String(80), nullable=True)
     google_place_id = db.Column(db.String(80), nullable=True)
     geo_lat = db.Column(db.Float, nullable=True)
     geo_lng = db.Column(db.Float, nullable=True)
@@ -558,7 +600,7 @@ class Place(db.Model):
         return {
             'id' : self.id,
             'titleEN' : self.titleEN,
-            'titleDE' : self.titleDE,
+            'title' : self.title,
             'google_place_id' : self.google_place_id,
             'geo_lat' : self.geo_lat,
             'geo_lng' : self.geo_lng
@@ -609,7 +651,8 @@ class Nutrient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     value_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'))  # example calories, or milligrams
     titleEN = db.Column(db.String(80), nullable=False)
-    titleDE = db.Column(db.String(80), nullable=True)
+    titleDE = db.Column(db.String(80), nullable=True)  # TODO: obsolete
+    title = db.Column(db.String(80), nullable=True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     uom = db.relationship("UOM")
@@ -644,9 +687,22 @@ class State(db.Model):
 # Marshmallow Schema Definitions
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+class UOMSchema(ma.ModelSchema):
+    class Meta:
+        model = UOM
+
+
 class MaterialSchema(ma.ModelSchema):
+    created = fields.DateTime(dump_only=True)
+
     class Meta:
         model = Material
+        fields = (
+            'id',
+            'private',
+            'titleEN',
+            'title',
+            'standard_uom_id')
 
 
 class MaterialForecastSchema(ma.ModelSchema):

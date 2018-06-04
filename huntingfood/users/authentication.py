@@ -39,8 +39,11 @@ def login(*args):
 def login_required(func):
 
     @wraps(func)
+    # TODO: Catch case when item is in session but none
     def decorated_view(*args, **kwargs):
-        if 'user_id' not in login_session:
+        if ('user_id' not in login_session or
+                'default_diet_plan_id' not in login_session or
+                'default_inventory_id' not in login_session):
             return login()
         else:
             return func(*args, **kwargs)

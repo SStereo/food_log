@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 // Returns the ISO week of the date.
 // source: https://weeknumber.net/how-to/javascript
 var DateGetWeek = function(d) {
@@ -29,7 +29,7 @@ var DateGetWeek = function(d) {
     var inputData = $('#sl-new-item').val();
 
     if (inputData === '') {
-      alert("You must write something!");
+      alert('You must write something!');
     } else {
 
       $.ajax({
@@ -53,38 +53,38 @@ var DateGetWeek = function(d) {
       dataType: 'text',
       data: {'id' : elId},
       success: function() {
-        itemrow.style.display = "none";
+        itemrow.style.display = 'none';
       }
     });
   }
 
 
   function slCreateElements(response) {
-    var items = document.getElementById("sl-items");
+    var items = document.getElementById('sl-items');
     var n;
     var itemValue = '';
     var itemId = '';
     n = response['inventory_items'].length;
 
     for (var i = 0; i < n; i++) {
-      itemValue = response['inventory_items'][i]['titleDE'];
+      itemValue = response['inventory_items'][i]['title'];
       itemId = response['inventory_items'][i]['id'];
       // Create new Item HTML
-      var itemrow = document.createElement("DIV");
-      itemrow.className = "sl-form";
+      var itemrow = document.createElement('DIV');
+      itemrow.className = 'sl-form';
       itemrow.id = itemId;
 
-      var elInput = document.createElement("INPUT");
+      var elInput = document.createElement('INPUT');
       elInput.value = itemValue;
-      elInput.type = "text"
-      elInput.className = "form-control sl-item";
+      elInput.type = 'text'
+      elInput.className = 'form-control sl-item';
 
-      var elButton = document.createElement("BUTTON");
-      elButton.className = "btn btn-default sl-btn";
+      var elButton = document.createElement('BUTTON');
+      elButton.className = 'btn btn-default sl-btn';
       elButton.onclick = slDeleteItem;
 
-      var elIcon = document.createElement("i");
-      elIcon.className = "fa fa-trash mr-1";
+      var elIcon = document.createElement('i');
+      elIcon.className = 'fa fa-trash mr-1';
 
       elButton.appendChild(elIcon);
       itemrow.appendChild(elInput);
@@ -93,7 +93,7 @@ var DateGetWeek = function(d) {
     };
 
     // TODO: wrong place should not apply for page load
-    document.getElementById("sl-new-item").value = "";
+    document.getElementById('sl-new-item').value = '';
 
   }
 
@@ -507,32 +507,45 @@ function saveInventoryItem(newValue) {
   var cp_plan_date_start = new Date(this.cp_plan_date_start())
   var cp_plan_date_end = new Date(this.cp_plan_date_end())
 
+  var object = {
+          'cp_day_in_month': this.cp_day_in_month(),
+          'cp_end_date': null,
+          'cp_period': this.cp_period(),
+          'cp_plan_date': null,
+          'cp_plan_date_end': cp_plan_date_end.toJSON(),
+          'cp_plan_date_start': cp_plan_date_start.toJSON(),
+          'cp_quantity': this.cp_quantity(),
+          'cp_type': this.cp_type(),
+          'cp_weekday': this.cp_weekday(),
+          'forecasts': {},
+          'id': this.id(),
+          'ignore_forecast': this.ignoreForecast(),
+          'inventory': inv_id,
+          'level': null,
+          'material': this.material_id(),
+          'quantity_base': this.quantity_base(),
+          'quantity_conversion_factor': this.quantity_conversion_factor(),
+          'quantity_stock': this.quantity_stock(),
+          're_order_level': this.re_order_level(),
+          're_order_quantity': this.re_order_quantity(),
+          'status': null,
+          'title': this.title(),
+          'titleDE': null,
+          'titleEN': null,
+          'uom_base': this.uom_base(),
+          'uom_stock': this.uom_stock()
+        }
+
   if (this.id()) {
     $.ajax({
       type: 'PUT',
       url: url_api_inventory,
-      dataType: 'json',
-      data: {
-        'id' : this.id(),
-        'inventory_id' : inv_id,
-        'titleEN' : this.titleEN(),
-        'titleDE' : this.title(),
-        'material_id' : this.material_id(),
-        'level' : this.level(),
-        'ignore_forecast' : this.ignoreForecast(),
-        're_order_level' : this.re_order_level(),
-        're_order_quantity' : this.re_order_quantity(),
-        'cp_type' : this.cp_type(),
-        'cp_quantity' : this.cp_quantity(),
-        'cp_plan_date_start' : cp_plan_date_start.toJSON(),
-        'cp_plan_date_end' : cp_plan_date_end.toJSON(),
-        'cp_period' : this.cp_period(),
-        'cp_weekday' : this.cp_weekday(),
-        'cp_day_in_month' : this.cp_day_in_month()
-      },
+      contentType: 'application/json; charset=utf-8',
       headers: {
         'X-CSRFTOKEN' : csrf_token
       },
+      dataType: 'json',
+      data: JSON.stringify(object),
       success: function(response) {
         //TODO: undo changes in case of failure
         console.log('saveInventoryItem: success');
@@ -554,9 +567,14 @@ var invViewModel = function() {
     return dateTo;
   } );
 
+  // Reference Data
+  self.materials = ko.observableArray([]);
+  self.unitsOfMeasure = ko.observableArray([]);
+
   // store the new Inventory value being entered
-	this.current = ko.observable();
-  this.ValidationErrors = ko.observableArray([]);
+	this.newInventoryItemTitle = ko.observable();
+  this.newInventoryItemBaseUnit = ko.observable();
+  this.newInventoryItemStockUnit = ko.observable();
 
   this.cpTypes = ko.observableArray([
     {'id': 0, 'TextDE': 'nein'},
@@ -565,6 +583,8 @@ var invViewModel = function() {
     {'id': 3, 'TextDE': 'einmal pro Monat'},
     {'id': 4, 'TextDE': 'einmal im Jahr'}
   ]);
+
+  this.ValidationErrors = ko.observableArray([]);
 
   this.filterStatus = ko.observable('all');
 
@@ -590,6 +610,25 @@ var invViewModel = function() {
 				return self.inventoryItems();
 			}
 		});
+
+
+  // Loads inventory items from Rest API
+  self.loadUnitsOfMeasure = function() {
+    self.unitsOfMeasure.removeAll();
+    console.log('Loading units of measures ...');
+    $.ajax({
+      type: 'GET',
+      url: url_api_uom,
+      dataType: 'json',
+      success: function(response) {
+        var parsed = response['uoms']
+        parsed.forEach( function(item) {
+          self.unitsOfMeasure.push( new UnitOfMeasure(item) );
+        });
+      }
+    });
+  };
+
 
   // Loads inventory items from Rest API
   self.loadInventoryItems = function() {
@@ -631,15 +670,15 @@ var invViewModel = function() {
     switch (data.status()) {
       case 0:
         data.ignoreForecast(false);
-        data.level(0);
+        data.quantity_base(0);
         console.log('toggle case 0');
         break;
       case 1:
-        data.level(data.plannedQuantity()/2);
+        data.quantity_base(data.plannedQuantity()/2);
         console.log('toggle case 1');
         break;
       case 2:
-        data.level(data.plannedQuantity());
+        data.quantity_base(data.plannedQuantity());
         console.log('toggle case 2');
         break;
       case 3:
@@ -652,22 +691,32 @@ var invViewModel = function() {
   // adds a inventory item
   self.addInventoryItem = function(data, event) {
 
-    var current = self.current().trim();
-    if (current) {
+    var title = self.newInventoryItemTitle().trim();
+    var uom_base_id = self.newInventoryItemBaseUnit();
+    var uom_stock_id = self.newInventoryItemStockUnit();
+    if (title) {
       console.log('addInventoryItem');
+
+      var object = {
+        'id': null,
+        'quantity_base': 0,
+        'quantity_conversion_factor': 200,
+        'quantity_stock': 0,
+        'title': title,
+        'uom_base': uom_base_id,
+        'uom_stock': uom_stock_id,
+        'material': null
+      }
 
       $.ajax({
         type: 'POST',
         url: url_api_inventory,
+        contentType: 'application/json; charset=utf-8',
         headers: {
           'X-CSRFTOKEN' : csrf_token
         },
         dataType: 'json',
-        data: {
-          'titleEN' : '',
-          'titleDE' : current,
-          'status' : 1,
-        },
+        data: JSON.stringify(object),
         success: function(response) {
 
           // turn the json string into a javascript object
@@ -680,7 +729,7 @@ var invViewModel = function() {
         }
       });
     }
-    self.current('');
+    self.newInventoryItemTitle('');
   };
 
   // edit an item
@@ -721,26 +770,26 @@ var invViewModel = function() {
     }
 
     var currentItem = ko.utils.unwrapObservable(item);
-    var currentLevel = ko.utils.unwrapObservable(currentItem.level);
+    var currentQuantityBase = ko.utils.unwrapObservable(currentItem.quantity_base);
     var currentTitle = ko.utils.unwrapObservable(currentItem.title);
     var currentReOrderLevel = ko.utils.unwrapObservable(currentItem.re_order_level);
 
     self.ValidationErrors.removeAll(); // Clear out any previous errors
 
-    if (currentLevel === null) {
-      self.ValidationErrors.push("Stock level is required.");
+    if (currentQuantityBase === null) {
+      self.ValidationErrors.push('Stock level is required.');
     } else { // Just some arbitrary checks here...
-      if (Number(currentLevel) == currentLevel && currentLevel % 1 === 0) { // is a whole number
-        if (currentLevel < 0) {
-          self.ValidationErrors.push("The stock level must be zero or greater.");
+      if (Number(currentQuantityBase) == currentQuantityBase && currentQuantityBase % 1 === 0) { // is a whole number
+        if (currentQuantityBase < 0) {
+          self.ValidationErrors.push('The stock base quantity must be zero or greater.');
         }
       } else {
-        self.ValidationErrors.push("Please enter a valid whole number for the stock level.");
+        self.ValidationErrors.push('Please enter a valid whole number for the stock base quantity.');
       }
     }
 
     if (!currentTitle) {
-      self.ValidationErrors.push("Please enter a title for the item");
+      self.ValidationErrors.push('Please enter a title for the item');
     }
 
     return self.ValidationErrors().length <= 0;
@@ -767,8 +816,8 @@ var invViewModel = function() {
     // Copy the user data into a new instance for editing. TODO: this does not work
 
     var data = {
-      'titleDE': item.title(),
-      'level': item.level(),
+      'title': item.title(),
+      'quantity_base': item.quantity_base(),
       're_order_quantity': item.re_order_quantity(),
       'cp_type': item.cp_type(),
       'cp_quantity': item.cp_quantity(),
@@ -791,7 +840,7 @@ var invViewModel = function() {
     }
 
     var title = ko.utils.unwrapObservable(updatedItem.title);
-    var level = ko.utils.unwrapObservable(updatedItem.level);
+    var quantity_base = ko.utils.unwrapObservable(updatedItem.quantity_base);
     var re_order_quantity = ko.utils.unwrapObservable(updatedItem.re_order_quantity);
     var cp_type = ko.utils.unwrapObservable(updatedItem.cp_type);
     var cp_quantity = ko.utils.unwrapObservable(updatedItem.cp_quantity);
@@ -808,7 +857,7 @@ var invViewModel = function() {
     } else {
       // Updating an existing item
       self.OriginalItemInstance().title(title);
-      self.OriginalItemInstance().level(level);
+      self.OriginalItemInstance().quantity_base(quantity_base);
       self.OriginalItemInstance().re_order_quantity(re_order_quantity);
       self.OriginalItemInstance().cp_type(cp_type);
       self.OriginalItemInstance().cp_quantity(cp_quantity);
@@ -827,7 +876,7 @@ var invViewModel = function() {
     self.OriginalItemInstance(undefined);
   };
 
-
+  self.loadUnitsOfMeasure();
   self.loadInventoryItems();
 
 }
@@ -839,16 +888,10 @@ var InventoryItem = function(data) {
   this.material_id = ko.observable(data.material);
   this.material_id.subscribe(saveInventoryItem, this);
 
-  this.title = ko.observable(data.titleDE);  // TODO: Enable multi-language support
+  this.title = ko.observable(data.title);  // TODO: Enable multi-language support
   this.title.subscribe(saveInventoryItem, this);
 
-  this.titleEN = ko.observable(data.titleEN);  // TODO: Enable multi-language support
-  this.titleEN.subscribe(saveInventoryItem, this);
-
-  this.level = ko.observable(data.level);
-  this.level.subscribe(saveInventoryItem, this);
-
-  this.ignoreForecast = ko.observable(data.ignoreForecast);
+  this.ignoreForecast = ko.observable(data.ignore_forecast);
   this.ignoreForecast.subscribe(saveInventoryItem, this);
 
   this.re_order_level = ko.observable(data.re_order_level);
@@ -859,8 +902,20 @@ var InventoryItem = function(data) {
 
   this.editing = ko.observable(false);
 
-  this.uom = ko.observable(data.uom);
-  this.uom.subscribe(saveInventoryItem, this);
+  this.uom_stock = ko.observable(data.uom_stock);
+  this.uom_stock.subscribe(saveInventoryItem, this);
+
+  this.uom_base = ko.observable(data.uom_base);
+  this.uom_base.subscribe(saveInventoryItem, this);
+
+  this.quantity_stock = ko.observable(data.quantity_stock);
+  this.quantity_stock.subscribe(saveInventoryItem, this);
+
+  this.quantity_base = ko.observable(data.quantity_base);
+  this.quantity_base.subscribe(saveInventoryItem, this);
+
+  this.quantity_conversion_factor = ko.observable(data.quantity_conversion_factor);
+  this.quantity_conversion_factor.subscribe(saveInventoryItem, this);
 
   this.cp_type = ko.observable(data.cp_type);
   this.cp_type.subscribe(saveInventoryItem, this);
@@ -923,11 +978,11 @@ var InventoryItem = function(data) {
   this.status = ko.computed(function() {
     if (this.plannedQuantity() == 0 || this.ignoreForecast()) {
       return 0;
-    } else if (this.plannedQuantity() > 0 && this.level() == 0) {
+    } else if (this.plannedQuantity() > 0 && this.quantity_base() == 0) {
       return 1;
-    } else if (this.level() < this.plannedQuantity()) {
+    } else if (this.quantity_base() < this.plannedQuantity()) {
       return 2;
-    } else if (this.level() >= this.plannedQuantity()) {
+    } else if (this.quantity_base() >= this.plannedQuantity()) {
       return 3;
     }
   }, this);
@@ -961,6 +1016,13 @@ var MaterialForecast = function(data) {
   this.quantity_uom = ko.observable(data.quantity_uom);
 }
 
+var UnitOfMeasure = function(data) {
+  this.uom = ko.observable(data.uom);
+  this.type = ko.observable(data.type);
+  this.longDE = ko.observable(data.longDE);
+  this.longEN = ko.observable(data.longEN);
+  this.shortDE = ko.observable(data.shortDE);
+}
 
 var dpVM = new dpViewModel();
 ko.applyBindings(dpVM, document.getElementById('diet_plan'));

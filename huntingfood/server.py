@@ -43,7 +43,8 @@ from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
 from huntingfood.models import ConsumptionPlan, ConsumptionPlanItem
 from huntingfood.models import Place
 # Marshmallow Schemas
-from huntingfood.models import InventoryItemSchema, MaterialForecastSchema, MaterialSchema
+from huntingfood.models import InventoryItemSchema, MaterialForecastSchema, MaterialSchema, UOMSchema
+from marshmallow import ValidationError
 
 # Set Logging level
 logger = logging.getLogger()
@@ -57,10 +58,12 @@ db.create_all()
 db.session.commit()
 
 # Create Marshmallow schema dumpers
-inventory_item_schema = InventoryItemSchema(many=True)
+inventory_items_schema = InventoryItemSchema(many=True)
+inventory_item_schema = InventoryItemSchema()
 material_forecast_schema = MaterialForecastSchema(many=True)
 material_schema = MaterialSchema(many=True)
-
+uom_schema = UOMSchema(many=True)
+uom_test_schema = UOMSchema()  # TODO:obsolete
 
 # Google Cloud Connection
 PK_escaped = app.config['GOOGLE_CLOUD_CREDENTIALS_PK']
@@ -188,6 +191,10 @@ def showShoppingList():
     consumption_plan = ConsumptionPlan.query.filter_by(
         id=login_session['default_consumption_plan_id']).first()
 
+    logging.info('diet_plan = %s' % login_session['default_diet_plan_id'])
+    logging.info('Inventory = %s' % login_session['default_inventory_id'])
+    logging.info('consumption_plan = %s' % login_session['default_consumption_plan_id'])
+
     return render_template(
         "shoppinglist.html",
         meals=meals,
@@ -199,6 +206,7 @@ def showShoppingList():
         g_api_key=app.config['GOOGLE_API_KEY'])
 
 
+# TODO: Obsolete
 @app.route('/shoppinglist/items', methods=['GET', 'POST'])
 def all_shopping_items_handler():
 
@@ -206,7 +214,7 @@ def all_shopping_items_handler():
 
     if request.method == 'POST':
         title = request.form.get('title')
-        inventory_item = InventoryItem(titleDE=title, level=0)
+        inventory_item = InventoryItem(title=title, level=0)
         session.add(inventory_item)
         session.commit()
         inventory_items.append(inventory_item)
@@ -219,9 +227,9 @@ def all_shopping_items_handler():
         return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
 
-# TODO: Think of combining both endpoints into one
+# TODO: obsolete
 @app.route('/shoppinglist/item', methods=['GET', 'DELETE', 'PUT'])
-def shopping_item_handler():
+def shopping_item_handlerDELETE():
 
     inventory_items = []
 
@@ -238,10 +246,10 @@ def shopping_item_handler():
         return "item deleted"
 
     elif request.method == 'PUT':
-        titleDE = request.args.get('title')
+        title = request.args.get('title')
         level = request.args.get('level')
-        if titleDE:
-            inventory_item.titleDE = titleDE
+        if title:
+            inventory_item.title = title
         if level:
             inventory_item.level = level
         session.commit()
@@ -266,11 +274,11 @@ def map_places_handler():
 @login_required
 def addMeals():
     if request.method == 'POST' and request.form['button'] == "Save":
-        print("Start file handler")
+        logging.info("Start file handler")
         # ---- FILE HANDLING -----
         filename = ""
         if 'file' not in request.files:
-            print("file not in request.files")
+            logging.info("file not in request.files")
             # TODO: Implement flash messages
             # flash('No file part')
 
@@ -282,14 +290,14 @@ def addMeals():
         if file.filename == '':
             # TODO: Implement flash
             # flash('No selected file')
-            print("Filename == ''")
+            logging.info("Filename == ''")
             return redirect(request.url)
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             now = datetime.datetime.now()
             filename = "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), filename.rsplit('.', 1)[1])  #$s replaced by timestamp and file extension
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], "%s.%s" % (now.strftime("%Y-%m-%d-%H-%M-%S-%f"), file.filename.rsplit('.', 1)[1]))
-            print("filepath = " + filepath)
+            logging.info("filepath = " + filepath)
             file.save(filepath)
 
         # ---- MEAL CREATION -----
@@ -316,37 +324,26 @@ def addMeals():
             ingredient_uom = request.form['uom'+row]
             user_language = login_session['language']
 
-            if (user_language != 'en'):
-                # Translate user language to en
-                translation = translate_client.translate(
-                    ingredient_text, source_language=login_session['language'])
-                ingredient_text_EN = translation['translatedText']
-                print("newIngredient.titleEN = " + ingredient_text_EN)
-            else:
-                ingredient_text_EN = ingredient_text
+            material = createMaterial(ingredient_text, user_language, ingredient_uom)
+
+            logging.info('Material created (len %s): %s' % (len(material.titleEN), material.titleEN))
 
             # Identify food entity from entered text using language processing
             # use en language to improve results since en splits combined
             # german words
             food_entity = analyze_ingredient(
-                translation['translatedText'], language='en')
-            print("Food entity: %s" % food_entity)
+                material.titleEN, language='en')
+            logging.info("Food entity: %s" % food_entity)
 
-            # Query a food database (e.g. NDB) to retrieve nutrient information
-            # and to create a food master data record. The id of such a record
-            # is returned if a match in the food database was found.
-            material_id = getFood(ingredient_text_EN, ingredient_text, ingredient_uom)
-            if not material_id:
-                material_id = None
-
+            # TODO:  Handle long strings exceeding 80 characters
             # Add new ingredient into database
             newIngredient = Ingredient(quantity=request.form['quantity'+row],
                                        uom_id=ingredient_uom,
                                        meal_id=newMeal.id,
                                        title=ingredient_text,
-                                       titleEN=translation['translatedText'],
+                                       titleEN=material.titleEN,
                                        base_food_part=food_entity,
-                                       material_id=material_id)
+                                       material_id=material.id)
 
             session.add(newIngredient)
             session.commit()
@@ -356,14 +353,13 @@ def addMeals():
         return redirect(url_for("showMeals"))
 
     elif request.method == 'POST' and request.form['button'] == "Cancel":
-        print("POST button = Cancel")
+        logging.info("Request cancelled")
         meals = Meal.query
-        return render_template("meals.html",meals=meals,getIngredients=getIngredients)
+        return render_template("meals.html", meals=meals, getIngredients=getIngredients)
     else:  # 'GET':
-        print("GET")
         uoms = UOM.query
         materials = Material.query
-        return render_template("meals_add.html",uoms=uoms,materials=materials)
+        return render_template("meals_add.html", uoms=uoms, materials=materials)
 
 
 @app.route('/meals/delete/<int:meal_id>', methods=['GET', 'POST'])
@@ -389,9 +385,41 @@ def showMeal(meal_id):
     return render_template("meal_view.html",meal=o,getIngredients=getIngredients)
 
 
+def createMaterial(title_local_lang, local_lang_code, uom_base_id):
+
+    if (local_lang_code != 'en'):
+        # Translate user language to en
+        translation = translate_client.translate(
+            title_local_lang, source_language=local_lang_code)
+        title_EN = translation['translatedText']
+        logging.info("New Material translation. title(%s) = %s -> title(en) = %s" % (local_lang_code, title_local_lang, title_EN))
+    else:
+        title_EN = title_local_lang
+
+    # Query a food database (e.g. NDB) to retrieve nutrient information
+    # and to create a food master data record. The id of such a record
+    # is returned if a match in the food database was found.
+    material = createFoodviaNDB(title_EN, title_local_lang, local_lang_code, uom_base_id)
+
+    # not a known Food in NDB
+    if not material:
+        material = Material(
+            titleEN=title_EN,
+            title=title_local_lang,
+            language_code=local_lang_code,
+            uom_base_id=uom_base_id)
+        session.add(material)
+        session.commit()
+
+    return material
+
+
 # Food database helper functions
 # TODO: Rework material creation
-def getFood(keyword, keyword_local_language, standard_uom):
+def createFoodviaNDB(keyword,
+                     keyword_local_language,
+                     local_language_code,
+                     base_uom):
     # Account Email: mailboxsoeren@gmail.com
     # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
 
@@ -401,7 +429,7 @@ def getFood(keyword, keyword_local_language, standard_uom):
         if results:
 
             i = list(results['items'])[0]  # TODO: identify relevant item, for now take the first one
-            print("Found NDB item: "+i.get_name())
+            logging.info("Found NDB item: "+i.get_name())
 
             # Create Food Main Group
             foodMainGroup = FoodMainGroup.query.filter_by(titleEN=i.get_group()).first()
@@ -412,13 +440,15 @@ def getFood(keyword, keyword_local_language, standard_uom):
                 session.commit()
 
             # Create Food
+            name_truncated_80 = (i.get_name()[:75] + '..') if len(i.get_name()) > 75 else i.get_name()
+            logging.info('Create Material (len %s): %s' % (len(name_truncated_80), name_truncated_80))
             food = Material.query.filter_by(titleEN=i.get_name()).first()
             if not food:
-                logging.info('Create Material: ' + i.get_name())
                 food = Material(
-                    titleEN=i.get_name(),
-                    titleDE=keyword_local_language,
-                    standard_uom_id=standard_uom,
+                    titleEN=name_truncated_80,
+                    title=keyword_local_language,
+                    language_code=local_language_code,
+                    uom_base_id=base_uom,
                     ndb_code=i.get_ndbno(),
                     food_maingroup_id=foodMainGroup.id)
                 session.add(food)
@@ -440,7 +470,7 @@ def getFood(keyword, keyword_local_language, standard_uom):
                             n.get_name(), target_language='de')['translatedText']
                         newNutrient = Nutrient(value_uom=n.get_unit(),
                                                titleEN=n.get_name(),
-                                               titleDE=translated_text)
+                                               title=translated_text)
                         session.add(newNutrient)
                         session.commit()
 
@@ -463,12 +493,12 @@ def getFood(keyword, keyword_local_language, standard_uom):
                                         value=n.get_value())
                     session.add(fc)
                     session.commit()
-            return food.id
+            return food
         else:
-            print("No results in NDB found")
+            logging.info("No results in NDB found")
             return None
     else:
-        print("Missing API Key in Environment Variable")
+        logging.info("Missing API Key in Environment Variable")
         return None
 
 
@@ -483,6 +513,20 @@ def api_v1_meals():
         return jsonify(meals=[m.serialize for m in meals])
 
 
+@app.route('/api/v1/uom', methods=['GET'])
+def api_v1_uom():
+    uoms = []
+    if request.method == 'GET':
+        type = request.args.get('type')
+        if type:
+            uoms = UOM.query.filter_by(
+                type=type).all()
+        else:
+            uoms = UOM.query.all()
+        result = uom_schema.dump(uoms).data
+        return jsonify({'uoms': result})
+
+
 @app.route('/api/v1/materials', methods=['GET'])
 def api_v1_materials():
     materials = []
@@ -490,7 +534,7 @@ def api_v1_materials():
         search_term = request.args.get('query')
         if search_term:
             materials = Material.query.filter_by(
-                titleDE=search_term).all()
+                title=search_term).all()
         else:
             materials = Material.query.all()
         result = material_schema.dump(materials).data
@@ -517,30 +561,48 @@ def api_v1_dietplan(diet_plan_id):
         consumed = tools.str_to_bool(request.form.get('consumed'))
         portions = tools.str_to_numeric(request.form.get('portions'))
 
-        if (plan_date) and (meal_id):
-
-            # Step 1: Create DIET PLAN ITEM
-            diet_plan_item = DietPlanItem(
-                diet_plan_id=diet_plan_id,
-                plan_date=plan_date,
-                meal_id=meal_id,
-                consumed=consumed,
-                portions=portions
-                )
-            session.add(diet_plan_item)
-            session.commit()
-
-            updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
-
-            # Step 6: Return Response
-            dp_item = DietPlanItem.query.filter_by(
-                id=diet_plan_item.id).all()
-            return jsonify(diet_plan_item=[i.serialize for i in dp_item])
-        else:
+        # Validations
+        if (not portions):
+            message = 'api_v1_dietplan: POST | Missing field: portions.'
             response = make_response(json.dumps(
-                'Missing key fields to create a diet plan item (meal_id, plan_date, diet_plan_id).'), 400)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
             return response
+
+        if (not plan_date):
+            message = 'api_v1_dietplan: POST | Missing field: plan_date.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not meal_id):
+            message = 'api_v1_dietplan: POST | Missing field: meal_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        # Step 1: Create DIET PLAN ITEM
+        diet_plan_item = DietPlanItem(
+            diet_plan_id=diet_plan_id,
+            plan_date=plan_date,
+            meal_id=meal_id,
+            consumed=consumed,
+            portions=portions
+            )
+        session.add(diet_plan_item)
+        session.commit()
+
+        updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
+
+        # Step 6: Return Response
+        dp_item = DietPlanItem.query.filter_by(
+            id=diet_plan_item.id).all()
+        return jsonify(diet_plan_item=[i.serialize for i in dp_item])
 
     if request.method == 'PUT':
         plan_date = dateutil.parser.parse(request.form.get('plan_date'))
@@ -580,194 +642,34 @@ def api_v1_dietplan(diet_plan_id):
         id = request.form.get('id')
         diet_plan_item = DietPlanItem.query.filter_by(id=id).one_or_none()
 
-        if (id) and (diet_plan_item):
-            plan_date = diet_plan_item.plan_date
-            session.delete(diet_plan_item)
-            session.commit()
-
-            updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
-
+        if (not id):
+            message = 'Missing dietplan item id in request'
             response = make_response(json.dumps(
-                'Item successfully deleted'), 200)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
-            return response
-        else:
-            response = make_response(json.dumps(
-                'Can not delete item because item was not found'), 400)
-            response.headers['Content-Type'] = 'application/json'
+            logging.info(message)
             return response
 
-
-@app.route('/api/v1/consumptionplan/<int:consumption_plan_id>', methods=['GET', 'POST'])
-def api_v1_consumption_plan(consumption_plan_id):
-    cp_items = []
-    if request.method == 'GET':
-        cp_items = DietPlanItem.query.filter_by(
-                diet_plan_id=consumption_plan_id).all()
-        return jsonify(consumption_plan_items=[i.serialize for i in cp_items])
-
-    if request.method == 'POST':
-        plan_date = dateutil.parser.parse(request.form.get('plan_date'))
-        material_id = request.form.get('material_id')
-        type = tools.str_to_numeric(request.form.get('type'))
-        quantity = tools.str_to_numeric(request.form.get('quantity'))
-        period = tools.str_to_numeric(request.form.get('period'))
-        weekday = tools.str_to_numeric(request.form.get('weekday'))
-        day_in_month = tools.str_to_numeric(request.form.get('day_in_month'))
-        end_date = dateutil.parser.parse(request.form.get('end_date'))
-
-        if (not type) or (not material_id) or (not quantity) or (not period):
+        if (not diet_plan_item):
+            message = 'Can not find dietplan with id = %s' % id
             response = make_response(json.dumps(
-                'Missing key fields to create a consumption plan item (type, material, quantity and period).'), 400)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.info(message)
             return response
 
-        if (type == 0 and not plan_date):
-            response = make_response(json.dumps(
-                'One time consumptions require a plan date which is missing.'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        if (type == 1 and period == 2 and not weekday):
-            response = make_response(json.dumps(
-                'Weekly consumptions require a week day which is missing.'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        if (type == 1 and period == 3 and not day_in_month):
-            response = make_response(json.dumps(
-                'Monthly consumptions require a day in a month which is missing.'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        if (type == 1 and period == 4 and not plan_date):
-            response = make_response(json.dumps(
-                'Yearly consumptions require a plan date which is missing.'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        # Step 0: Validate if Consumption Plan Item already exists for given material
-        try:
-            existing_cp_item = ConsumptionPlanItem.query.\
-                select_from(ConsumptionPlanItem).\
-                filter(ConsumptionPlanItem.consumption_plan_id == login_session['default_consumption_plan_id']).\
-                filter(ConsumptionPlanItem.material_id == material_id).all()
-        except NoRecordsError:
-            logging.info('No records found')
-        except exc.SQLAlchemyError:
-            logging.exception('Some problem occurred')
-
-        if len(existing_cp_item) == 0:
-            # Step 1: Create CONSUMPTION PLAN ITEM
-            consumption_plan_item = ConsumptionPlanItem(
-                consumption_plan_id=consumption_plan_id,
-                material_id=material_id,
-                type=type,
-                quantity=quantity,
-                plan_date=plan_date,
-                period=period,
-                weekday=weekday,
-                day_in_month=day_in_month,
-                end_date=end_date
-                )
-            session.add(consumption_plan_item)
-            session.commit()
-        else:
-            # TODO: Complete by either deleting existing ones or create a new one and expire the old ones
-            response = make_response(json.dumps(
-                'Not yet implemented'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        # Step 2: Create missing INVENTORY_ITEMS for the material
-        try:
-            missing_inventory_items = Material.query.\
-                select_from(Material).\
-                outerjoin(Material.referencedInventoryItem).\
-                filter(InventoryItem.inventory_id == login_session['default_inventory_id']).\
-                filter(InventoryItem.material_id == None).all()
-        except NoRecordsError:
-            logging.info('No records found')
-        except exc.SQLAlchemyError:
-            logging.exception('Some problem occurred')
-
-            logging.info('Missing Inventory items = ' +
-                         str(len(missing_inventory_items)) +
-                         ' for Material Id = ' + material_id)
-
-        for row in missing_inventory_items:
-            logging.info("Create inventory items: " + str(row.titleEN))
-            if (row.titleEN):
-                inventory_item = InventoryItem(
-                    inventory_id=login_session['default_inventory_id'],  # TODO: what if the user wants to update another inventory?
-                    titleEN=row.titleEN,
-                    titleDE=row.titleDE,
-                    status=1,
-                    material_id=row.id,
-                    level=0,
-                    sku_uom=row.standard_uom_id,
-                    re_order_level=99,
-                    re_order_quantity=99
-                    )
-                session.add(inventory_item)
-                session.commit()
-
-        # Step 3: Retrieve standard uom from material
-        # TODO: Find a better way instead of running a query
-        try:
-            material = Material.query.\
-                select_from(Material).\
-                filter(Material.id == material_id).first()
-        except NoRecordsError:
-            logging.info('No records found')
-        except exc.SQLAlchemyError:
-            logging.exception('Some problem occurred')
-
-            logging.info('Standard uom from material = ' +
-                         material.standard_uom_id)
-
-        # Step 4: Create new material forecast(s)
-        material_forecasts = []
-        if (type == 0):
-            d = plan_date
-            material_forecasts.append(
-                MaterialForecast(
-                    inventory_id=login_session['default_inventory_id'],
-                    material_id=material_id,
-                    plan_date=d,
-                    quantity=quantity,
-                    quantity_uom=material.standard_uom_id,
-                    consumption_plan_item_id=consumption_plan_item.id
-                )
-            )
-        elif (type == 1 and period == 1):
-            d = plan_date
-            for x in range(1, 365):
-                d += datetime.timedelta(days=1)
-                material_forecasts.append(
-                    MaterialForecast(
-                        inventory_id=login_session['default_inventory_id'],
-                        material_id=material_id,
-                        plan_date=d,
-                        quantity=quantity,
-                        quantity_uom=material.standard_uom_id,
-                        consumption_plan_item_id=consumption_plan_item.id
-                    )
-                )
-        else:
-            # TODO: Implement other period types
-            response = make_response(json.dumps(
-                'Not yet implemented'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        session.add_all(material_forecasts)
+        plan_date = diet_plan_item.plan_date
+        session.delete(diet_plan_item)
         session.commit()
 
-        # Step 5: Return Response
-        cp_item = ConsumptionPlanItem.query.filter_by(
-            id=consumption_plan_item.id).all()
-        return jsonify(consumption_plan_item=[i.serialize for i in cp_item])
+        updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
+
+        message = 'Item with id = %s successfully deleted' % id
+        response = make_response(json.dumps(
+            message), 200)
+        response.headers['Content-Type'] = 'application/json'
+        logging.info(message)
+        return response
 
 
 @app.route('/api/v1/inventory/<int:inventory_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
@@ -777,125 +679,173 @@ def api_v1_inventory(inventory_id):
     if request.method == 'GET':
         inventory_items = InventoryItem.query.filter_by(
             inventory_id=inventory_id).all()
-        result = inventory_item_schema.dump(inventory_items).data
+        result = inventory_items_schema.dump(inventory_items).data
         return jsonify({'inventory_items': result})
 
     if request.method == 'POST':
-        # retrieve fields from post request
-        titleEN = request.form.get('titleEN')
-        titleDE = request.form.get('titleDE')
-        status = tools.str_to_numeric(request.form.get('status'))
-        material_id = tools.str_to_numeric(request.form.get('material_id'))
-        level = tools.str_to_numeric(request.form.get('level'))
-        re_order_level = tools.str_to_numeric(request.form.get('re_order_level'))
-        re_order_quantity = tools.str_to_numeric(request.form.get('re_order_quantity'))
-        ignore_forecast = tools.str_to_bool(request.form.get('ignore_forecast'))
-        # consumption plan fields
-        cp_type = tools.str_to_numeric(request.form.get('cp_type'))
-        cp_quantity = tools.str_to_numeric(request.form.get('cp_quantity'))
-        cp_plan_date_start = dateutil.parser.parse(request.form.get('cp_plan_date_start'))
-        cp_plan_date_end = dateutil.parser.parse(request.form.get('cp_plan_date_end'))
-        cp_period = tools.str_to_numeric(request.form.get('cp_period'))
-        cp_weekday = tools.str_to_numeric(request.form.get('cp_weekday'))
-        cp_day_in_month = tools.str_to_numeric(request.form.get('cp_day_in_month'))
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = inventory_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
 
-        # Field Validations
-        if (not titleDE) or (not material_id):
+        title = data['title']
+        quantity_base = data['quantity_base']
+        quantity_stock = data['quantity_stock']
+        quantity_conversion_factor = data['quantity_conversion_factor']
+        uom_base = data['uom_base'].uom
+        uom_stock = data['uom_stock'].uom
+        material_id = data['material']
+
+        # Validations
+        if (not title):
+            message = 'api_v1_dietplan: POST | Missing field: title.'
             response = make_response(json.dumps(
-                'Missing key fields to create an inventory item (material, title).'), 400)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
             return response
+
+        if (not uom_base):
+            message = 'api_v1_dietplan: POST | Missing field: uom_base.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not uom_stock):
+            message = 'api_v1_dietplan: POST | Missing field: uom_stock.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not material_id):
+            message = 'api_v1_dietplan: POST | No existing material. Creating new material ...'
+            logging.info(message)
+            material = createMaterial(title, login_session['language'], uom_base)
+            material_id = material.id
 
         # Step 1: Create an inventory item
         inventory_item = InventoryItem(
             inventory_id=inventory_id,
-            titleEN=titleEN,
-            titleDE=titleDE,
-            status=status,
+            titleEN=material.titleEN,
+            title=title,
             material_id=material_id,
-            level=level,
-            re_order_level=re_order_level,
-            re_order_quantity=re_order_quantity,
-            ignore_forecast=ignore_forecast,
-            cp_type=cp_type,
-            cp_quantity=cp_quantity,
-            cp_plan_date_start=cp_plan_date_start,
-            cp_plan_date_end=cp_plan_date_end,
-            cp_period=cp_period,
-            cp_weekday=cp_weekday,
-            cp_day_in_month=cp_day_in_month,
-            cp_end_date=cp_end_date
+            uom_stock_id=uom_stock,
+            uom_base_id=uom_base,
+            quantity_base=quantity_base,
+            quantity_stock=quantity_stock,
+            quantity_conversion_factor=quantity_conversion_factor,
             )
         session.add(inventory_item)
         session.commit()
 
         inventory_items = InventoryItem.query.filter_by(
             id=inventory_item.id).all()
-        result = inventory_item_schema.dump(inventory_items).data
+        result = inventory_items_schema.dump(inventory_items).data
         return jsonify({'inventory_items': result})
 
     if request.method == 'PUT':
-        # retrieve fields from post request
-        id = tools.str_to_numeric(request.form.get('id'))
-        titleEN = request.form.get('titleEN')
-        titleDE = request.form.get('titleDE')
-        status = tools.str_to_numeric(request.form.get('status'))
-        material_id = tools.str_to_numeric(request.form.get('material_id'))
-        level = tools.str_to_numeric(request.form.get('level'))
-        re_order_level = tools.str_to_numeric(request.form.get('re_order_level'))
-        re_order_quantity = tools.str_to_numeric(request.form.get('re_order_quantity'))
-        ignore_forecast = tools.str_to_bool(request.form.get('ignore_forecast'))
+
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = inventory_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        print('errors = ' + str(errors))
+
+        id = data['id']
+        title = data['title']
+        quantity_base = data['quantity_base']
+        quantity_stock = data['quantity_stock']
+        quantity_conversion_factor = data['quantity_conversion_factor']
+        uom_base = data['uom_base'].uom if data['uom_base'] else None
+        uom_stock = data['uom_stock'].uom if data['uom_stock'] else None
+        material_id = data['material'].id if data['material'] else None
+        status = data['status']
+        re_order_level = data['re_order_level']
+        re_order_quantity = data['re_order_quantity']
+        ignore_forecast = data['ignore_forecast']
+
         # consumption plan fields
-        cp_type = tools.str_to_numeric(request.form.get('cp_type'))
-        cp_quantity = tools.str_to_numeric(request.form.get('cp_quantity'))
-        cp_plan_date_start = tools.str_to_date(request.form.get('cp_plan_date_start'))
-        cp_plan_date_end = tools.str_to_date(request.form.get('cp_plan_date_end'))
-        cp_period = tools.str_to_numeric(request.form.get('cp_period'))
-        cp_weekday = tools.str_to_numeric(request.form.get('cp_weekday'))
-        cp_day_in_month = tools.str_to_numeric(request.form.get('cp_day_in_month'))
+        cp_type = data['cp_type']
+        cp_quantity = data['cp_quantity']
+        cp_plan_date_start = data['cp_plan_date_start']
+        cp_plan_date_end = data['cp_plan_date_end']
+        cp_period = data['cp_period']
+        cp_weekday = data['cp_weekday']
+        cp_day_in_month = data['cp_day_in_month']
+
+        # Validations
+        if (not id):
+            message = 'api_v1_dietplan: PUT | Missing field: id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not material_id):
+            message = 'api_v1_dietplan: PUT | Missing field: material_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
 
         # TODO: Create a consistent behaviour for querying the db, with or without try?
         inventory_item = InventoryItem.query.filter_by(id=id).one_or_none()
+        if (not inventory_item):
+            message = 'api_v1_dietplan: PUT | No inventory item found.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
 
         # Step 1: Update inventory item
         cp_changed = False
-        if (id) and (inventory_item):
-            inventory_item.titleEN = titleEN,
-            inventory_item.titleDE = titleDE,
-            inventory_item.status = status,
-            inventory_item.material_id = material_id,
-            inventory_item.level = level,
-            inventory_item.re_order_level = re_order_level,
-            inventory_item.re_order_quantity = re_order_quantity
-            inventory_item.ignore_forecast = ignore_forecast
+        inventory_item.title = title,
+        inventory_item.status = status,
+        inventory_item.material_id = material_id,
+        inventory_item.quantity_base = quantity_base,
+        inventory_item.quantity_stock = quantity_stock,
+        inventory_item.quantity_conversion_factor = quantity_conversion_factor,
+        inventory_item.uom_base_id = uom_base,
+        inventory_item.uom_stock_id = uom_stock,
+        inventory_item.re_order_level = re_order_level,
+        inventory_item.re_order_quantity = re_order_quantity
+        inventory_item.ignore_forecast = ignore_forecast
 
-            # Identify if cp was changed
-            if (inventory_item.cp_type != cp_type) \
-                    or (inventory_item.cp_quantity != cp_quantity) \
-                    or (inventory_item.cp_plan_date_start != cp_plan_date_start) \
-                    or (inventory_item.cp_period != cp_period) \
-                    or (inventory_item.cp_weekday != cp_weekday) \
-                    or (inventory_item.cp_day_in_month != cp_day_in_month) \
-                    or (inventory_item.cp_plan_date_end != cp_plan_date_end):
-                cp_changed = True
-
-                inventory_item.cp_type = cp_type,
-                inventory_item.cp_quantity = cp_quantity,
-                inventory_item.cp_plan_date_start = cp_plan_date_start,
-                inventory_item.cp_period = cp_period,
-                inventory_item.cp_weekday = cp_weekday,
-                inventory_item.cp_day_in_month = cp_day_in_month
-                inventory_item.cp_plan_date_end = cp_plan_date_end
-
-            session.commit()
-        else:
-            response = make_response(json.dumps(
-                'Can not change item because item was not found'), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
+        # Identify if cp was changed
+        if (inventory_item.cp_type != cp_type) \
+                or (inventory_item.cp_quantity != cp_quantity) \
+                or (inventory_item.cp_plan_date_start != cp_plan_date_start) \
+                or (inventory_item.cp_period != cp_period) \
+                or (inventory_item.cp_weekday != cp_weekday) \
+                or (inventory_item.cp_day_in_month != cp_day_in_month) \
+                or (inventory_item.cp_plan_date_end != cp_plan_date_end):
+            cp_changed = True
+            inventory_item.cp_type = cp_type,
+            inventory_item.cp_quantity = cp_quantity,
+            inventory_item.cp_plan_date_start = cp_plan_date_start,
+            inventory_item.cp_period = cp_period,
+            inventory_item.cp_weekday = cp_weekday,
+            inventory_item.cp_day_in_month = cp_day_in_month
+            inventory_item.cp_plan_date_end = cp_plan_date_end
+        session.commit()
+        logging.info('Inventory Item %s successfully updated' % inventory_item.id)
 
         # Step 2: re-create material forecasts for regular consumption
-        if (cp_type is not None) and (material_id) and (cp_quantity is not None):
+        if (cp_type is not None) and (cp_quantity is not None):
             if (cp_changed):
                 logging.info('Delete consumption forecast due to change ...')
                 forecasts = db.session.query(MaterialForecast).\
@@ -915,11 +865,10 @@ def api_v1_inventory(inventory_id):
                 except exc.SQLAlchemyError:
                     logging.exception('Some problem occurred')
 
-                logging.info('Standard uom from material = ' +
-                             material.standard_uom_id)
+                logging.info('Base uom from material = ' +
+                             material.uom_base_id)
 
                 if (cp_type == 1):
-                    print("wtf")
                     logging.info('Create new forecasts for daily consumption ...')
                     plan_date_start = cp_plan_date_start
                     # TODO: Wire up plan_date_end to the front end
@@ -931,15 +880,14 @@ def api_v1_inventory(inventory_id):
                                 plan_date_start=plan_date_start,
                                 plan_date_end=plan_date_end,
                                 quantity_per_day=cp_quantity,
-                                quantity_uom=material.standard_uom_id)
+                                quantity_uom=material.uom_base_id)
                     session.add(new_forecast)
                     session.commit()
 
         inventory_items = InventoryItem.query.filter_by(
             id=inventory_item.id).all()
-        result = inventory_item_schema.dump(inventory_items).data
+        result = inventory_items_schema.dump(inventory_items).data
         return jsonify({'inventory_items': result})
-
 
     if request.method == 'DELETE':
         id = request.form.get('id')
@@ -977,7 +925,7 @@ def analyze_ingredient(ingredient_text, **kwargs):
     # Reference:
     # https://cloud.google.com/natural-language/docs/reference/rest/v1/Token
     content = ' '.join([intro_text[target_language], ingredient_text])
-    print("content: %s" % content)
+    logging.info("content: %s" % content)
     document = language.types.Document(
         content=content,
         type=language.enums.Document.Type.PLAIN_TEXT,
@@ -1029,7 +977,7 @@ def analyze_ingredient(ingredient_text, **kwargs):
             token = tokens[index]
             token_parse_label = parse_label[token.dependency_edge.label]
             token_pos_tag = pos_tag[token.part_of_speech.tag]
-            print(u'{} - {}: {} - {} - {}'.format(index,pos_tag[token.part_of_speech.tag],token.text.content,token.dependency_edge.head_token_index,parse_label[token.dependency_edge.label]))
+            logging.info(u'{} - {}: {} - {} - {}'.format(index,pos_tag[token.part_of_speech.tag],token.text.content,token.dependency_edge.head_token_index,parse_label[token.dependency_edge.label]))
             #TODO: Skip intro sentence part
 
             if ((index + 1) > skip_intro_words):
@@ -1126,10 +1074,12 @@ def updateMaterialForecast(diet_plan_id, inventory_id, plan_date):
                 inventory_item = InventoryItem(
                     inventory_id=login_session['default_inventory_id'],  # TODO: what if the user wants to update another inventory?
                     titleEN=inv_item.titleEN,
-                    titleDE=inv_item.titleDE,
+                    title=inv_item.title,
                     material_id=inv_item.id,
-                    level=0,
-                    sku_uom=inv_item.standard_uom_id,
+                    quantity_stock=0,
+                    quantity_base=0,
+                    uom_base_id=inv_item.uom_base_id,
+                    uom_stock_id=inv_item.uom_stock_id,
                     re_order_level=99,
                     re_order_quantity=99
                     )
@@ -1168,18 +1118,18 @@ def updateMaterialForecast(diet_plan_id, inventory_id, plan_date):
             portions_factor = (float(dp_item.portions)/row.Meal.portions)
             logging.info("portions_factor = " + str(portions_factor))
             logging.info("Old MaterialForecast ("
-                         + str(row.Material.titleDE) + ") = "
+                         + str(row.Material.title) + ") = "
                          + str(row.MaterialForecast.quantity_per_day))
             row.MaterialForecast.quantity_per_day = row.MaterialForecast.quantity_per_day + portions_factor * row.Ingredient.quantity
             logging.info("New MaterialForecast ("
-                         + str(row.Material.titleDE) + ") = "
+                         + str(row.Material.title) + ") = "
                          + str(row.MaterialForecast.quantity_per_day))
 
             # for materials with forecast remove the records from
             # the all material list
             for m in materials:
                 if (m.Material.id == row.Material.id):
-                    print('remove material from array')
+                    logging.info('remove material from array')
                     materials.remove(m)
 
         session.commit()

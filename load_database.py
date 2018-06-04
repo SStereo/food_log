@@ -1,7 +1,7 @@
 from huntingfood.models import User, UserGroup, UOM, Meal, Ingredient, Material, MaterialForecast
 from huntingfood.models import FoodComposition, Nutrient, ShoppingOrder
 from huntingfood.models import ShoppingOrderItem, FoodMainGroup
-from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
+from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem, ConsumptionPlanItem, ConsumptionPlan
 from huntingfood.models import TradeItem, Place, Country, State
 
 from huntingfood import db
@@ -20,6 +20,12 @@ num_rows_deleted = FoodComposition.query.delete()
 db.session.commit()
 
 num_rows_deleted = Nutrient.query.delete()
+db.session.commit()
+
+num_rows_deleted = ConsumptionPlanItem.query.delete()
+db.session.commit()
+
+num_rows_deleted = ConsumptionPlan.query.delete()
 db.session.commit()
 
 num_rows_deleted = DietPlanItem.query.delete()
@@ -127,68 +133,68 @@ obj_uoms = [
 
 # TODO: change field to say ndb nutrient mapping or so because other database have other terms for lookup
 obj_nutrients = [
-           Nutrient(value_uom="g",titleEN="Water",titleDE="Wasser"),
-           Nutrient(value_uom="kcal",titleEN="Energy",titleDE="Energie"),
-           Nutrient(value_uom="g",titleEN="Protein",titleDE="Eiweis"),
-           Nutrient(value_uom="g",titleEN="Total lipid (fat)",titleDE="Fett"),
-           Nutrient(value_uom="g",titleEN="Carbohydrate, by difference",titleDE="Kohlenhydrate"),
-           Nutrient(value_uom="g",titleEN="Fiber, total dietary",titleDE="Ballaststoff"),
-           Nutrient(value_uom="g",titleEN="Sugars, total",titleDE="Zucker"),
-           Nutrient(value_uom="mg",titleEN="Calcium, Ca",titleDE="Kalzium"),
-           Nutrient(value_uom="mg",titleEN="Iron, Fe",titleDE="Eisen"),
-           Nutrient(value_uom="mg",titleEN="Magnesium, Mg",titleDE="Magnesium"),
-           Nutrient(value_uom="mg",titleEN="Phosphorus, P",titleDE="Phosphor"),
-           Nutrient(value_uom="mg",titleEN="Potassium, K",titleDE="Potassium"),
-           Nutrient(value_uom="mg",titleEN="Sodium, Na",titleDE="Sodium"),
-           Nutrient(value_uom="mg",titleEN="Zinc, Zn",titleDE="Zink"),
-           Nutrient(value_uom="mg",titleEN="Vitamin C, total ascorbic acid",titleDE="Vitamin C"),
-           Nutrient(value_uom="mg",titleEN="Thiamin",titleDE="Thiamin"),
-           Nutrient(value_uom="mg",titleEN="Riboflavin",titleDE="Riboflavin"),
-           Nutrient(value_uom="mg",titleEN="Vitamin B-6",titleDE="Vitamin B-6"),
-           Nutrient(value_uom="µg",titleEN="Folate, DFE",titleDE="Folsäure"),
-           Nutrient(value_uom="µg",titleEN="Vitamin B-12",titleDE="Vitamin B-12"),
-           Nutrient(value_uom="µg",titleEN="Vitamin A, RAE",titleDE="Vitamin A, RAE"),
-           Nutrient(value_uom="IU",titleEN="Vitamin A, IU",titleDE="Vitamin A, IU"),
-           Nutrient(value_uom="mg",titleEN="Vitamin E (alpha-tocopherol)",titleDE="Vitamin E"),
-           Nutrient(value_uom="µg",titleEN="Vitamin D (D2 + D3)",titleDE="Vitamin D (D2 + D3)"),
-           Nutrient(value_uom="IU",titleEN="Vitamin D",titleDE="Vitamin D"),
-           Nutrient(value_uom="µg",titleEN="Vitamin K (phylloquinone)",titleDE="Vitamin K"),
-           Nutrient(value_uom="g",titleEN="Fatty acids, total saturated",titleDE="gesättigte Fettsäuren"),
-           Nutrient(value_uom="g",titleEN="Fatty acids, total monounsaturated",titleDE="einfach ungesättigte Fettsäure"),
-           Nutrient(value_uom="g",titleEN="Fatty acids, total polyunsaturated",titleDE="mehrfach ungesättigte Fettsäure"),
-           Nutrient(value_uom="g",titleEN="Fatty acids, total trans",titleDE="trans-Fettsäuren"),
-           Nutrient(value_uom="mg",titleEN="Cholesterol",titleDE="Cholesterin"),
-           Nutrient(value_uom="mg",titleEN="Caffeine",titleDE="Koffein")
+           Nutrient(value_uom="g",titleEN="Water",title="Wasser"),
+           Nutrient(value_uom="kcal",titleEN="Energy",title="Energie"),
+           Nutrient(value_uom="g",titleEN="Protein",title="Eiweis"),
+           Nutrient(value_uom="g",titleEN="Total lipid (fat)",title="Fett"),
+           Nutrient(value_uom="g",titleEN="Carbohydrate, by difference",title="Kohlenhydrate"),
+           Nutrient(value_uom="g",titleEN="Fiber, total dietary",title="Ballaststoff"),
+           Nutrient(value_uom="g",titleEN="Sugars, total",title="Zucker"),
+           Nutrient(value_uom="mg",titleEN="Calcium, Ca",title="Kalzium"),
+           Nutrient(value_uom="mg",titleEN="Iron, Fe",title="Eisen"),
+           Nutrient(value_uom="mg",titleEN="Magnesium, Mg",title="Magnesium"),
+           Nutrient(value_uom="mg",titleEN="Phosphorus, P",title="Phosphor"),
+           Nutrient(value_uom="mg",titleEN="Potassium, K",title="Potassium"),
+           Nutrient(value_uom="mg",titleEN="Sodium, Na",title="Sodium"),
+           Nutrient(value_uom="mg",titleEN="Zinc, Zn",title="Zink"),
+           Nutrient(value_uom="mg",titleEN="Vitamin C, total ascorbic acid",title="Vitamin C"),
+           Nutrient(value_uom="mg",titleEN="Thiamin",title="Thiamin"),
+           Nutrient(value_uom="mg",titleEN="Riboflavin",title="Riboflavin"),
+           Nutrient(value_uom="mg",titleEN="Vitamin B-6",title="Vitamin B-6"),
+           Nutrient(value_uom="µg",titleEN="Folate, DFE",title="Folsäure"),
+           Nutrient(value_uom="µg",titleEN="Vitamin B-12",title="Vitamin B-12"),
+           Nutrient(value_uom="µg",titleEN="Vitamin A, RAE",title="Vitamin A, RAE"),
+           Nutrient(value_uom="IU",titleEN="Vitamin A, IU",title="Vitamin A, IU"),
+           Nutrient(value_uom="mg",titleEN="Vitamin E (alpha-tocopherol)",title="Vitamin E"),
+           Nutrient(value_uom="µg",titleEN="Vitamin D (D2 + D3)",title="Vitamin D (D2 + D3)"),
+           Nutrient(value_uom="IU",titleEN="Vitamin D",title="Vitamin D"),
+           Nutrient(value_uom="µg",titleEN="Vitamin K (phylloquinone)",title="Vitamin K"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total saturated",title="gesättigte Fettsäuren"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total monounsaturated",title="einfach ungesättigte Fettsäure"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total polyunsaturated",title="mehrfach ungesättigte Fettsäure"),
+           Nutrient(value_uom="g",titleEN="Fatty acids, total trans",title="trans-Fettsäuren"),
+           Nutrient(value_uom="mg",titleEN="Cholesterol",title="Cholesterin"),
+           Nutrient(value_uom="mg",titleEN="Caffeine",title="Koffein")
 ]
 
 obj_materials = [
-           Material(titleDE="Zwiebel", standard_uom_id="pc"),
-           Material(titleDE="Curry", standard_uom_id="g"),
-           Material(titleDE="rote Linsen", standard_uom_id="g"),
-           Material(titleDE="Gemüsebrühe", standard_uom_id="g"),
-           Material(titleDE="Tomatenmark", standard_uom_id="g"),
-           Material(titleDE="gehackte Tomaten", standard_uom_id="g"),
-           Material(titleDE="Blumenkohl", standard_uom_id="pc"),
-           Material(titleDE="grüne Bohnen", standard_uom_id="g"),
-           Material(titleDE="frischer Koriander", standard_uom_id="g"),
-           Material(titleDE="griechischer Joghurt", standard_uom_id="g"),
-           Material(titleDE="Knoblauchzehe", standard_uom_id="pc"),
-           Material(titleDE="Olivenöl", standard_uom_id="l"),
-           Material(titleDE="Salz", standard_uom_id="g"),
-           Material(titleDE="schwarzer Pfeffer", standard_uom_id="g"),
-           Material(titleDE="Zucker", standard_uom_id="g"),
-           Material(titleDE="Wasser", standard_uom_id="l"),
-           Material(titleDE="Stange Lauch", standard_uom_id="pc"),
-           Material(titleDE="Karotte", standard_uom_id="pc"),
-           Material(titleDE="Knollensellerie, mittelgroß", standard_uom_id="g"),
-           Material(titleDE="Linsen", standard_uom_id="g"),
-           Material(titleDE="Räucherbauch", standard_uom_id="g"),
-           Material(titleDE="Kartoffel", standard_uom_id="pc"),
-           Material(titleDE="Wienerle", standard_uom_id="pc"),
-           Material(titleDE="Öl", standard_uom_id="l"),
-           Material(titleDE="Muskat", standard_uom_id="g"),
-           Material(titleDE="Rotweinessig", standard_uom_id="l"),
-           Material(titleDE="Spätzle", standard_uom_id="g"),
+           Material(title="Zwiebel", language_code="de", standard_uom_id="pc"),
+           Material(title="Curry", language_code="de", standard_uom_id="g"),
+           Material(title="rote Linsen", language_code="de", standard_uom_id="g"),
+           Material(title="Gemüsebrühe", language_code="de", standard_uom_id="g"),
+           Material(title="Tomatenmark", language_code="de", standard_uom_id="g"),
+           Material(title="gehackte Tomaten", language_code="de", standard_uom_id="g"),
+           Material(title="Blumenkohl", language_code="de", standard_uom_id="pc"),
+           Material(title="grüne Bohnen", language_code="de", standard_uom_id="g"),
+           Material(title="frischer Koriander", language_code="de", standard_uom_id="g"),
+           Material(title="griechischer Joghurt", language_code="de", standard_uom_id="g"),
+           Material(title="Knoblauchzehe", language_code="de", standard_uom_id="pc"),
+           Material(title="Olivenöl", language_code="de", standard_uom_id="l"),
+           Material(title="Salz", language_code="de", standard_uom_id="g"),
+           Material(title="schwarzer Pfeffer", language_code="de", standard_uom_id="g"),
+           Material(title="Zucker", language_code="de", standard_uom_id="g"),
+           Material(title="Wasser", language_code="de", standard_uom_id="l"),
+           Material(title="Stange Lauch", language_code="de", standard_uom_id="pc"),
+           Material(title="Karotte", language_code="de", standard_uom_id="pc"),
+           Material(title="Knollensellerie, mittelgroß", language_code="de", standard_uom_id="g"),
+           Material(title="Linsen", language_code="de", standard_uom_id="g"),
+           Material(title="Räucherbauch", language_code="de", standard_uom_id="g"),
+           Material(title="Kartoffel", language_code="de", standard_uom_id="pc"),
+           Material(title="Wienerle", language_code="de", standard_uom_id="pc"),
+           Material(title="Öl", language_code="de", standard_uom_id="l"),
+           Material(title="Muskat", language_code="de", standard_uom_id="g"),
+           Material(title="Rotweinessig", language_code="de", standard_uom_id="l"),
+           Material(title="Spätzle", language_code="de", standard_uom_id="g"),
 ]
 
 obj_meals = [
@@ -409,21 +415,21 @@ obj_ingredients = [
 obj_places = [
     Place(
         titleEN='NORMA Frauenaurach',
-        titleDE='NORMA Frauenaurach',
+        title='NORMA Frauenaurach',
         google_place_id='ChIJe5c7N0H_oUcRg62tY-FBrVA',
         geo_lat='49.561972',
         geo_lng='10.961898',
         ),
     Place(
         titleEN='Dorfladen Hüttendorf',
-        titleDE='Dorfladen Hüttendorf',
+        title='Dorfladen Hüttendorf',
         google_place_id='ChIJn3nyUHL_oUcRR_VbmRcwF-w',
         geo_lat='49.548049',
         geo_lng='10.961172',
         ),
     Place(
         titleEN='Edeka Neumühle',
-        titleDE='Edeka Neumühle',
+        title='Edeka Neumühle',
         google_place_id='ChIJ4-bDBrf4oUcRYofAX6KmRUU',
         geo_lat='49.588103',
         geo_lng='10.977139',

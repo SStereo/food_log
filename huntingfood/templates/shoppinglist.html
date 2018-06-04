@@ -106,8 +106,21 @@
             </p>
           </div>
           <!-- Date Picker End -->
-				  <input class="new-inv" data-bind="value: current, valueUpdate: 'afterkeydown', enterKey: addInventoryItem" placeholder="Neue Zutat/Gegenstand" autofocus>
-			  </header>
+          <form data-bind="submit: addInventoryItem">
+            <input class="text-center new-inv" data-bind="value: newInventoryItemTitle, valueUpdate: 'afterkeydown', enterKey: addInventoryItem" placeholder="Neue Zutat/Gegenstand" autofocus>
+
+            <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
+            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
+
+            <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
+            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
+
+            <button type="submit" class="btn btn-primary">Hinzufügen</button>
+
+          </form>
+
+
+        </header>
 
         <section data-bind="visible: inventoryItems().length">
           <table class="table">
@@ -124,8 +137,8 @@
               <tr class="inv-list" data-bind="css: statusClass">
                 <td><button class="toggle btn btn-primary" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
                 <td data-bind="text: title()"></td>
-                <td data-bind="text: level()"></td>
-                <td data-bind="text: plannedQuantity() + uom()"></td>
+                <td data-bind="text: quantity_base()"></td>
+                <td data-bind="text: plannedQuantity() + uom_base()"></td>
                 <td><button class="btn btn-secondary" data-bind="click: $root.EditItem">details..</button></td>
               </tr>
             </tbody>
@@ -148,9 +161,9 @@
                            data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().title">
                   </div>
                   <div class="form-group">
-                    <label for="LevelInput">Wieviele Einheiten sind noch da?</label>
-                    <input type="text" class="form-control" id="LevelInput" placeholder="0"
-                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().level">
+                    <label for="QuantityBaseInput">Wieviele Einheiten sind noch da?</label>
+                    <input type="text" class="form-control" id="QuantityBaseInput" placeholder="0"
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().quantity_base">
                   </div>
                   <div class="form-group">
                     <label for="cpTypeInput">Zeitraum für regelmässiger Verbrauch?</label>
@@ -210,9 +223,9 @@
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
   var url_api_meals = "{{ url_for('api_v1_meals') }}";
   var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
-  var url_api_consumption_plan = "{{ url_for('api_v1_consumption_plan', consumption_plan_id = consumption_plan.id ) }}";
-  var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
+    var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
   var url_api_users = "{{ url_for('api_v1_users') }}";
+  var url_api_uom = "{{ url_for('api_v1_uom') }}";
   var dp_id = {{ diet_plan.id }};
   var inv_id = {{ inventory.id }};
   var csrf_token = "{{ csrf_token() }}";
