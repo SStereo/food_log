@@ -530,7 +530,6 @@ function saveInventoryItem(newValue) {
           're_order_quantity': this.re_order_quantity(),
           'status': null,
           'title': this.title(),
-          'titleDE': null,
           'titleEN': null,
           'uom_base': this.uom_base(),
           'uom_stock': this.uom_stock()
@@ -629,6 +628,15 @@ var invViewModel = function() {
     });
   };
 
+  self.loadMaterials = function(searchTerm, callback) {
+    $.ajax({
+      dataType: 'json',
+      url: url_api_materials,
+      data: {
+        query: searchTerm
+      },
+    }).done(callback);
+  };
 
   // Loads inventory items from Rest API
   self.loadInventoryItems = function() {
@@ -691,10 +699,17 @@ var invViewModel = function() {
   // adds a inventory item
   self.addInventoryItem = function(data, event) {
 
-    var title = self.newInventoryItemTitle().trim();
+    var title = self.newInventoryItemTitle();
     var uom_base_id = self.newInventoryItemBaseUnit();
     var uom_stock_id = self.newInventoryItemStockUnit();
     if (title) {
+      if (isNaN(title)) {
+        var material_id = null;
+        title = title.trim();
+      } else {
+        var material_id = title;
+        var title = '';
+      }
       console.log('addInventoryItem');
 
       var object = {
@@ -705,7 +720,7 @@ var invViewModel = function() {
         'title': title,
         'uom_base': uom_base_id,
         'uom_stock': uom_stock_id,
-        'material': null
+        'material': material_id
       }
 
       $.ajax({
@@ -720,7 +735,7 @@ var invViewModel = function() {
         success: function(response) {
 
           // turn the json string into a javascript object
-          var parsed = response['inventory_item']
+          var parsed = response['inventory_items']
 
           // for each iterable item create a new DietPlanItem observable
           parsed.forEach( function(item) {

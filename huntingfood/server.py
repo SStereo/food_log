@@ -458,6 +458,7 @@ def createFoodviaNDB(keyword,
                 report = n.food_report(i.get_ndbno())
 
                 nutrients = report['food'].get_nutrients()
+                food_compositions = []
                 for n in nutrients:
                     # use existing nutrient object if exists
                     if n.get_name() in nutrientDict:
@@ -486,13 +487,17 @@ def createFoodviaNDB(keyword,
                         uomID = "x"  # TODO: improve later
 
                     logging.info('Create FoodComposition')
-                    fc = FoodComposition(material_id=food.id,
+                    food_compositions.append(
+                        FoodComposition(material_id=food.id,
                                         nutrient_id=nutriendID,
                                         per_qty_uom=uomID,
                                         per_qty=100,
-                                        value=n.get_value())
-                    session.add(fc)
-                    session.commit()
+                                        value=n.get_value()
+                                        )
+                                            )
+
+                session.add_all(food_compositions)
+                session.commit()
             return food
         else:
             logging.info("No results in NDB found")
@@ -533,12 +538,12 @@ def api_v1_materials():
     if request.method == 'GET':
         search_term = request.args.get('query')
         if search_term:
-            materials = Material.query.filter_by(
-                title=search_term).all()
+            materials = Material.query.filter(Material.title.like('%' + search_term + '%')).all()
         else:
             materials = Material.query.all()
         result = material_schema.dump(materials).data
-        return jsonify({'materials': result})
+        #  return jsonify({'materials': result})
+        return jsonify(result)
 
 
 @app.route('/api/v1/dietplan/<int:diet_plan_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
@@ -697,17 +702,9 @@ def api_v1_inventory(inventory_id):
         quantity_conversion_factor = data['quantity_conversion_factor']
         uom_base = data['uom_base'].uom
         uom_stock = data['uom_stock'].uom
-        material_id = data['material']
+        material_id = data['material'].id if data['material'] else None
 
         # Validations
-        if (not title):
-            message = 'api_v1_dietplan: POST | Missing field: title.'
-            response = make_response(json.dumps(
-                message), 400)
-            response.headers['Content-Type'] = 'application/json'
-            logging.warning(message)
-            return response
-
         if (not uom_base):
             message = 'api_v1_dietplan: POST | Missing field: uom_base.'
             response = make_response(json.dumps(
@@ -724,11 +721,34 @@ def api_v1_inventory(inventory_id):
             logging.warning(message)
             return response
 
-        if (not material_id):
+        if (not title) and (not material_id):
+            message = 'api_v1_dietplan: POST | Missing field: title.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        elif (title) and (not material_id):
             message = 'api_v1_dietplan: POST | No existing material. Creating new material ...'
             logging.info(message)
             material = createMaterial(title, login_session['language'], uom_base)
             material_id = material.id
+
+        elif (not title) and (material_id):
+            message = 'api_v1_dietplan: POST | Existing material.'
+            logging.info(message)
+            material = Material.query.filter_by(id=material_id).one_or_none()
+            # Use title from existing material
+            if (material):
+                title = material.title
+            else:
+                message = 'api_v1_dietplan: POST | Material with id %s not found.' % material_id
+                response = make_response(json.dumps(
+                    message), 400)
+                response.headers['Content-Type'] = 'application/json'
+                logging.warning(message)
+                return response
 
         # Step 1: Create an inventory item
         inventory_item = InventoryItem(

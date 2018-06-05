@@ -223,8 +223,7 @@ class Material(db.Model):
     user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable=True)  # only required for private food items, for example home made foods
     title = db.Column(db.String(160), nullable=True)
     language_code = db.Column(db.String(8), nullable=False)
-    titleEN = db.Column(db.String(160), nullable=True)  # TODO: obsolete
-    titleDE = db.Column(db.String(160), nullable=True)  # TODO: Best way to store other languages?
+    titleEN = db.Column(db.String(160), nullable=True)
     standard_uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)  # Physical, e.g. g (Sugar)
     uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)  # One updated on an inventory, updated here for future inventories
@@ -380,9 +379,7 @@ class InventoryItem(db.Model):
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
     titleEN = db.Column(db.String(160), nullable=True)
-    titleDE = db.Column(db.String(160), nullable=True)  # TODO: obsolete
     title = db.Column(db.String(160), nullable=True)
-    status = db.Column(db.SmallInteger, nullable=True)  # TODO: obsolete since calculated on the fly
     uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     quantity_stock = db.Column(db.Float, nullable=True)
@@ -425,7 +422,6 @@ class InventoryItem(db.Model):
             'inventory_id': self.inventory_id,
             'titleEN': self.titleEN,
             'title': self.title,
-            'status': self.status,
             'material_id': self.material_id,
             'level': self.level,
             'ignore_forecast': self.ignore_forecast,

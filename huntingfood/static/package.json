@@ -11,6 +11,7 @@
   "dependencies": {
     "bootstrap-datepicker": "^1.8.0",
     "director": "^1.2.8",
+    "knockout-jqautocomplete": "^0.5.0",
     "moment": "^2.22.1"
   }
 }

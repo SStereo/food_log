@@ -107,7 +107,12 @@
           </div>
           <!-- Date Picker End -->
           <form data-bind="submit: addInventoryItem">
-            <input class="text-center new-inv" data-bind="value: newInventoryItemTitle, valueUpdate: 'afterkeydown', enterKey: addInventoryItem" placeholder="Neue Zutat/Gegenstand" autofocus>
+
+            <!-- jqAutoComplete Knockout plugin START -->
+            <input class="text-center new-inv"
+                   data-bind="jqAuto: { value: newInventoryItemTitle, source: $root.loadMaterials, inputProp: 'title', labelProp: 'title', valueProp: 'id' }, valueUpdate: 'afterkeydown', enterKey: addInventoryItem"
+                   placeholder="Neue Zutat/Gegenstand" autofocus />
+            <!-- jqAutoComplete Knockout plugin END -->
 
             <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
             <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
@@ -223,16 +228,19 @@
   var url_sl_items = "{{ url_for('all_shopping_items_handler') }}";
   var url_api_meals = "{{ url_for('api_v1_meals') }}";
   var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
-    var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
+  var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
   var url_api_users = "{{ url_for('api_v1_users') }}";
   var url_api_uom = "{{ url_for('api_v1_uom') }}";
+  var url_api_materials = "{{ url_for('api_v1_materials') }}";
   var dp_id = {{ diet_plan.id }};
   var inv_id = {{ inventory.id }};
   var csrf_token = "{{ csrf_token() }}";
 </script>
-<script src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
+<script type=text/javascript src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
+<script type=text/javascript src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
+<script type=text/javascript src="{{ url_for('static', filename='node_modules/knockout-jqautocomplete/build/knockout-jqAutocomplete.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>
-<script src="{{ url_for('static', filename='node_modules/director/build/director.js') }}"></script>
+<script type=text/javascript src="{{ url_for('static', filename='node_modules/director/build/director.js') }}"></script>
 <script>
   $(function () {
 
