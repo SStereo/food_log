@@ -230,6 +230,7 @@ class Material(db.Model):
     uom_issue_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)  # tbsp (4 table spoons of sugar)
     bls_code = db.Column(db.String(7), nullable=True)
     ndb_code = db.Column(db.String(7), nullable=True)
+    ndb_title = db.Column(db.String(160), nullable=True)
     isBaseFood = db.Column(db.Boolean, unique = False, default = False)
     parentBaseFood = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -383,7 +384,9 @@ class InventoryItem(db.Model):
     uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
     quantity_stock = db.Column(db.Float, nullable=True)
+    quantity_stock_user = db.Column(db.Float, nullable=True)
     quantity_base = db.Column(db.Float, nullable=True)
+    quantity_base_user = db.Column(db.Float, nullable=True)  # save the quantity entered by the user to recover it from auto toggle setting
     quantity_conversion_factor = db.Column(db.Float, nullable=True)  # to calculate issue units from stock units
     level = db.Column(db.Float, nullable=True)  # TODO: should be renamed to stock (on hand)
     re_order_level = db.Column(db.Integer, nullable=True)
@@ -408,6 +411,11 @@ class InventoryItem(db.Model):
     cp_weekday = db.Column(db.SmallInteger, nullable=True)
     cp_day_in_month = db.Column(db.SmallInteger, nullable=True)
     cp_end_date = db.Column(db.DateTime(timezone=True), nullable=True)  # TODO: depreciated
+
+    op_plan_date_start = db.Column(db.DateTime(timezone=True), nullable=True)
+    op_plan_date_end = db.Column(db.DateTime(timezone=True), nullable=True)
+    op_quantity = db.Column(db.Float, nullable=True)
+
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     inventory = db.relationship("Inventory", foreign_keys=[inventory_id], back_populates="items")
@@ -717,4 +725,5 @@ class InventoryItemSchema(ma.ModelSchema):
                                 'plan_date_start',
                                 'plan_date_end',
                                 'quantity_per_day',
+                                'quantity',
                                 'quantity_uom'])

@@ -115,7 +115,7 @@
             <!-- jqAutoComplete Knockout plugin END -->
 
             <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
-            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
+            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
 
             <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
             <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
@@ -128,23 +128,27 @@
         </header>
 
         <section data-bind="visible: inventoryItems().length">
-          <table class="table">
+          <table class="table px-0">
             <thead>
               <tr>
                 <th scope="Status"><i class="fas fa-question-circle"></i></th>
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
                 <th scope="Bestand"><i class="fas fa-warehouse"></i></th>
+                <th scope="Other"><i class="fas fa-hand-holding"></i></th>
+                <th scope="Periodic"><i class="fas fa-redo"></i></th>
                 <th scope="Bedarf"><i class="fas fa-utensils"></i></th>
-                <th scope="Details"><i class="fas fa-info-circle"></i></th>
+                <th scope="Total"><i class="fas fa-equals"></i></th>
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredInventoryItems">
               <tr class="inv-list" data-bind="css: statusClass">
-                <td><button class="toggle btn btn-primary" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
-                <td data-bind="text: title()"></td>
-                <td data-bind="text: quantity_base()"></td>
-                <td data-bind="text: plannedQuantity() + uom_base()"></td>
-                <td><button class="btn btn-secondary" data-bind="click: $root.EditItem">details..</button></td>
+                <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
+                <td class="px-1 inv-list-title" data-bind="text: title() + ' (' + uom_base() + ')'"></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: quantity_base(), click: $root.EditItem2"></button></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityOther(), click: $root.EditItem4"></button></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityPeriodic(), click: $root.EditItem"></button></td>
+                <td class="px-1" data-bind="text: plannedQuantity()"></td>
+                <td class="px-1" data-bind="text: plannedQuantityTotal()"></td>
               </tr>
             </tbody>
           </table>
@@ -180,7 +184,7 @@
                            data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_quantity">
                   </div>
                   <div class="form-group">
-                    <label for="cpQuantityInput">Ab wann?</label>
+                    <label for="cpPlanDateStartInput">Ab wann?</label>
                     <input type="text" class="form-control datepicker" id="cpPlanDateStartInput"
                            data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_plan_date_start">
                   </div>
@@ -203,6 +207,80 @@
         </div>
         <!-- Modal view END -->
 
+        <!-- Modal: Quantity -->
+        <div data-bind="modal: ItemBeingEdited2" class="fade" role="dialog" tabindex="-1">
+          <form data-bind="submit: $root.SaveItem2">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h3>Bestand</h3>
+                  <a class="close" data-dismiss="modal">×</a>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label for="QuantityBaseInput">Bestand (Lagereinheit)</label>
+                    <input type="text" class="form-control" id="QuantityStockInput" placeholder="0"
+                           data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_stock">
+                  </div>
+                  <div class="form-group">
+                    <label for="QuantityBaseInput">Bestand (Basiseinheit)</label>
+                    <input type="text" class="form-control" id="QuantityBaseInput" placeholder="0"
+                           data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_base">
+                  </div>
+
+                  <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
+                  <div class="alert alert-danger" style="margin: 20px 0 0">
+                    Please correct the following errors:
+                    <ul data-bind="foreach: { data: ValidationErrors, as: 'errorMessage' }">
+                      <li data-bind="text: errorMessage"></li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <!-- Modal view END -->
+
+        <!-- Modal: Forecast Other -->
+        <div data-bind="modal: ItemBeingEdited4" class="fade" role="dialog" tabindex="-1">
+          <form data-bind="submit: $root.SaveItem4">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h3>Zusätzlicher Bedarf</h3>
+                  <p>kein regelmässiger oder durch Speisen geplanter Bedarf</p>
+                  <a class="close" data-dismiss="modal">×</a>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label for="OPQuantityInput">Bedarf (Basiseinheit)</label>
+                    <input type="text" class="form-control" id="OPQuantityInput" placeholder="0"
+                           data-bind="textInput: ItemBeingEdited4() && ItemBeingEdited4().op_quantity">
+                  </div>
+                  <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
+                  <div class="alert alert-danger" style="margin: 20px 0 0">
+                    Please correct the following errors:
+                    <ul data-bind="foreach: { data: ValidationErrors, as: 'errorMessage' }">
+                      <li data-bind="text: errorMessage"></li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <!-- Modal view END -->
       </div>
     </div>
 

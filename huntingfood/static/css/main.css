@@ -78,7 +78,15 @@ input[type="text"].sl-item {
 	margin: 0;
 	padding: 0;
 	list-style: none;
+  font-size: 10px;
+}
+
+.inv-list-title {
+	margin: 0;
+	padding: 0;
+	list-style: none;
   font-size: 12px;
+  font-style: oblique;
 }
 
 .inv-list li {
@@ -89,7 +97,7 @@ input[type="text"].sl-item {
 }
 
 .inv-list button {
-	font-size: 12px;
+	font-size: 10px;
 }
 
 .inv-list > input {
@@ -131,10 +139,6 @@ input[type="text"].sl-item {
 	border: none; /* Mobile Safari */
 	-webkit-appearance: none;
 	appearance: none;
-}
-
-.inv-list li .toggle {
-	/*opacity: 0;*/
 }
 
 .inv-list li label {
@@ -260,8 +264,34 @@ tr.on-stock {
   display: block;
 }
 
+/* TODO: fix this shit */
+.custom-select {
+  display: none;
+}
+
+
+.show-control {
+  display: inline-block;
+}
+
+.hide-control {
+  display: none;
+}
+
 /* Modal window styles */
 
 .hide-link {
   display: none;
+}
+
+.inv-btn {
+  width: 40px;
+}
+
+.inv-btn-tgl {
+  width: 40px;
+}
+
+td {
+  padding: 0px;
 }

@@ -13,6 +13,33 @@ var DateGetWeek = function(d) {
                         - 3 + (week1.getDay() + 6) % 7) / 7);
 }
 
+// Compares two time periods and determines the number of days overlap
+var DaysOverlap = function(d0_start, d0_end, d1_start, d1_end) {
+  var days = 0
+  var timeDiff = 0;
+  if (d0_start.getTime() >= d1_start.getTime() && d1_end.getTime() > d0_start.getTime()) {
+    if (d0_end.getTime() <= d1_end.getTime()) {
+      timeDiff = Math.abs(d0_end.getTime() - d0_start.getTime());
+      days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    } else if (d0_end.getTime() > d1_end.getTime()) {
+      timeDiff = Math.abs(d1_end.getTime() - d0_start.getTime());
+      days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    };
+  } else if (d0_start.getTime() < d1_start.getTime() && d1_start.getTime() < d0_end.getTime()) {
+    if (d0_end.getTime() <= d1_end.getTime()) {
+      timeDiff = Math.abs(d0_end.getTime() - d1_start.getTime());
+      days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    } else if (d0_end.getTime() > d1_end.getTime()) {
+      timeDiff = Math.abs(d1_end.getTime() - d1_start.getTime());
+      days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    };
+  } else {
+    days = 0;
+  };
+
+  return days;
+}
+
 
   function slLoadItems() {
     $.ajax({
@@ -474,7 +501,9 @@ ko.bindingHandlers.selectAndFocus = {
 	}
 };
 
-// Custom binding for a modal bootstrap
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Custom binding for a modal bootstrap dialogs
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ko.bindingHandlers['modal'] = {
   init: function(element, valueAccessor, allBindingsAccessor) {
@@ -500,12 +529,18 @@ ko.bindingHandlers['modal'] = {
 };
 
 
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// AJAX functions
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 function saveInventoryItem(newValue) {
-  // avoid sending ajax call when values are changed in the model window by
+  // TODO: avoid sending ajax call when values are changed in the modal window by
   // validating if the id exists
 
   var cp_plan_date_start = new Date(this.cp_plan_date_start())
   var cp_plan_date_end = new Date(this.cp_plan_date_end())
+  var op_plan_date_start = new Date(this.op_plan_date_start())
+  var op_plan_date_end = new Date(this.op_plan_date_end())
 
   var object = {
           'cp_day_in_month': this.cp_day_in_month(),
@@ -516,19 +551,20 @@ function saveInventoryItem(newValue) {
           'cp_plan_date_start': cp_plan_date_start.toJSON(),
           'cp_quantity': this.cp_quantity(),
           'cp_type': this.cp_type(),
-          'cp_weekday': this.cp_weekday(),
           'forecasts': {},
           'id': this.id(),
           'ignore_forecast': this.ignoreForecast(),
           'inventory': inv_id,
           'level': null,
           'material': this.material_id(),
+          'op_plan_date_end': op_plan_date_end.toJSON(),
+          'op_plan_date_start': op_plan_date_start.toJSON(),
+          'op_quantity': this.op_quantity(),
           'quantity_base': this.quantity_base(),
           'quantity_conversion_factor': this.quantity_conversion_factor(),
           'quantity_stock': this.quantity_stock(),
           're_order_level': this.re_order_level(),
           're_order_quantity': this.re_order_quantity(),
-          'status': null,
           'title': this.title(),
           'titleEN': null,
           'uom_base': this.uom_base(),
@@ -559,8 +595,8 @@ var invViewModel = function() {
   const default_forecast_days = 7;
   this.planForecastDays = ko.observable(default_forecast_days);
 
-  this.plan_date_start = ko.observable( new Date() );
-  this.plan_date_end = ko.computed( function() {
+  self.plan_date_start = ko.observable( new Date() );
+  self.plan_date_end = ko.computed( function() {
     var dateTo = new Date(self.plan_date_start()); //new Date();
     dateTo.setDate(dateTo.getDate() + parseInt(self.planForecastDays()));
     return dateTo;
@@ -574,6 +610,16 @@ var invViewModel = function() {
 	this.newInventoryItemTitle = ko.observable();
   this.newInventoryItemBaseUnit = ko.observable();
   this.newInventoryItemStockUnit = ko.observable();
+  self.showControls = ko.computed( function() {
+    console.log('title = ' + self.newInventoryItemTitle());
+    if (self.newInventoryItemTitle() === undefined) {
+      console.log('hide control');
+      return 'hide-control';
+    } else {
+      console.log('show control');
+      return 'show-control';
+    }
+  });
 
   this.cpTypes = ko.observableArray([
     {'id': 0, 'TextDE': 'nein'},
@@ -582,6 +628,16 @@ var invViewModel = function() {
     {'id': 3, 'TextDE': 'einmal pro Monat'},
     {'id': 4, 'TextDE': 'einmal im Jahr'}
   ]);
+
+  // Required for modal: The instance of the item currently being edited.
+  self.ItemBeingEdited = ko.observable();
+  self.ItemBeingEdited2 = ko.observable();
+  self.ItemBeingEdited3 = ko.observable();
+  self.ItemBeingEdited4 = ko.observable();
+
+
+  // Required for modal: Used to keep a reference back to the original user record being edited
+  self.OriginalItemInstance = ko.observable();
 
   this.ValidationErrors = ko.observableArray([]);
 
@@ -675,24 +731,38 @@ var invViewModel = function() {
 
   self.toogleStatus = function(data, event) {
     console.log('toggleStatus');
+    var statusText = '';
     switch (data.status()) {
       case 0:
         data.ignoreForecast(false);
         data.quantity_base(0);
         console.log('toggle case 0');
+        statusText = '0%';
         break;
       case 1:
-        data.quantity_base(data.plannedQuantity()/2);
+        if (data.quantity_base_user() < data.plannedQuantityTotal() && data.quantity_base_user() != 0 && data.quantity_base_user() != null) {
+          data.quantity_base(data.quantity_base_user());
+        } else {
+          data.quantity_base(data.plannedQuantityTotal()/2);
+        }
+        statusText = Math.round(data.quantity_base() / data.plannedQuantityTotal() * 100) + '%';
         console.log('toggle case 1');
         break;
       case 2:
-        data.quantity_base(data.plannedQuantity());
+        if (data.quantity_base_user() > data.plannedQuantityTotal()) {
+          data.quantity_base(data.quantity_base_user());
+        } else {
+          data.quantity_base(data.plannedQuantityTotal());
+        }
         console.log('toggle case 2');
+        statusText = Math.round(data.quantity_base() / data.plannedQuantityTotal() * 100) + '%';
         break;
       case 3:
         data.ignoreForecast(true);
         console.log('toggle case 3');
+        statusText = 'zZ';
     };
+    data.statusText(statusText);
 
   };
 
@@ -747,37 +817,6 @@ var invViewModel = function() {
     self.newInventoryItemTitle('');
   };
 
-  // edit an item
-	this.editItemOld = function (item) {
-		item.editing(true);
-		item.previousTitle = item.title();
-	}.bind(this);
-
-  // stop editing an item.  Remove the item, if it is now empty
-	this.saveEditing = function (item) {
-		item.editing(false);
-
-		var title = item.title();
-		var trimmedTitle = title.trim();
-
-		// Observable value changes are not triggered if they're consisting of whitespaces only
-		// Therefore we've to compare untrimmed version with a trimmed one to chech whether anything changed
-		// And if yes, we've to set the new value manually
-		if (title !== trimmedTitle) {
-			item.title(trimmedTitle);
-		}
-
-		if (!trimmedTitle) {
-			this.remove(item);
-		}
-	}.bind(this);
-
-	// cancel editing an item and revert to the previous content
-	this.cancelEditing = function (item) {
-		item.editing(false);
-		item.title(item.previousTitle);
-	}.bind(this);
-
   // Required for modal: Validate data
   self.ValidateInventoryItem = function(item) {
     if (!item) {
@@ -810,17 +849,59 @@ var invViewModel = function() {
     return self.ValidationErrors().length <= 0;
   };
 
-  // Required for modal: The instance of the item currently being edited.
-  self.ItemBeingEdited = ko.observable();
+  // Required for modal: Validate data
+  self.ValidateInventoryItem2 = function(item) {
+    if (!item) {
+      return false;
+    }
 
-  // Required for modal: Used to keep a reference back to the original user record being edited
-  self.OriginalItemInstance = ko.observable();
+    var currentItem = ko.utils.unwrapObservable(item);
+    var quantityBase = ko.utils.unwrapObservable(currentItem.quantity_base);
+    var quantityStock = ko.utils.unwrapObservable(currentItem.quantity_stock);
 
-  // Required for modal: add new item, TODO: combine with existing approach
-  self.AddNewItem = function() {
-    // Load up a new user instance to be edited
-    self.ItemBeingEdited(new InventoryItem());
-    self.OriginalItemInstance(undefined);
+    self.ValidationErrors.removeAll(); // Clear out any previous errors
+
+    if (quantityBase === null) {
+      self.ValidationErrors.push('Bestand wird benötigt.');
+    } else { // Just some arbitrary checks here...
+        if (quantityBase < 0) {
+          self.ValidationErrors.push('Bestand muß 0 oder größer sein.');
+        }
+    }
+
+    if (quantityStock === null) {
+      self.ValidationErrors.push('Lagerbestand wird benötigt.');
+    } else { // Just some arbitrary checks here...
+        if (quantityStock < 0) {
+          self.ValidationErrors.push('Lagerbestand muß 0 oder größer sein.');
+        }
+    }
+
+    return self.ValidationErrors().length <= 0;
+  };
+
+  // Required for modal: Validate data
+  self.ValidateInventoryItem4 = function(item) {
+    if (!item) {
+      return false;
+    }
+
+    var currentItem = ko.utils.unwrapObservable(item);
+    var op_plan_date_start = ko.utils.unwrapObservable(currentItem.op_plan_date_start);
+    var op_plan_date_end = ko.utils.unwrapObservable(currentItem.op_plan_date_end);
+    var op_quantity = ko.utils.unwrapObservable(currentItem.op_quantity);
+
+    self.ValidationErrors.removeAll(); // Clear out any previous errors
+
+    if (op_quantity === null) {
+      self.ValidationErrors.push('Bedarf muss 0 oder größer sein.');
+    } else { // Just some arbitrary checks here...
+        if (quantityBase < 0) {
+          self.ValidationErrors.push('Bedarf muss 0 oder größer sein.');
+        }
+    }
+
+    return self.ValidationErrors().length <= 0;
   };
 
   // Required for modal: Edit item in the modal window
@@ -845,6 +926,75 @@ var invViewModel = function() {
     self.ItemBeingEdited(new InventoryItem(data));
   };
 
+  // Required for modal: Edit item in the modal window
+  self.EditItem2 = function(item) {
+
+    self.OriginalItemInstance(item);
+
+    var data = {
+      'quantity_base': item.quantity_base(),
+      'quantity_stock': item.quantity_stock()
+    };
+
+    self.ItemBeingEdited2(new InventoryItem(data));
+  };
+
+  // Required for modal: Edit item in the modal window
+  self.EditItem4 = function(item) {
+
+    self.OriginalItemInstance(item);
+
+    var data = {
+      'op_plan_date_start': self.plan_date_start(),
+      'op_plan_date_end': '2028-06-03T22:00:00+00:00',
+      'op_quantity': item.op_quantity()
+    };
+
+    self.ItemBeingEdited4(new InventoryItem(data));
+  };
+
+  // Required for modal: Edit item in the modal window
+  // TODO: obsolete
+  self.EditItem3 = function(item) {
+
+    self.OriginalItemInstance(item);
+    var data = null;
+    // Open existing forecast element if exists
+    item.forecasts().forEach( function(element) {
+      if (element.type() == 2 && element.plan_date_end > self.plan_date_start()) {
+        console.log('Existing forecast found');
+        data = {
+          'forecasts': {
+            'id': element.id(),
+            'plan_date_start': element.plan_date_start(),
+            'plan_date_end': element.plan_date_end(),
+            'quantity': element.quantity(),
+            'quantity_uom': element.quantity_uom(),
+            'type': 2}
+        };
+      }
+    });
+
+
+    // if no forecast exists, create a new object template
+    if (data == null) {
+      console.log('Create new forecast in item ' + item.id());
+      data = {
+        'forecasts': [
+          {
+          'plan_date_start': self.plan_date_start(),
+          'plan_date_end': '2028-06-03T22:00:00+00:00',
+          'quantity': 0,
+          'quantity_uom': item.uom_base(),
+          'type': 2
+          }
+        ]
+      };
+    }
+
+    self.ItemBeingEdited3(new InventoryItem(data));
+  };
+
   // Save the changes back to the original instance in the collection.
   self.SaveItem = function() {
     var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited);
@@ -865,8 +1015,6 @@ var invViewModel = function() {
     var cp_plan_date_start = ko.utils.unwrapObservable(updatedItem.cp_plan_date_start);
     var cp_plan_date_end = ko.utils.unwrapObservable(updatedItem.cp_plan_date_end);
 
-    console.log('var re_order_quantity = ' + ko.utils.unwrapObservable(updatedItem.re_order_quantity));
-
     if (self.OriginalItemInstance() === undefined) {
       return false;
     } else {
@@ -882,12 +1030,102 @@ var invViewModel = function() {
       self.OriginalItemInstance().cp_plan_date_start(cp_plan_date_start);
       self.OriginalItemInstance().cp_plan_date_end(cp_plan_date_end);
 
-      console.log('self.OriginalItemInstance().re_order_quantity() = ' + self.OriginalItemInstance().re_order_quantity());
-
     }
 
     // Clear out any reference to a item being edited
     self.ItemBeingEdited(undefined);
+    self.OriginalItemInstance(undefined);
+  };
+
+  // Save the changes back to the original instance in the collection.
+  self.SaveItem2 = function() {
+    var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited2);
+    if (!self.ValidateInventoryItem2(updatedItem)) {
+      return false;
+    }
+    var quantity_base = ko.utils.unwrapObservable(updatedItem.quantity_base);
+    var quantity_stock = ko.utils.unwrapObservable(updatedItem.quantity_stock);
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      self.OriginalItemInstance().quantity_base(quantity_base);
+      self.OriginalItemInstance().quantity_stock(quantity_stock);
+      self.OriginalItemInstance().quantity_base_user(quantity_base);
+      self.OriginalItemInstance().quantity_stock_user(quantity_stock);
+    }
+    self.ItemBeingEdited2(undefined);
+    self.OriginalItemInstance(undefined);
+  };
+
+  // Save the changes back to the original instance in the collection.
+  self.SaveItem4 = function() {
+    var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited4);
+    if (!self.ValidateInventoryItem2(updatedItem)) {
+      return false;
+    }
+    var op_plan_date_start = ko.utils.unwrapObservable(updatedItem.op_plan_date_start);
+    var op_plan_date_end = ko.utils.unwrapObservable(updatedItem.op_plan_date_end);
+    var op_quantity = ko.utils.unwrapObservable(updatedItem.op_quantity);
+
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      self.OriginalItemInstance().op_plan_date_start(op_plan_date_start);
+      self.OriginalItemInstance().op_plan_date_end(op_plan_date_end);
+      self.OriginalItemInstance().op_quantity(op_quantity);
+    }
+    self.ItemBeingEdited4(undefined);
+    self.OriginalItemInstance(undefined);
+  };
+
+  // Save the changes back to the original instance in the collection.
+  // TODO: obsolete
+  self.SaveItem3 = function() {
+    var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited3);
+    if (!self.ValidateInventoryItem3(updatedItem)) {
+      return false;
+    }
+
+    var forecast_plan_date_start = undefined;
+    var forecast_plan_date_end = undefined;
+    var forecast_quantity = undefined;
+    var forecast_quantity_uom = undefined;
+
+    console.log('updatedItem.forecasts() = ' + updatedItem.forecasts());
+    updatedItem.forecasts().forEach( function(element) {
+      // Since there is anyways only one forecast item in the edited item no more
+      // logic is here required to determine the right one
+      console.log('element = ' + element.plan_date_start());
+      forecast_plan_date_start = ko.utils.unwrapObservable(element.plan_date_start());
+      forecast_plan_date_end = ko.utils.unwrapObservable(element.plan_date_end);
+      forecast_quantity = ko.utils.unwrapObservable(element.quantity);
+      forecast_quantity_uom = ko.utils.unwrapObservable(element.quantity_uom);
+    });
+
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      self.OriginalItemInstance().forecasts().forEach( function(element) {
+        if (element.type() == 2 && element.plan_date_end > self.plan_date_start()) {
+          element.quantity(forecast_quantity);
+          element.quantity_uom(forecast_quantity_uom);
+          self.ItemBeingEdited3(undefined);
+        }
+      });
+    }
+
+    if (typeof self.ItemBeingEdited3() != 'undefined') {
+      var data = {
+        'plan_date_start': forecast_plan_date_start,
+        'plan_date_end': forecast_plan_date_end,
+        'quantity': forecast_quantity,
+        'quantity_uom': forecast_quantity_uom,
+        'type': 2
+      }
+      self.OriginalItemInstance().forecasts().push( new MaterialForecast(data) )
+      self.ItemBeingEdited3(undefined);
+    }
+
     self.OriginalItemInstance(undefined);
   };
 
@@ -926,8 +1164,12 @@ var InventoryItem = function(data) {
   this.quantity_stock = ko.observable(data.quantity_stock);
   this.quantity_stock.subscribe(saveInventoryItem, this);
 
+  this.quantity_stock_user = ko.observable(data.quantity_stock_user);
+
   this.quantity_base = ko.observable(data.quantity_base);
   this.quantity_base.subscribe(saveInventoryItem, this);
+
+  this.quantity_base_user = ko.observable(data.quantity_base_user);
 
   this.quantity_conversion_factor = ko.observable(data.quantity_conversion_factor);
   this.quantity_conversion_factor.subscribe(saveInventoryItem, this);
@@ -953,6 +1195,15 @@ var InventoryItem = function(data) {
   this.cp_day_in_month = ko.observable(data.cp_day_in_month);
   this.cp_day_in_month.subscribe(saveInventoryItem, this);
 
+  this.op_quantity = ko.observable(data.op_quantity);
+  this.op_quantity.subscribe(saveInventoryItem, this);
+
+  this.op_plan_date_start = ko.observable(data.op_plan_date_start);
+  this.op_plan_date_start.subscribe(saveInventoryItem, this);
+
+  this.op_plan_date_end = ko.observable(data.op_plan_date_end);
+  this.op_plan_date_end.subscribe(saveInventoryItem, this);
+
   this.forecasts = ko.observableArray(ko.utils.arrayMap(data.forecasts, function(forecast) {
     return new MaterialForecast(forecast);
   }));
@@ -962,53 +1213,64 @@ var InventoryItem = function(data) {
     var d0_start = new Date(invVM.plan_date_start());
     var d0_end = new Date(invVM.plan_date_end());
     this.forecasts().forEach( function(element) {
-      var d1_start = new Date(element.plan_date_start());
-      var d1_end = new Date(element.plan_date_end());
-      var days = 0
-      var timeDiff = 0;
-      if (d0_start.getTime() >= d1_start.getTime() && d1_end.getTime() > d0_start.getTime()) {
-        if (d0_end.getTime() <= d1_end.getTime()) {
-          timeDiff = Math.abs(d0_end.getTime() - d0_start.getTime());
-          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        } else if (d0_end.getTime() > d1_end.getTime()) {
-          timeDiff = Math.abs(d1_end.getTime() - d0_start.getTime());
-          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        };
-      } else if (d0_start.getTime() < d1_start.getTime() && d1_start.getTime() < d0_end.getTime()) {
-        if (d0_end.getTime() <= d1_end.getTime()) {
-          timeDiff = Math.abs(d0_end.getTime() - d1_start.getTime());
-          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        } else if (d0_end.getTime() > d1_end.getTime()) {
-          timeDiff = Math.abs(d1_end.getTime() - d1_start.getTime());
-          days = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        };
-      } else {
-        days = 0;
-      };
-      totalPlannedQuantity += days * element.quantity_per_day();
+      if (element.type() == 0) {
+        var d1_start = new Date(element.plan_date_start());
+        var d1_end = new Date(element.plan_date_end());
+        var days = DaysOverlap(d0_start, d0_end, d1_start, d1_end);
+        totalPlannedQuantity += days * element.quantity_per_day();
+      }
     });
     return totalPlannedQuantity
   }, this);
 
-  this.status = ko.computed(function() {
-    if (this.plannedQuantity() == 0 || this.ignoreForecast()) {
-      return 0;
-    } else if (this.plannedQuantity() > 0 && this.quantity_base() == 0) {
-      return 1;
-    } else if (this.quantity_base() < this.plannedQuantity()) {
-      return 2;
-    } else if (this.quantity_base() >= this.plannedQuantity()) {
-      return 3;
-    }
+  this.plannedQuantityOther = ko.computed( function() {
+    var totalQuantity = 0;
+    this.forecasts().forEach( function(element) {
+      if (element.type() == 2) {
+        //TODO: decide if quantity or quantity per day should be used
+        totalQuantity += element.quantity();
+      }
+    });
+    return totalQuantity
   }, this);
 
-  this.statusText = ko.computed(function() {
-    switch (this.status()) {
-      case 0: return 'zZ';
-      case 1: return '0%';
-      case 2: return '50%';
-      case 3: return '100%';
-    };
+  this.plannedQuantityPeriodic = ko.computed( function() {
+    var totalPlannedQuantity = 0;
+    var d0_start = new Date(invVM.plan_date_start());
+    var d0_end = new Date(invVM.plan_date_end());
+    this.forecasts().forEach( function(element) {
+      if (element.type() == 1) {
+        var d1_start = new Date(element.plan_date_start());
+        var d1_end = new Date(element.plan_date_end());
+        var days = DaysOverlap(d0_start, d0_end, d1_start, d1_end);
+        totalPlannedQuantity += days * element.quantity_per_day();
+      }
+    });
+    return totalPlannedQuantity
+  }, this);
+
+  this.plannedQuantityTotal = ko.computed( function() {
+    var totalQuantity = 0;
+    totalQuantity = this.plannedQuantity() + this.plannedQuantityOther() + this.plannedQuantityPeriodic();
+    return totalQuantity
+  }, this);
+
+  this.statusText = ko.observable();
+
+  this.status = ko.computed(function() {
+    if (this.plannedQuantity() == 0 || this.ignoreForecast()) {
+      this.statusText('zZ');
+      return 0;
+    } else if (this.plannedQuantity() > 0 && this.quantity_base() == 0) {
+      this.statusText('0%');
+      return 1;
+    } else if (this.quantity_base() < this.plannedQuantity()) {
+      this.statusText(Math.round(this.quantity_base() / this.plannedQuantityTotal()*100) + '%');
+      return 2;
+    } else if (this.quantity_base() >= this.plannedQuantity()) {
+      this.statusText(Math.round(this.quantity_base() / this.plannedQuantityTotal()*100) + '%');
+      return 3;
+    }
   }, this);
 
   this.statusClass = ko.computed(function() {
@@ -1028,6 +1290,7 @@ var MaterialForecast = function(data) {
   this.plan_date_start = ko.observable(data.plan_date_start);
   this.plan_date_end = ko.observable(data.plan_date_end);
   this.quantity_per_day = ko.observable(data.quantity_per_day);
+  this.quantity = ko.observable(data.quantity);
   this.quantity_uom = ko.observable(data.quantity_uom);
 }
 

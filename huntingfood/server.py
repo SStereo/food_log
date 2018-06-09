@@ -445,7 +445,8 @@ def createFoodviaNDB(keyword,
             food = Material.query.filter_by(titleEN=i.get_name()).first()
             if not food:
                 food = Material(
-                    titleEN=name_truncated_80,
+                    ndb_title=name_truncated_80,
+                    titleEN=keyword,
                     title=keyword_local_language,
                     language_code=local_language_code,
                     uom_base_id=base_uom,
@@ -780,8 +781,6 @@ def api_v1_inventory(inventory_id):
         except ValidationError as err:
             return jsonify(err.messages), 422
 
-        print('errors = ' + str(errors))
-
         id = data['id']
         title = data['title']
         quantity_base = data['quantity_base']
@@ -790,7 +789,6 @@ def api_v1_inventory(inventory_id):
         uom_base = data['uom_base'].uom if data['uom_base'] else None
         uom_stock = data['uom_stock'].uom if data['uom_stock'] else None
         material_id = data['material'].id if data['material'] else None
-        status = data['status']
         re_order_level = data['re_order_level']
         re_order_quantity = data['re_order_quantity']
         ignore_forecast = data['ignore_forecast']
@@ -801,8 +799,11 @@ def api_v1_inventory(inventory_id):
         cp_plan_date_start = data['cp_plan_date_start']
         cp_plan_date_end = data['cp_plan_date_end']
         cp_period = data['cp_period']
-        cp_weekday = data['cp_weekday']
-        cp_day_in_month = data['cp_day_in_month']
+
+        # Other plan fields
+        op_plan_date_start = data['op_plan_date_start']
+        op_plan_date_end = data['op_plan_date_end']
+        op_quantity = data['op_quantity']
 
         # Validations
         if (not id):
@@ -833,8 +834,8 @@ def api_v1_inventory(inventory_id):
 
         # Step 1: Update inventory item
         cp_changed = False
+        op_changed = False
         inventory_item.title = title,
-        inventory_item.status = status,
         inventory_item.material_id = material_id,
         inventory_item.quantity_base = quantity_base,
         inventory_item.quantity_stock = quantity_stock,
@@ -850,17 +851,22 @@ def api_v1_inventory(inventory_id):
                 or (inventory_item.cp_quantity != cp_quantity) \
                 or (inventory_item.cp_plan_date_start != cp_plan_date_start) \
                 or (inventory_item.cp_period != cp_period) \
-                or (inventory_item.cp_weekday != cp_weekday) \
-                or (inventory_item.cp_day_in_month != cp_day_in_month) \
                 or (inventory_item.cp_plan_date_end != cp_plan_date_end):
             cp_changed = True
             inventory_item.cp_type = cp_type,
             inventory_item.cp_quantity = cp_quantity,
             inventory_item.cp_plan_date_start = cp_plan_date_start,
             inventory_item.cp_period = cp_period,
-            inventory_item.cp_weekday = cp_weekday,
-            inventory_item.cp_day_in_month = cp_day_in_month
             inventory_item.cp_plan_date_end = cp_plan_date_end
+
+        # Identify if op was changed
+        if (inventory_item.op_plan_date_start != op_plan_date_start) \
+                or (inventory_item.op_plan_date_end != op_plan_date_end) \
+                or (inventory_item.op_quantity != op_quantity):
+            op_changed = True
+            inventory_item.op_plan_date_start = op_plan_date_start,
+            inventory_item.op_plan_date_end = op_plan_date_end,
+            inventory_item.op_quantity = op_quantity,
         session.commit()
         logging.info('Inventory Item %s successfully updated' % inventory_item.id)
 
@@ -903,6 +909,30 @@ def api_v1_inventory(inventory_id):
                                 quantity_uom=material.uom_base_id)
                     session.add(new_forecast)
                     session.commit()
+
+        # Step 2.2: re-create material forecasts for other consumption
+        if (op_quantity is not None):
+            if (op_changed):
+                logging.info('Delete other forecast due to change ...')
+                forecasts = db.session.query(MaterialForecast).\
+                    filter(MaterialForecast.inventory_id == inventory_id).\
+                    filter(MaterialForecast.material_id == material_id).\
+                    filter(MaterialForecast.type == 2).\
+                    delete(synchronize_session=False)
+                session.commit()
+
+                logging.info('Create new forecast for other consumption ...')
+                new_forecast = MaterialForecast(
+                            inventory_id=login_session['default_inventory_id'],
+                            material_id=material_id,
+                            type=2,
+                            plan_date_start=op_plan_date_start,
+                            plan_date_end=op_plan_date_end,
+                            quantity=op_quantity,
+                            quantity_uom=uom_base)
+                session.add(new_forecast)
+                session.commit()
+
 
         inventory_items = InventoryItem.query.filter_by(
             id=inventory_item.id).all()
