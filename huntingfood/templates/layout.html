@@ -110,6 +110,16 @@
     <script type=text/javascript src="{{ url_for('static', filename='js/bootstrap.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='node_modules/bootstrap-datepicker/dist/js/bootstrap-datepicker.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='node_modules/moment/moment.js') }}"></script>
+    <!-- Globalization libraries
+    see: https://github.com/globalizejs/globalize#number-module -->
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/cldrjs/dist/cldr.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/cldrjs/dist/cldr/event.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/cldrjs/dist/cldr/supplemental.js') }}"></script>
+
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/globalize/dist/globalize.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('static', filename='node_modules/globalize/dist/globalize/number.js') }}"></script>
+
+
     <script type=text/javascript src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     <!-- Modification of fixed floating button to allow standard click event instead of opening the child items

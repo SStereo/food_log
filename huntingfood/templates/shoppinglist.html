@@ -310,9 +310,13 @@
   var url_api_users = "{{ url_for('api_v1_users') }}";
   var url_api_uom = "{{ url_for('api_v1_uom') }}";
   var url_api_materials = "{{ url_for('api_v1_materials') }}";
+  var url_cldr_numbers_de = "{{ url_for('static', filename='node_modules/cldr-data/main/de/numbers.json') }}";
+  var url_cldr_likely_subtags = "{{ url_for('static', filename='node_modules/cldr-data/supplemental/likelySubtags.json') }}";
+  var url_cldr_numberingSystems = "{{ url_for('static', filename='node_modules/cldr-data/supplemental/numberingSystems.json') }}";
   var dp_id = {{ diet_plan.id }};
   var inv_id = {{ inventory.id }};
   var csrf_token = "{{ csrf_token() }}";
+  var de
 </script>
 <script type=text/javascript src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
@@ -348,6 +352,39 @@
         invVM.loadInventoryItems();
       }
     })
+
+    // Initialize Globalize module with CDLR json files
+    // async: false,
+
+    $.ajax({
+      url: url_cldr_likely_subtags,
+      type: 'GET',
+      async: false,
+      success: function(data) {
+          Globalize.load(data);
+      }
+    });
+
+    $.ajax({
+      url: url_cldr_numbers_de,
+      type: 'GET',
+      async: false,
+      success: function(data) {
+          Globalize.load(data);
+      }
+    });
+
+    $.ajax({
+      url: url_cldr_numberingSystems,
+      type: 'GET',
+      async: false,
+      success: function(data) {
+          Globalize.load(data);
+
+      }
+    });
+
+    de = Globalize( "de" );
 
   })
 </script>

@@ -781,21 +781,24 @@ def api_v1_inventory(inventory_id):
         except ValidationError as err:
             return jsonify(err.messages), 422
 
+        # TODO: find a way to catch cases where field is not provided
+        # so the key is missing. This can happen when the ajax call on the
+        # client is asked to send a undefined variable and then omits the value
         id = data['id']
         title = data['title']
-        quantity_base = data['quantity_base']
-        quantity_stock = data['quantity_stock']
+        quantity_base = data['quantity_base'] if 'quantity_base' in data.keys() else None
+        quantity_stock = data['quantity_stock'] if 'quantity_stock' in data.keys() else None
         quantity_conversion_factor = data['quantity_conversion_factor']
         uom_base = data['uom_base'].uom if data['uom_base'] else None
         uom_stock = data['uom_stock'].uom if data['uom_stock'] else None
         material_id = data['material'].id if data['material'] else None
         re_order_level = data['re_order_level']
-        re_order_quantity = data['re_order_quantity']
+        re_order_quantity = data['re_order_quantity'] if 're_order_quantity' in data.keys() else None
         ignore_forecast = data['ignore_forecast']
 
         # consumption plan fields
         cp_type = data['cp_type']
-        cp_quantity = data['cp_quantity']
+        cp_quantity = data['cp_quantity'] if 'cp_quantity' in data.keys() else None
         cp_plan_date_start = data['cp_plan_date_start']
         cp_plan_date_end = data['cp_plan_date_end']
         cp_period = data['cp_period']
@@ -803,7 +806,7 @@ def api_v1_inventory(inventory_id):
         # Other plan fields
         op_plan_date_start = data['op_plan_date_start']
         op_plan_date_end = data['op_plan_date_end']
-        op_quantity = data['op_quantity']
+        op_quantity = data['op_quantity'] if 'op_quantity' in data.keys() else None
 
         # Validations
         if (not id):
@@ -911,6 +914,8 @@ def api_v1_inventory(inventory_id):
                     session.commit()
 
         # Step 2.2: re-create material forecasts for other consumption
+        # TODO: Should we delete all forecasts of type 2 because there could
+        # be many ones per date period?
         if (op_quantity is not None):
             if (op_changed):
                 logging.info('Delete other forecast due to change ...')
@@ -932,6 +937,14 @@ def api_v1_inventory(inventory_id):
                             quantity_uom=uom_base)
                 session.add(new_forecast)
                 session.commit()
+        elif (op_quantity is None):
+            logging.info('Delete forecast ...')
+            forecasts = db.session.query(MaterialForecast).\
+                filter(MaterialForecast.inventory_id == inventory_id).\
+                filter(MaterialForecast.material_id == material_id).\
+                filter(MaterialForecast.type == 2).\
+                delete(synchronize_session=False)
+            session.commit()
 
 
         inventory_items = InventoryItem.query.filter_by(
@@ -1206,6 +1219,7 @@ class Error(Exception):
     """Base class for exceptions in this module."""
     pass
 
+
 class NoRecordsError(Error):
     """Exception raised when an all() query does not return any results.
 
@@ -1216,7 +1230,6 @@ class NoRecordsError(Error):
 
     def __init__(self, message):
         self.message = message
-
 
 
 if __name__ == '__main__':

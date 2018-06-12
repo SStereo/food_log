@@ -383,14 +383,14 @@ class InventoryItem(db.Model):
     title = db.Column(db.String(160), nullable=True)
     uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)
-    quantity_stock = db.Column(db.Float, nullable=True)
+    quantity_stock = db.Column(db.Float, default=0, nullable=True)
     quantity_stock_user = db.Column(db.Float, nullable=True)
-    quantity_base = db.Column(db.Float, nullable=True)
+    quantity_base = db.Column(db.Float, default=0, nullable=True)
     quantity_base_user = db.Column(db.Float, nullable=True)  # save the quantity entered by the user to recover it from auto toggle setting
     quantity_conversion_factor = db.Column(db.Float, nullable=True)  # to calculate issue units from stock units
-    level = db.Column(db.Float, nullable=True)  # TODO: should be renamed to stock (on hand)
-    re_order_level = db.Column(db.Integer, nullable=True)
-    re_order_quantity = db.Column(db.Integer, nullable=True)
+    level = db.Column(db.Float, default=0, nullable=True)  # TODO: should be renamed to stock (on hand)
+    re_order_level = db.Column(db.Integer, default=0, nullable=True)
+    re_order_quantity = db.Column(db.Integer, default=0, nullable=True)
     ignore_forecast = db.Column(db.Boolean, unique=False, default=False)  # Any forecast is ignored so the status will calculate to 0: No Need
     # type:
     # 0 = no regular consumption
@@ -398,8 +398,8 @@ class InventoryItem(db.Model):
     # 2 = once a week
     # 3 = once a month
     # 4 = once a year
-    cp_type = db.Column(db.SmallInteger, nullable=False, default=0)
-    cp_quantity = db.Column(db.Float, nullable=True)
+    cp_type = db.Column(db.SmallInteger, default=0, nullable=False)
+    cp_quantity = db.Column(db.Float, default=0, nullable=True)
     cp_plan_date = db.Column(db.DateTime(timezone=True), nullable=True)  # TODO: obsolete
     cp_plan_date_start = db.Column(db.DateTime(timezone=True), nullable=True)
     cp_plan_date_end = db.Column(db.DateTime(timezone=True), nullable=True)
@@ -414,7 +414,7 @@ class InventoryItem(db.Model):
 
     op_plan_date_start = db.Column(db.DateTime(timezone=True), nullable=True)
     op_plan_date_end = db.Column(db.DateTime(timezone=True), nullable=True)
-    op_quantity = db.Column(db.Float, nullable=True)
+    op_quantity = db.Column(db.Float, default=0, nullable=True)
 
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -463,7 +463,7 @@ class ShoppingOrderItem(db.Model):
     title = db.Column(db.String(80), nullable=True)
     shopping_order_id = db.Column(db.Integer, db.ForeignKey('shopping_orders.id'))
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)
-    quantity = db.Column(db.Float, nullable=True)
+    quantity = db.Column(db.Float, default=0, nullable=True)
     quantity_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     in_basket = db.Column(db.Boolean, default = False)
     in_basket_time = db.Column(db.DateTime, nullable=True)
@@ -499,7 +499,7 @@ class DietPlanItem(db.Model):
     diet_plan_id = db.Column(db.Integer, db.ForeignKey('diet_plans.id'), nullable=False)
     meal_id = db.Column(db.Integer, db.ForeignKey('meals.id'), nullable=False)
     plan_date = db.Column(db.DateTime(timezone=True), nullable=False)
-    portions = db.Column(db.SmallInteger, nullable=True)
+    portions = db.Column(db.SmallInteger, default=0, nullable=True)
     consumed = db.Column(db.Boolean, nullable=True)
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)  # TODO: Allow individual food items to be placed in a dietplan, like an apple a day keeps the doctor away
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -543,7 +543,7 @@ class ConsumptionPlanItem(db.Model):
     # 0 = one time consumption
     # 1 = periodical consumption
     type = db.Column(db.SmallInteger, nullable=False)
-    quantity = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Float, default=0, nullable=False)
     plan_date = db.Column(db.DateTime(timezone=True), nullable=True)
     period = db.Column(db.SmallInteger, nullable=True)
     # null = non periodic type = 1
