@@ -14,7 +14,7 @@
     <!-- STATIC folder version -->
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='node_modules/bootstrap-datepicker/dist/css/bootstrap-datepicker3.css') }}" rel="stylesheet">
+    <link href="{{ url_for('node_static', filename='bootstrap-datepicker/dist/css/bootstrap-datepicker3.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/jquery-ui.min.css') }}" rel="stylesheet">
 
     <Style>
@@ -108,16 +108,16 @@
     <script type=text/javascript src="{{ url_for('static', filename='js/jquery-3.2.1.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/popper.js') }}"></script>
     <script type=text/javascript src="{{ url_for('static', filename='js/bootstrap.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/bootstrap-datepicker/dist/js/bootstrap-datepicker.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/moment/moment.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='bootstrap-datepicker/dist/js/bootstrap-datepicker.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='moment/moment.js') }}"></script>
     <!-- Globalization libraries
     see: https://github.com/globalizejs/globalize#number-module -->
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/cldrjs/dist/cldr.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/cldrjs/dist/cldr/event.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/cldrjs/dist/cldr/supplemental.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='cldrjs/dist/cldr.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='cldrjs/dist/cldr/event.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='cldrjs/dist/cldr/supplemental.js') }}"></script>
 
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/globalize/dist/globalize.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='node_modules/globalize/dist/globalize/number.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='globalize/dist/globalize.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='globalize/dist/globalize/number.js') }}"></script>
 
 
     <script type=text/javascript src="{{ url_for('static', filename='js/main.js') }}"></script>

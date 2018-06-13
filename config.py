@@ -38,3 +38,4 @@ class Config(object):
     NDB_KEY = os.environ.get('NDB_KEY')
     # Data settings
     DATA_PORTIONS = [1, 2, 3, 4, 5, 6]
+    CUSTOM_STATIC_NODE_PATH = '../node_modules'

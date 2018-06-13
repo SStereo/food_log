@@ -126,6 +126,12 @@ def map():
         g_api_key=app.config['GOOGLE_API_KEY'])
 
 
+# Custom static folder for node modules
+@app.route('/node_modules/<path:filename>')
+def node_static(filename):
+    return send_from_directory(app.config['CUSTOM_STATIC_NODE_PATH'], filename)
+
+
 # Custom Static folders
 @app.route('/css/<path:filename>')
 def css_static(filename):
