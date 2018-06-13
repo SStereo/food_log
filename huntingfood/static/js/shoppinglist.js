@@ -534,8 +534,13 @@ ko.bindingHandlers['modal'] = {
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 function saveInventoryItem(newValue) {
-  // TODO: avoid sending ajax call when values are changed in the modal window by
-  // validating if the id exists
+
+  var currentItem = this;
+
+
+  console.log('this.title() = ' + this.title());
+  console.log('currentItem.title() = ' + currentItem.title());
+
   if (this.suspend_backend_update()) {
     console.log('saveInventoryItem: suspended');
     return false;
@@ -629,6 +634,19 @@ function saveInventoryItem(newValue) {
       data: JSON.stringify(object),
       success: function(response) {
         //TODO: undo changes in case of failure
+
+        var parsed = response['inventory_items'];
+
+        parsed.forEach( function(item) {
+
+          // TODO: Find a way to update the existing observable
+          //currentItem.forecasts(item);
+
+          //currentItem = new InventoryItem(item);
+          //currentItem.title('Zitrone2');
+        });
+
+        //currentItem.title('Zitrone2');
         console.log('saveInventoryItem: success');
       }
     });
