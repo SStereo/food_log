@@ -143,12 +143,12 @@
             <tbody data-bind="foreach: filteredInventoryItems">
               <tr class="inv-list" data-bind="css: statusClass">
                 <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
-                <td class="px-1 inv-list-title" data-bind="text: title() + ' (' + uom_base() + ')'"></td>
-                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: quantity_base(), click: $root.EditItem2"></button></td>
-                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityOther(), click: $root.EditItem4"></button></td>
-                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityPeriodic(), click: $root.EditItem"></button></td>
-                <td class="px-1" data-bind="text: plannedQuantity()"></td>
-                <td class="px-1" data-bind="text: plannedQuantityTotal()"></td>
+                <td class="px-1"><button class="inv-btn-title btn btn-secondary px-1" data-bind="text: title() + ' (' + uom_base() + ')', click: $root.EditItem3"></button></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: quantity_base_formatted(), click: $root.EditItem2"></button></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityOther_formatted(), click: $root.EditItem4"></button></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityPeriodic_formatted(), click: $root.EditItem"></button></td>
+                <td class="px-1" data-bind="text: plannedQuantity_formatted()"></td>
+                <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
               </tr>
             </tbody>
           </table>
@@ -160,20 +160,10 @@
             <div class="modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h3>Item Details</h3>
+                  <h3>Regelmässiger Bedarf</h3>
                   <a class="close" data-dismiss="modal">×</a>
                 </div>
                 <div class="modal-body">
-                  <div class="form-group">
-                    <label for="TitleInput">Bezeichnung</label>
-                    <input type="text" class="form-control" id="TitleInput" placeholder="title of item .."
-                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().title">
-                  </div>
-                  <div class="form-group">
-                    <label for="QuantityBaseInput">Wieviele Einheiten sind noch da?</label>
-                    <input type="text" class="form-control" id="QuantityBaseInput" placeholder="0"
-                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().quantity_base">
-                  </div>
                   <div class="form-group">
                     <label for="cpTypeInput">Zeitraum für regelmässiger Verbrauch?</label>
                     <select class="custom-select" data-bind="options: $root.cpTypes, optionsText: 'TextDE', optionsValue: 'id', value: ItemBeingEdited() && ItemBeingEdited().cp_type"></select>
@@ -181,12 +171,7 @@
                   <div class="form-group">
                     <label for="cpQuantityInput">Anzahl Einheiten pro Zeitraum?</label>
                     <input type="text" class="form-control" id="cpQuantityInput"
-                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_quantity">
-                  </div>
-                  <div class="form-group">
-                    <label for="cpPlanDateStartInput">Ab wann?</label>
-                    <input type="text" class="form-control datepicker" id="cpPlanDateStartInput"
-                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_plan_date_start">
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_quantity_formatted">
                   </div>
                   <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
                   <div class="alert alert-danger" style="margin: 20px 0 0">
@@ -220,12 +205,63 @@
                   <div class="form-group">
                     <label for="QuantityBaseInput">Bestand (Lagereinheit)</label>
                     <input type="text" class="form-control" id="QuantityStockInput" placeholder="0"
-                           data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_stock">
+                           data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_stock_formatted">
                   </div>
                   <div class="form-group">
                     <label for="QuantityBaseInput">Bestand (Basiseinheit)</label>
                     <input type="text" class="form-control" id="QuantityBaseInput" placeholder="0"
-                           data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_base">
+                           data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_base_formatted">
+                  </div>
+
+                  <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
+                  <div class="alert alert-danger" style="margin: 20px 0 0">
+                    Please correct the following errors:
+                    <ul data-bind="foreach: { data: ValidationErrors, as: 'errorMessage' }">
+                      <li data-bind="text: errorMessage"></li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <!-- Modal view END -->
+
+        <!-- Modal view START -->
+        <div data-bind="modal: ItemBeingEdited3" class="fade" role="dialog" tabindex="-1">
+          <form data-bind="submit: $root.SaveItem3">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h3>Item Details</h3>
+                  <a class="close" data-dismiss="modal">×</a>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label for="TitleInput">Bezeichnung</label>
+                    <input type="text" class="form-control" id="TitleInput" placeholder="title of item .."
+                           data-bind="textInput: ItemBeingEdited3() && ItemBeingEdited3().title">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
+                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: ItemBeingEdited3() && ItemBeingEdited3().uom_stock"></select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="CFactorInput">Wieviel Verbrauchseinheiten sind in einer Einkaufseinheit?</label>
+                    <input type="text" class="form-control" id="CFactorInput" placeholder="title of item .."
+                           data-bind="textInput: ItemBeingEdited3() && ItemBeingEdited3().quantity_conversion_factor_formatted">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
+                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: ItemBeingEdited3() && ItemBeingEdited3().uom_base"></select>
                   </div>
 
                   <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
@@ -261,7 +297,7 @@
                   <div class="form-group">
                     <label for="OPQuantityInput">Bedarf (Basiseinheit)</label>
                     <input type="text" class="form-control" id="OPQuantityInput" placeholder="0"
-                           data-bind="textInput: ItemBeingEdited4() && ItemBeingEdited4().op_quantity">
+                           data-bind="textInput: ItemBeingEdited4() && ItemBeingEdited4().op_quantity_formatted">
                   </div>
                   <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
                   <div class="alert alert-danger" style="margin: 20px 0 0">
@@ -316,7 +352,7 @@
   var dp_id = {{ diet_plan.id }};
   var inv_id = {{ inventory.id }};
   var csrf_token = "{{ csrf_token() }}";
-  var de
+  var localSetting
 </script>
 <script type=text/javascript src="{{ url_for('static', filename='js/knockout-3.2.0.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
@@ -384,7 +420,7 @@
       }
     });
 
-    de = Globalize( "de" );
+    localSetting = Globalize( "de" );
 
   })
 </script>

@@ -292,6 +292,10 @@ tr.on-stock {
   width: 40px;
 }
 
+.inv-btn-title {
+  width: 170px;
+}
+
 td {
   padding: 0px;
 }

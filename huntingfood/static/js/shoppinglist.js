@@ -537,61 +537,15 @@ function saveInventoryItem(newValue) {
 
   var currentItem = this;
 
-
-  console.log('this.title() = ' + this.title());
-  console.log('currentItem.title() = ' + currentItem.title());
-
   if (this.suspend_backend_update()) {
     console.log('saveInventoryItem: suspended');
     return false;
   }
 
-  var parser;
-  Globalize.locale( "de" );
-  parser = Globalize.numberParser();
-
-  console.log('this.cp_quantity() = ' + this.cp_quantity());
   var cp_plan_date_start = new Date(this.cp_plan_date_start());
   var cp_plan_date_end = new Date(this.cp_plan_date_end());
   var op_plan_date_start = new Date(this.op_plan_date_start());
   var op_plan_date_end = new Date(this.op_plan_date_end());
-
-  // Parsing numbers based on local settings
-  // TODO: Is there not a simplier way to handle number fields?
-  if (this.quantity_base() != null && typeof this.quantity_base() === 'string') {
-    var quantity_base = parser(this.quantity_base());
-    console.log('Parsed number quantity_base = ' + quantity_base);
-  } else {
-    var quantity_base = this.quantity_base();
-  }
-
-  if (this.quantity_stock() != null && typeof this.quantity_stock() === 'string') {
-    var quantity_stock = parser(this.quantity_stock());
-    console.log('Parsed number quantity_stock = ' + quantity_stock);
-  } else {
-    var quantity_stock = this.quantity_stock();
-  }
-
-  if (this.cp_quantity() != null && typeof this.cp_quantity() === 'string') {
-    var cp_quantity = parser(this.cp_quantity());
-    console.log('Parsed number cp_quantity = ' + cp_quantity);
-  } else {
-    var cp_quantity = this.cp_quantity();
-  }
-
-  if (this.op_quantity() != null && typeof this.op_quantity() === 'string') {
-    var op_quantity = parser(this.op_quantity());
-    console.log('Parsed number op_quantity = ' + op_quantity);
-  } else {
-    var op_quantity = this.op_quantity();
-  }
-
-  if (this.re_order_quantity() != null && typeof this.re_order_quantity() === 'string') {
-    var re_order_quantity = parser(this.re_order_quantity());
-    console.log('Parsed number re_order_quantity = ' + re_order_quantity);
-  } else {
-    var re_order_quantity = this.re_order_quantity();
-  }
 
   var object = {
           'cp_day_in_month': this.cp_day_in_month(),
@@ -600,7 +554,7 @@ function saveInventoryItem(newValue) {
           'cp_plan_date': null,
           'cp_plan_date_end': cp_plan_date_end.toJSON(),
           'cp_plan_date_start': cp_plan_date_start.toJSON(),
-          'cp_quantity': cp_quantity,
+          'cp_quantity': this.cp_quantity(),
           'cp_type': this.cp_type(),
           'forecasts': {},
           'id': this.id(),
@@ -610,12 +564,12 @@ function saveInventoryItem(newValue) {
           'material': this.material_id(),
           'op_plan_date_end': op_plan_date_end.toJSON(),
           'op_plan_date_start': op_plan_date_start.toJSON(),
-          'op_quantity': op_quantity,
-          'quantity_base': quantity_base,
+          'op_quantity': this.op_quantity(),
+          'quantity_base': this.quantity_base(),
           'quantity_conversion_factor': this.quantity_conversion_factor(),
-          'quantity_stock': quantity_stock,
+          'quantity_stock': this.quantity_stock(),
           're_order_level': this.re_order_level(),
-          're_order_quantity': re_order_quantity,
+          're_order_quantity': this.re_order_quantity(),
           'title': this.title(),
           'titleEN': null,
           'uom_base': this.uom_base(),
@@ -635,18 +589,16 @@ function saveInventoryItem(newValue) {
       success: function(response) {
         //TODO: undo changes in case of failure
 
+        // Updates forecast from response JSON since changes are calculated
+        // on the backend
         var parsed = response['inventory_items'];
-
+        currentItem.forecasts.removeAll();
         parsed.forEach( function(item) {
-
-          // TODO: Find a way to update the existing observable
-          //currentItem.forecasts(item);
-
-          //currentItem = new InventoryItem(item);
-          //currentItem.title('Zitrone2');
+          currentItem.forecasts(ko.utils.arrayMap(item.forecasts, function(forecast) {
+            return new MaterialForecast(forecast);
+          }));
         });
 
-        //currentItem.title('Zitrone2');
         console.log('saveInventoryItem: success');
       }
     });
@@ -795,13 +747,11 @@ var invViewModel = function() {
   };
 
   self.toogleStatus = function(data, event) {
-    console.log('toggleStatus');
     var statusText = '';
     switch (data.status()) {
       case 0:
         data.ignoreForecast(false);
         data.quantity_base(0);
-        console.log('toggle case 0');
         statusText = '0%';
         break;
       case 1:
@@ -811,7 +761,6 @@ var invViewModel = function() {
           data.quantity_base(data.plannedQuantityTotal()/2);
         }
         statusText = Math.round(data.quantity_base() / data.plannedQuantityTotal() * 100) + '%';
-        console.log('toggle case 1');
         break;
       case 2:
         if (data.quantity_base_user() > data.plannedQuantityTotal()) {
@@ -819,12 +768,10 @@ var invViewModel = function() {
         } else {
           data.quantity_base(data.plannedQuantityTotal());
         }
-        console.log('toggle case 2');
         statusText = Math.round(data.quantity_base() / data.plannedQuantityTotal() * 100) + '%';
         break;
       case 3:
         data.ignoreForecast(true);
-        console.log('toggle case 3');
         statusText = 'zZ';
     };
     data.statusText(statusText);
@@ -895,21 +842,7 @@ var invViewModel = function() {
 
     self.ValidationErrors.removeAll(); // Clear out any previous errors
 
-    if (currentQuantityBase === null) {
-      self.ValidationErrors.push('Stock level is required.');
-    } else { // Just some arbitrary checks here...
-      if (Number(currentQuantityBase) == currentQuantityBase && currentQuantityBase % 1 === 0) { // is a whole number
-        if (currentQuantityBase < 0) {
-          self.ValidationErrors.push('The stock base quantity must be zero or greater.');
-        }
-      } else {
-        self.ValidationErrors.push('Please enter a valid whole number for the stock base quantity.');
-      }
-    }
-
-    if (!currentTitle) {
-      self.ValidationErrors.push('Please enter a title for the item');
-    }
+    // add checks
 
     return self.ValidationErrors().length <= 0;
   };
@@ -946,6 +879,36 @@ var invViewModel = function() {
   };
 
   // Required for modal: Validate data
+  self.ValidateInventoryItem3 = function(item) {
+    if (!item) {
+      return false;
+    }
+
+    var currentItem = ko.utils.unwrapObservable(item);
+    var title = ko.utils.unwrapObservable(currentItem.title);
+    var uom_base = ko.utils.unwrapObservable(currentItem.uom_base);
+    var uom_stock = ko.utils.unwrapObservable(currentItem.uom_stock);
+    var quantity_conversion_factor = ko.utils.unwrapObservable(currentItem.quantity_conversion_factor);
+
+    self.ValidationErrors.removeAll(); // Clear out any previous errors
+
+    if (!title) {
+      self.ValidationErrors.push('Please enter a title for the item');
+    }
+
+    if (quantity_conversion_factor === null) {
+      self.ValidationErrors.push('Missing conversion factor');
+    } else { // Just some arbitrary checks here...
+        if (uom_stock === null) {
+          self.ValidationErrors.push('Einkaufseinheit muss definiert werden.');
+        }
+    }
+
+    return self.ValidationErrors().length <= 0;
+  };
+
+
+  // Required for modal: Validate data
   self.ValidateInventoryItem4 = function(item) {
     if (!item) {
       return false;
@@ -954,11 +917,11 @@ var invViewModel = function() {
     var currentItem = ko.utils.unwrapObservable(item);
     var op_plan_date_start = ko.utils.unwrapObservable(currentItem.op_plan_date_start);
     var op_plan_date_end = ko.utils.unwrapObservable(currentItem.op_plan_date_end);
-    var op_quantity = ko.utils.unwrapObservable(currentItem.op_quantity);
+    var op_quantity_formatted = ko.utils.unwrapObservable(currentItem.op_quantity_formatted);
 
     self.ValidationErrors.removeAll(); // Clear out any previous errors
 
-    if (op_quantity === null) {
+    if (op_quantity_formatted === null) {
       self.ValidationErrors.push('Bedarf muss 0 oder größer sein.');
     } else { // Just some arbitrary checks here...
         if (quantityBase < 0) {
@@ -975,9 +938,6 @@ var invViewModel = function() {
     var now = new Date();
     var today = new Date(now.getFullYear(),now.getMonth(), now.getDate(), 0, 0, 0, 0); // returns current date in UTC
     var data = {
-      'title': item.title(),
-      'quantity_base': item.quantity_base(),
-      're_order_quantity': item.re_order_quantity(),
       'cp_type': item.cp_type(),
       'cp_quantity': item.cp_quantity(),
       'cp_period': item.cp_period(),
@@ -1003,6 +963,18 @@ var invViewModel = function() {
   };
 
   // Required for modal: Edit item in the modal window
+  self.EditItem3 = function(item) {
+    self.OriginalItemInstance(item);
+    var data = {
+      'title': item.title(),
+      'uom_stock': item.uom_stock(),
+      'uom_base': item.uom_base(),
+      'quantity_conversion_factor': item.quantity_conversion_factor()
+    };
+    self.ItemBeingEdited3(new InventoryItem(data));
+  };
+
+  // Required for modal: Edit item in the modal window
   self.EditItem4 = function(item) {
     self.OriginalItemInstance(item);
     var now = new Date();
@@ -1015,46 +987,6 @@ var invViewModel = function() {
     self.ItemBeingEdited4(new InventoryItem(data));
   };
 
-  // Required for modal: Edit item in the modal window
-  // TODO: obsolete
-  self.EditItem3 = function(item) {
-    self.OriginalItemInstance(item);
-    var data = null;
-    // Open existing forecast element if exists
-    item.forecasts().forEach( function(element) {
-      if (element.type() == 2 && element.plan_date_end > self.plan_date_start()) {
-        console.log('Existing forecast found');
-        data = {
-          'forecasts': {
-            'id': element.id(),
-            'plan_date_start': element.plan_date_start(),
-            'plan_date_end': element.plan_date_end(),
-            'quantity': element.quantity(),
-            'quantity_uom': element.quantity_uom(),
-            'type': 2}
-        };
-      }
-    });
-
-
-    // if no forecast exists, create a new object template
-    if (data == null) {
-      console.log('Create new forecast in item ' + item.id());
-      data = {
-        'forecasts': [
-          {
-          'plan_date_start': self.plan_date_start(),
-          'plan_date_end': '2028-06-03T22:00:00+00:00',
-          'quantity': 0,
-          'quantity_uom': item.uom_base(),
-          'type': 2
-          }
-        ]
-      };
-    }
-
-    self.ItemBeingEdited3(new InventoryItem(data));
-  };
 
   // Save the changes back to the original instance in the collection.
   self.SaveItem = function() {
@@ -1065,9 +997,6 @@ var invViewModel = function() {
       return false;
     }
 
-    var title = ko.utils.unwrapObservable(updatedItem.title);
-    var quantity_base = ko.utils.unwrapObservable(updatedItem.quantity_base);
-    var re_order_quantity = ko.utils.unwrapObservable(updatedItem.re_order_quantity);
     var cp_type = ko.utils.unwrapObservable(updatedItem.cp_type);
     var cp_quantity = ko.utils.unwrapObservable(updatedItem.cp_quantity);
     var cp_period = ko.utils.unwrapObservable(updatedItem.cp_period);
@@ -1081,9 +1010,6 @@ var invViewModel = function() {
     } else {
       // Updating an existing item
       self.OriginalItemInstance().suspend_backend_update(true);
-      self.OriginalItemInstance().title(title);
-      self.OriginalItemInstance().quantity_base(quantity_base);
-      self.OriginalItemInstance().re_order_quantity(re_order_quantity);
       self.OriginalItemInstance().cp_type(cp_type);
       self.OriginalItemInstance().cp_quantity(cp_quantity);
       self.OriginalItemInstance().cp_period(cp_period);
@@ -1122,6 +1048,30 @@ var invViewModel = function() {
   };
 
   // Save the changes back to the original instance in the collection.
+  self.SaveItem3 = function() {
+    var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited3);
+    if (!self.ValidateInventoryItem3(updatedItem)) {
+      return false;
+    }
+    var title = ko.utils.unwrapObservable(updatedItem.title);
+    var uom_base = ko.utils.unwrapObservable(updatedItem.uom_base);
+    var uom_stock = ko.utils.unwrapObservable(updatedItem.uom_stock);
+    var quantity_conversion_factor = ko.utils.unwrapObservable(updatedItem.quantity_conversion_factor);
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      self.OriginalItemInstance().suspend_backend_update(true);
+      self.OriginalItemInstance().title(title);
+      self.OriginalItemInstance().uom_base(uom_base);
+      self.OriginalItemInstance().uom_stock(uom_stock);
+      self.OriginalItemInstance().quantity_conversion_factor(quantity_conversion_factor);
+      self.OriginalItemInstance().suspend_backend_update(false);
+    }
+    self.ItemBeingEdited3(undefined);
+    self.OriginalItemInstance(undefined);
+  };
+
+  // Save the changes back to the original instance in the collection.
   self.SaveItem4 = function() {
     var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited4);
     if (!self.ValidateInventoryItem2(updatedItem)) {
@@ -1144,63 +1094,18 @@ var invViewModel = function() {
     self.OriginalItemInstance(undefined);
   };
 
-  // Save the changes back to the original instance in the collection.
-  // TODO: obsolete
-  self.SaveItem3 = function() {
-    var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited3);
-    if (!self.ValidateInventoryItem3(updatedItem)) {
-      return false;
-    }
-
-    var forecast_plan_date_start = undefined;
-    var forecast_plan_date_end = undefined;
-    var forecast_quantity = undefined;
-    var forecast_quantity_uom = undefined;
-
-    console.log('updatedItem.forecasts() = ' + updatedItem.forecasts());
-    updatedItem.forecasts().forEach( function(element) {
-      // Since there is anyways only one forecast item in the edited item no more
-      // logic is here required to determine the right one
-      console.log('element = ' + element.plan_date_start());
-      forecast_plan_date_start = ko.utils.unwrapObservable(element.plan_date_start());
-      forecast_plan_date_end = ko.utils.unwrapObservable(element.plan_date_end);
-      forecast_quantity = ko.utils.unwrapObservable(element.quantity);
-      forecast_quantity_uom = ko.utils.unwrapObservable(element.quantity_uom);
-    });
-
-    if (self.OriginalItemInstance() === undefined) {
-      return false;
-    } else {
-      self.OriginalItemInstance().forecasts().forEach( function(element) {
-        if (element.type() == 2 && element.plan_date_end > self.plan_date_start()) {
-          element.quantity(forecast_quantity);
-          element.quantity_uom(forecast_quantity_uom);
-          self.ItemBeingEdited3(undefined);
-        }
-      });
-    }
-
-    if (typeof self.ItemBeingEdited3() != 'undefined') {
-      var data = {
-        'plan_date_start': forecast_plan_date_start,
-        'plan_date_end': forecast_plan_date_end,
-        'quantity': forecast_quantity,
-        'quantity_uom': forecast_quantity_uom,
-        'type': 2
-      }
-      self.OriginalItemInstance().forecasts().push( new MaterialForecast(data) )
-      self.ItemBeingEdited3(undefined);
-    }
-
-    self.OriginalItemInstance(undefined);
-  };
-
   self.loadUnitsOfMeasure();
   self.loadInventoryItems();
 
 }
 
 var InventoryItem = function(data) {
+
+  var formatter;
+  var parser;
+  formatter = localSetting.numberFormatter();
+  parser = localSetting.numberParser();
+
   this.id = ko.observable(data.id);
   this.inventory_id = ko.observable(data.inventory_id);
 
@@ -1218,6 +1123,22 @@ var InventoryItem = function(data) {
 
   this.re_order_quantity = ko.observable(data.re_order_quantity);
   this.re_order_quantity.subscribe(saveInventoryItem, this);
+  this.re_order_quantity_formatted = ko.pureComputed({
+        read: function () {
+          if (this.re_order_quantity() != null && typeof this.re_order_quantity() === 'number') {
+            return formatter(this.re_order_quantity());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.re_order_quantity(value)
+              }
+            }
+        },
+        owner: this
+    });
 
   this.suspend_backend_update = ko.observable(false);
   this.suspend_backend_update.subscribe(saveInventoryItem, this);
@@ -1230,22 +1151,86 @@ var InventoryItem = function(data) {
 
   this.quantity_stock = ko.observable(data.quantity_stock);
   this.quantity_stock.subscribe(saveInventoryItem, this);
+  this.quantity_stock_formatted = ko.pureComputed({
+        read: function () {
+          if (this.quantity_stock() != null && typeof this.quantity_stock() === 'number') {
+            return formatter(this.quantity_stock());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.quantity_stock(value)
+              }
+            }
+        },
+        owner: this
+    });
 
   this.quantity_stock_user = ko.observable(data.quantity_stock_user);
 
   this.quantity_base = ko.observable(data.quantity_base);
   this.quantity_base.subscribe(saveInventoryItem, this);
+  this.quantity_base_formatted = ko.pureComputed({
+        read: function () {
+          if (this.quantity_base() != null && typeof this.quantity_base() === 'number') {
+            return formatter(this.quantity_base());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.quantity_base(value)
+              }
+            }
+        },
+        owner: this
+    });
 
   this.quantity_base_user = ko.observable(data.quantity_base_user);
 
   this.quantity_conversion_factor = ko.observable(data.quantity_conversion_factor);
   this.quantity_conversion_factor.subscribe(saveInventoryItem, this);
+  this.quantity_conversion_factor_formatted = ko.pureComputed({
+        read: function () {
+          if (this.quantity_conversion_factor() != null && typeof this.quantity_conversion_factor() === 'number') {
+            return formatter(this.quantity_conversion_factor());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.quantity_conversion_factor(value)
+              }
+            }
+        },
+        owner: this
+    });
 
   this.cp_type = ko.observable(data.cp_type);
   this.cp_type.subscribe(saveInventoryItem, this);
 
   this.cp_quantity = ko.observable(data.cp_quantity);
   this.cp_quantity.subscribe(saveInventoryItem, this);
+  this.cp_quantity_formatted = ko.pureComputed({
+        read: function () {
+          if (this.cp_quantity() != null && typeof this.cp_quantity() === 'number') {
+            return formatter(this.cp_quantity());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.cp_quantity(value)
+              }
+            }
+        },
+        owner: this
+    });
 
   this.cp_plan_date_start = ko.observable(data.cp_plan_date_start);
   this.cp_plan_date_start.subscribe(saveInventoryItem, this);
@@ -1264,6 +1249,22 @@ var InventoryItem = function(data) {
 
   this.op_quantity = ko.observable(data.op_quantity);
   this.op_quantity.subscribe(saveInventoryItem, this);
+  this.op_quantity_formatted = ko.pureComputed({
+        read: function () {
+          if (this.op_quantity() != null && typeof this.op_quantity() === 'number') {
+            return formatter(this.op_quantity());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.op_quantity(value)
+              }
+            }
+        },
+        owner: this
+    });
 
   this.op_plan_date_start = ko.observable(data.op_plan_date_start);
   this.op_plan_date_start.subscribe(saveInventoryItem, this);
@@ -1290,6 +1291,12 @@ var InventoryItem = function(data) {
     return totalPlannedQuantity
   }, this);
 
+  this.plannedQuantity_formatted = ko.pureComputed( function() {
+    if (this.plannedQuantity() != null && typeof this.plannedQuantity() === 'number') {
+      return formatter(this.plannedQuantity());
+    }
+  }, this);
+
   this.plannedQuantityOther = ko.computed( function() {
     var totalQuantity = 0;
     this.forecasts().forEach( function(element) {
@@ -1299,6 +1306,12 @@ var InventoryItem = function(data) {
       }
     });
     return totalQuantity
+  }, this);
+
+  this.plannedQuantityOther_formatted = ko.pureComputed( function() {
+    if (this.plannedQuantityOther() != null && typeof this.plannedQuantityOther() === 'number') {
+      return formatter(this.plannedQuantityOther());
+    }
   }, this);
 
   this.plannedQuantityPeriodic = ko.computed( function() {
@@ -1316,10 +1329,22 @@ var InventoryItem = function(data) {
     return totalPlannedQuantity
   }, this);
 
+  this.plannedQuantityPeriodic_formatted = ko.pureComputed( function() {
+    if (this.plannedQuantityPeriodic() != null && typeof this.plannedQuantityPeriodic() === 'number') {
+      return formatter(this.plannedQuantityPeriodic());
+    }
+  }, this);
+
   this.plannedQuantityTotal = ko.computed( function() {
     var totalQuantity = 0;
     totalQuantity = this.plannedQuantity() + this.plannedQuantityOther() + this.plannedQuantityPeriodic();
     return totalQuantity
+  }, this);
+
+  this.plannedQuantityTotal_formatted = ko.pureComputed( function() {
+    if (this.plannedQuantityTotal() != null && typeof this.plannedQuantityTotal() === 'number') {
+      return formatter(this.plannedQuantityTotal());
+    }
   }, this);
 
   this.statusText = ko.observable();
