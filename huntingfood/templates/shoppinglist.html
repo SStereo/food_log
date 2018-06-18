@@ -90,6 +90,8 @@
     </div>
 
 
+    <!-- Start Binding -->
+    <!-- <div id="inventoryshopping"> -->
     <!-- Tab 2: Inventory -->
     <div class="tab-pane fade" id="inventory" role="tabpanel" aria-labelledby="inventory-tab">
       <div class="container">
@@ -323,15 +325,63 @@
 
     <div class="tab-pane fade" id="shoppinglist" role="tabpanel" aria-labelledby="shoppinglist-tab">
       <div class="container">
-        <div id="sl-messages"></div>
-        <div class="sl-form">
-          <input type="text" id="sl-new-item" class="form-control sl-item" placeholder="neuer Eintrag ...">
-          <button onclick="slSaveData()" class="btn btn-primary sl-btn"><i class="fa fa-plus mr-1"></i></button>
-        </div>
-        <div id="sl-items">
-        </div>
+        <header>
+          <!-- Date Picker Start -->
+          <div class="input-group">
+            <div class="form-group">
+              <label for="formControlRange" data-bind="text: planForecastDays() + ' days'"></label>
+              <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: planForecastDays">
+            </div>
+            <!-- <input type="text" class="datepicker" data-bind="value: plan_date_start"> -->
+            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">
+
+            </p>
+          </div>
+          <!-- Date Picker End -->
+          <form data-bind="submit: addInventoryItem">
+
+            <!-- jqAutoComplete Knockout plugin START -->
+            <input class="text-center new-inv"
+                   data-bind="jqAuto: { value: newInventoryItemTitle, source: $root.loadMaterials, inputProp: 'title', labelProp: 'title', valueProp: 'id' }, valueUpdate: 'afterkeydown', enterKey: addInventoryItem"
+                   placeholder="Neue Zutat/Gegenstand" autofocus />
+            <!-- jqAutoComplete Knockout plugin END -->
+
+            <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
+            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
+
+            <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
+            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
+
+            <button type="submit" class="btn btn-primary">Hinzufügen</button>
+
+          </form>
+
+
+        </header>
+
+        <section data-bind="visible: inventoryItems().length">
+          <table class="table px-0">
+            <thead>
+              <tr>
+                <th scope="Status"><i class="fas fa-question-circle"></i></th>
+                <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
+                <th scope="Bedarf"><i class="fas fa-utensils"></i></th>
+
+              </tr>
+            </thead>
+            <tbody data-bind="foreach: filteredShoppingItems">
+              <tr class="inv-list" data-bind="css: statusClass">
+                <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
+                <td class="px-1"><button class="inv-btn-title btn btn-secondary px-1" data-bind="text: title() + ' (' + uom_base() + ')', click: $root.EditItem3"></button></td>
+                <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
       </div>
     </div>
+  <!-- </div> -->
+  <!-- End Binding -->
   </div>
 </main>
 {% endblock %}
@@ -343,6 +393,7 @@
   var url_api_meals = "{{ url_for('api_v1_meals') }}";
   var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
   var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
+  var url_api_shopping_order = "{{ url_for('api_v1_shopping_order') }}";
   var url_api_users = "{{ url_for('api_v1_users') }}";
   var url_api_uom = "{{ url_for('api_v1_uom') }}";
   var url_api_materials = "{{ url_for('api_v1_materials') }}";
@@ -361,8 +412,6 @@
 <script type=text/javascript src="{{ url_for('node_static', filename='director/build/director.js') }}"></script>
 <script>
   $(function () {
-
-    slLoadItems();
 
     var today = new Date();
     $('.datepicker').datepicker({

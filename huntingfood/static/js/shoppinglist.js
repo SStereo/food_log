@@ -41,90 +41,6 @@ var DaysOverlap = function(d0_start, d0_end, d1_start, d1_end) {
 }
 
 
-  function slLoadItems() {
-    $.ajax({
-      type: 'GET',
-      url: url_sl_items,
-      dataType: 'json',
-      success: slCreateElements // name of function that processes the response
-    });
-  }
-
-
-  function slSaveData() {
-    var messageDiv = $('#sl-messages');
-    var inputData = $('#sl-new-item').val();
-
-    if (inputData === '') {
-      alert('You must write something!');
-    } else {
-
-      $.ajax({
-        type: 'POST',
-        url: url_sl_items,
-        dataType: 'json',
-        data: {'title' : inputData},
-        success: slCreateElements // name of function that processes the response
-      });
-    }
-  }
-
-
-  function slDeleteItem() {
-    var itemrow = this.parentElement;
-    elId = itemrow.id;
-
-    $.ajax({
-      type: 'DELETE',
-      url: url_sl_items,
-      dataType: 'text',
-      data: {'id' : elId},
-      success: function() {
-        itemrow.style.display = 'none';
-      }
-    });
-  }
-
-
-  function slCreateElements(response) {
-    var items = document.getElementById('sl-items');
-    var n;
-    var itemValue = '';
-    var itemId = '';
-    n = response['inventory_items'].length;
-
-    for (var i = 0; i < n; i++) {
-      itemValue = response['inventory_items'][i]['title'];
-      itemId = response['inventory_items'][i]['id'];
-      // Create new Item HTML
-      var itemrow = document.createElement('DIV');
-      itemrow.className = 'sl-form';
-      itemrow.id = itemId;
-
-      var elInput = document.createElement('INPUT');
-      elInput.value = itemValue;
-      elInput.type = 'text'
-      elInput.className = 'form-control sl-item';
-
-      var elButton = document.createElement('BUTTON');
-      elButton.className = 'btn btn-default sl-btn';
-      elButton.onclick = slDeleteItem;
-
-      var elIcon = document.createElement('i');
-      elIcon.className = 'fa fa-trash mr-1';
-
-      elButton.appendChild(elIcon);
-      itemrow.appendChild(elInput);
-      itemrow.appendChild(elButton);
-      items.appendChild(itemrow);
-    };
-
-    // TODO: wrong place should not apply for page load
-    document.getElementById('sl-new-item').value = '';
-
-  }
-
-
   // KNOCKOUT FRAMEWORK IMPLEMENTATION
 
   // VIEW MODEL
@@ -300,6 +216,7 @@ var dpViewModel = function() {
     $.ajax({
       type: 'POST',
       url: url_api_dietplan,
+      contentType: 'application/json; charset=utf-8',
       headers: {
         'X-CSRFTOKEN' : csrf_token
       },
@@ -612,6 +529,10 @@ var invViewModel = function() {
   const default_plan_date_end = '2028-06-03T22:00:00+00:00'
   this.planForecastDays = ko.observable(default_forecast_days);
 
+  // Shopping Order
+  self.shoppingOrders = ko.observableArray([]);
+  self.currentShoppingOrder = ko.observable();
+
   self.plan_date_start = ko.observable( new Date() );
   self.plan_date_end = ko.computed( function() {
     var dateTo = new Date(self.plan_date_start()); //new Date();
@@ -658,10 +579,11 @@ var invViewModel = function() {
 
   this.ValidationErrors = ko.observableArray([]);
 
-  this.filterStatus = ko.observable('all');
+  this.filterInventory = ko.observable('all');
+  this.filterShoppingList = ko.observable('1 || 2');
 
   this.filteredInventoryItems = ko.computed(function () {
-			switch (self.filterStatus()) {
+			switch (self.filterInventory()) {
 			case '0':
 				return self.inventoryItems().filter(function (item) {
 					return item.status() == 0;
@@ -683,8 +605,35 @@ var invViewModel = function() {
 			}
 		});
 
+    this.filteredShoppingItems = ko.computed(function () {
+  			switch (self.filterShoppingList()) {
+  			case '0':
+  				return self.inventoryItems().filter(function (item) {
+  					return item.status() == 0;
+  				});
+  			case '1':
+  				return self.inventoryItems().filter(function (item) {
+  					return item.status() == 1;
+  				});
+        case '2':
+  				return self.inventoryItems().filter(function (item) {
+  					return item.status() == 2;
+  				});
+        case '3':
+          return self.inventoryItems().filter(function (item) {
+            return item.status() == 3;
+          });
+        case '1 || 2':
+          return self.inventoryItems().filter(function (item) {
+            return (item.status() == 1 || item.status() == 2);
+          });
+  			default:
+  				return self.inventoryItems();
+  			}
+  		});
 
-  // Loads inventory items from Rest API
+
+  // Loads unit of measures from Rest API
   self.loadUnitsOfMeasure = function() {
     self.unitsOfMeasure.removeAll();
     console.log('Loading units of measures ...');
@@ -709,6 +658,71 @@ var invViewModel = function() {
         query: searchTerm
       },
     }).done(callback);
+  };
+
+  // Loads all shopping orders and creates a new one if all are closed
+  self.GetShoppingOrder = function() {
+
+    console.log('Get open shopping order ...');
+    $.ajax({
+      type: 'GET',
+      url: url_api_shopping_order,
+      dataType: 'json',
+      data: {
+        'status' : 1
+      },
+      success: function(response) {
+        var parsed = response['shopping_orders']
+        parsed.forEach( function(item) {
+          self.shoppingOrders.push( new ShoppingOrder(item) );
+        });
+      },
+      statusCode: {
+        404: function(response) {
+          self.addShoppingOrder({type: 1});
+        }
+      },
+      error: function(response) {
+        // TODO: Handle error gracefully
+      }
+    });
+  };
+
+  self.addShoppingOrder = function(data) {
+    console.log('addShoppingOrder: type = ' + data.type + ')');
+
+    var plan_date_start = new Date(self.plan_date_start());
+    var plan_date_end = new Date(self.plan_date_end());
+
+    var object = {
+      'type': data.type,
+      'status': 1,
+      'plan_date_start': plan_date_start.toJSON(),
+      'plan_date_end': plan_date_end.toJSON(),
+      'closed': false,
+      'place_id': '',
+      'receipt_photo': ''
+    }
+
+    $.ajax({
+      type: 'POST',
+      url: url_api_shopping_order,
+      contentType: 'application/json; charset=utf-8',
+      headers: {
+        'X-CSRFTOKEN' : csrf_token
+      },
+      dataType: 'json',
+      data: JSON.stringify(object),
+      success: function(response) {
+
+        // turn the json string into a javascript object
+        var parsed = response['shopping_order']
+
+        parsed.forEach( function(item) {
+          self.shoppingOrders.push( new ShoppingOrder(item) );
+        });
+      }
+    });
   };
 
   // Loads inventory items from Rest API
@@ -1095,6 +1109,7 @@ var invViewModel = function() {
   };
 
   self.loadUnitsOfMeasure();
+  self.GetShoppingOrder();
   self.loadInventoryItems();
 
 }
@@ -1394,8 +1409,31 @@ var UnitOfMeasure = function(data) {
   this.shortDE = ko.observable(data.shortDE);
 }
 
+var ShoppingOrder = function(data) {
+  this.id = ko.observable(data.id);
+  this.plan_date_start = ko.observable(data.plan_date_start);
+  this.plan_date_end = ko.observable(data.plan_date_end);
+  this.status = ko.observable(data.status);
+  this.shopping_order_items = ko.observableArray(ko.utils.arrayMap(data.items, function(forecast) {
+    return new ShoppingOrderItem(forecast);
+  }));
+}
+
+var ShoppingOrderItem = function(data) {
+  this.id = ko.observable(data.id);
+  this.inventory_id = ko.observable(data.inventory_id);
+  this.material_id = ko.observable(data.material_id);
+  this.quantity_required = ko.observable(data.quantity_required);
+  this.quantity_purchased = ko.observable(data.quantity_purchased);
+  this.in_basket = ko.observable(data.in_basket);
+  this.in_basket_time = ko.observable(data.in_basket_time);
+  this.in_basket_geo_lon = ko.observable(data.in_basket_geo_lon);
+  this.in_basket_geo_lat = ko.observable(data.in_basket_geo_lat);
+}
+
 var dpVM = new dpViewModel();
 ko.applyBindings(dpVM, document.getElementById('diet_plan'));
 
 var invVM = new invViewModel();
 ko.applyBindings(invVM, document.getElementById('inventory'));
+ko.applyBindings(invVM, document.getElementById('shoppinglist'));

@@ -33,7 +33,6 @@ class User(db.Model):
     language = db.Column(db.String(6), nullable=False)
     default_diet_plan_id = db.Column(db.Integer, db.ForeignKey('diet_plans.id'), nullable=True, unique=True)  # TODO: fix this when multiple users share one diet_plan and inventory
     default_inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'), nullable=True, unique=True)
-    default_consumption_plan_id = db.Column(db.Integer, db.ForeignKey('consumption_plans.id'), nullable=True, unique=True)
     default_portions = db.Column(db.SmallInteger, nullable=True)
     street = db.Column(db.String(120), nullable=True)
     city = db.Column(db.String(120), nullable=True)
@@ -49,11 +48,9 @@ class User(db.Model):
         back_populates="creator",
         cascade="all, delete-orphan")
     diet_plans = db.relationship("DietPlan", primaryjoin='User.id == DietPlan.creator_id', cascade="all, delete-orphan", back_populates="creator")
-    consumption_plans = db.relationship("ConsumptionPlan", primaryjoin='User.id == ConsumptionPlan.creator_id', cascade="all, delete-orphan", back_populates="creator")
     default_diet_plan = db.relationship("DietPlan", primaryjoin='User.default_diet_plan_id == DietPlan.id', cascade="all, delete-orphan", single_parent=True)
     default_inventory = db.relationship("Inventory", primaryjoin='User.default_inventory_id == Inventory.id', cascade="all, delete-orphan", single_parent=True)
-    default_consumption_plan = db.relationship("ConsumptionPlan", primaryjoin='User.default_consumption_plan_id == ConsumptionPlan.id', cascade="all, delete-orphan", single_parent=True)
-    shopping_order = db.relationship("ShoppingOrder", cascade="all, delete-orphan")
+    shopping_orders = db.relationship("ShoppingOrder", cascade="all, delete-orphan")
 
     def hash_password(self, password):
         self.password_hash = pwd_context.encrypt(password)
@@ -312,10 +309,6 @@ class MaterialForecast(db.Model):
         db.String(5),
         db.ForeignKey('units_of_measures.uom'),
         nullable=True)
-    consumption_plan_item_id = db.Column(
-        db.Integer,
-        db.ForeignKey('consumption_plan_items.id'),
-        nullable=True)
     diet_plan_item_id = db.Column(
         db.Integer,
         db.ForeignKey('diet_plan_items.id'),
@@ -332,8 +325,6 @@ class MaterialForecast(db.Model):
         "Material")
     uom = db.relationship(
         "UOM")
-    consumption_plan_item = db.relationship(
-        "ConsumptionPlanItem")
 
     inventory_item = db.relationship(
         "InventoryItem",
@@ -442,31 +433,36 @@ class InventoryItem(db.Model):
 class ShoppingOrder(db.Model):
     __tablename__ = 'shopping_orders'
     id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.SmallInteger, nullable=False)  # 1: shopping list, 2: purchase order
+    plan_date_start = db.Column(db.DateTime(timezone=True), nullable=True)
+    plan_date_end = db.Column(db.DateTime(timezone=True), nullable=True)
     status = db.Column(db.SmallInteger, nullable=True)  # 0: closed, 1: open
-    created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    closed = db.Column(db.DateTime, nullable=True)
-    creator_id = db.Column(db.Integer,db.ForeignKey('users.id'), nullable=False)
-    user_group_id = db.Column(db.Integer,db.ForeignKey('user_groups.id'), nullable=True)
+    closed = db.Column(db.DateTime(timezone=True), nullable=True)
+    place_id = db.Column(db.Integer, db.ForeignKey('places.id'), nullable=True)
+    receipt_photo = db.Column(db.String, nullable=True)
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable=True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
-    creator = db.relationship("User")
-    user_group = db.relationship("UserGroup")
-    items = db.relationship("ShoppingOrderItem", cascade="all, delete-orphan")
+    creator = db.relationship(
+        "User",
+        back_populates="shopping_orders",
+        primaryjoin='User.id == ShoppingOrder.creator_id')
 
 
 # Items on a shopping list that must be bought / ordered
 class ShoppingOrderItem(db.Model):
     __tablename__ = 'shopping_order_items'
     id = db.Column(db.Integer, primary_key=True)
-    titleEN = db.Column(db.String(80), nullable=True)  # TODO: remove those fields later and replace with good/food_id
-    titleDE = db.Column(db.String(80), nullable=True)
-    title = db.Column(db.String(80), nullable=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
     shopping_order_id = db.Column(db.Integer, db.ForeignKey('shopping_orders.id'))
-    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)
-    quantity = db.Column(db.Float, default=0, nullable=True)
-    quantity_uom = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
-    in_basket = db.Column(db.Boolean, default = False)
-    in_basket_time = db.Column(db.DateTime, nullable=True)
+    title = db.Column(db.String(80), nullable=True)
+    uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
+    quantity_required = db.Column(db.Float, default=0, nullable=True)
+    quantity_purchased = db.Column(db.Float, default=0, nullable=True)
+    in_basket = db.Column(db.Boolean, default=False)
+    in_basket_time = db.Column(db.DateTime(timezone=True), nullable=True)
     in_basket_geo_lon = db.Column(db.Float, nullable=True)
     in_basket_geo_lat = db.Column(db.Float, nullable=True)
     sort_order = db.Column(db.SmallInteger, nullable=True)
@@ -478,7 +474,19 @@ class ShoppingOrderItem(db.Model):
 
     material = db.relationship("Material")
     shopping_order = db.relationship("ShoppingOrder")
+
+    shopping_order = db.relationship(
+        "ShoppingOrder",
+        foreign_keys=[shopping_order_id],
+        primaryjoin="ShoppingOrderItem.shopping_order_id==ShoppingOrder.id",
+        backref=db.backref("shopping_order_items", cascade="all, delete-orphan"))
+
     trade_item = db.relationship("TradeItem")
+    inventory_item = db.relationship(
+        "InventoryItem",
+        foreign_keys=[inventory_id, material_id],
+        primaryjoin="and_(ShoppingOrderItem.inventory_id==InventoryItem.inventory_id, ShoppingOrderItem.material_id==InventoryItem.material_id)",
+        backref='shopping_order_items')
 
 
 class DietPlan(db.Model):
@@ -521,60 +529,6 @@ class DietPlanItem(db.Model):
         }
 
 
-class ConsumptionPlan(db.Model):
-    __tablename__ = 'consumption_plans'
-    id = db.Column(db.Integer, primary_key=True)
-    creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable=True)
-    created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-
-    items = db.relationship("ConsumptionPlanItem", cascade="all, delete-orphan")
-    creator = db.relationship("User", primaryjoin='User.id == ConsumptionPlan.creator_id')
-    user_group = db.relationship("UserGroup")
-
-
-class ConsumptionPlanItem(db.Model):
-    __tablename__ = 'consumption_plan_items'
-    id = db.Column(db.Integer, primary_key=True)
-    consumption_plan_id = db.Column(db.Integer, db.ForeignKey('consumption_plans.id'), nullable=False)
-    inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))  # TODO: Rethink if this is right
-    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True)  # TODO: Allow individual food items to be placed in a dietplan, like an apple a day keeps the doctor away
-    # type:
-    # 0 = one time consumption
-    # 1 = periodical consumption
-    type = db.Column(db.SmallInteger, nullable=False)
-    quantity = db.Column(db.Float, default=0, nullable=False)
-    plan_date = db.Column(db.DateTime(timezone=True), nullable=True)
-    period = db.Column(db.SmallInteger, nullable=True)
-    # null = non periodic type = 1
-    # 1 = daily
-    # 2 = weekly
-    # 3 = monthly
-    # 4 = yearly
-    weekday = db.Column(db.SmallInteger, nullable=True)
-    day_in_month = db.Column(db.SmallInteger, nullable=True)
-    end_date = db.Column(db.DateTime(timezone=True), nullable=True)
-    created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-
-    consumption_plan = db.relationship("ConsumptionPlan")
-
-    @property
-    def serialize(self):
-        return {
-            'id': self.id,
-            'consumption_plan_id': self.consumption_plan_id,
-            'material_id': self.material_id,
-            'type': self.type,
-            'quantity': self.quantity,
-            'plan_date': self.plan_date,
-            'period': self.period,
-            'weekday': self.weekday,
-            'day_in_month': self.day_in_month,
-            'end_date': self.end_date,
-            'created': self.created
-        }
-
-
 # Items that relate to real products bought in the retail / grocery stores
 class TradeItem(db.Model):
     __tablename__ = 'trade_items'
@@ -583,7 +537,7 @@ class TradeItem(db.Model):
     upc = db.Column(db.String(13), nullable=True)
     gtin = db.Column(db.String(14), nullable=True)
     titleEN = db.Column(db.String(80), nullable=False)
-    titleDE = db.Column(db.String(80), nullable=True)
+    title = db.Column(db.String(80), nullable=True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 
@@ -591,12 +545,13 @@ class Place(db.Model):
     __tablename__ = 'places'
     id = db.Column(db.Integer, primary_key=True)
     titleEN = db.Column(db.String(80), nullable=False)  # storing google data not allowed except place id
-    titleDE = db.Column(db.String(80), nullable=True)  # TODO: obsolete
     title = db.Column(db.String(80), nullable=True)
     google_place_id = db.Column(db.String(80), nullable=True)
     geo_lat = db.Column(db.Float, nullable=True)
     geo_lng = db.Column(db.Float, nullable=True)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    shopping_orders = db.relationship("ShoppingOrder", backref="place")
 
     @property
     def serialize(self):
@@ -714,6 +669,27 @@ class MaterialForecastSchema(ma.ModelSchema):
         model = MaterialForecast
 
 
+
+class ShoppingOrderItemSchema(ma.ModelSchema):
+    class Meta:
+        model = ShoppingOrderItem
+
+
+class ShoppingOrderSchema(ma.ModelSchema):
+    class Meta:
+        model = ShoppingOrder
+    shopping_order_items = fields.Nested(ShoppingOrderItemSchema,
+                                         many=True,
+                                         only=[
+                                            'id',
+                                            'shopping_order_id',
+                                            'quantity_required',
+                                            'quantity_purchased',
+                                            'in_basket',
+                                            'quantity',
+                                            'quantity_uom'])
+
+
 class InventoryItemSchema(ma.ModelSchema):
     class Meta:
         model = InventoryItem
@@ -727,3 +703,13 @@ class InventoryItemSchema(ma.ModelSchema):
                                 'quantity_per_day',
                                 'quantity',
                                 'quantity_uom'])
+    shopping_order_items = fields.Nested(ShoppingOrderItemSchema,
+                                         many=True,
+                                         only=[
+                                            'id',
+                                            'shopping_order_id',
+                                            'quantity_required',
+                                            'quantity_purchased',
+                                            'in_basket',
+                                            'quantity',
+                                            'quantity_uom'])

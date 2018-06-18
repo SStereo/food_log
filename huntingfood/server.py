@@ -40,10 +40,16 @@ from huntingfood.models import UOM, Meal, Ingredient, Material, MaterialForecast
 from huntingfood.models import FoodComposition, Nutrient
 from huntingfood.models import FoodMainGroup
 from huntingfood.models import InventoryItem, Inventory, DietPlan, DietPlanItem
-from huntingfood.models import ConsumptionPlan, ConsumptionPlanItem
-from huntingfood.models import Place
+from huntingfood.models import Place, ShoppingOrder, ShoppingOrderItem
+
 # Marshmallow Schemas
-from huntingfood.models import InventoryItemSchema, MaterialForecastSchema, MaterialSchema, UOMSchema
+from huntingfood.models import \
+    InventoryItemSchema, \
+    MaterialForecastSchema, \
+    MaterialSchema, \
+    UOMSchema, \
+    ShoppingOrderSchema, \
+    ShoppingOrderItemSchema
 from marshmallow import ValidationError
 
 # Set Logging level
@@ -60,6 +66,8 @@ db.session.commit()
 # Create Marshmallow schema dumpers
 inventory_items_schema = InventoryItemSchema(many=True)
 inventory_item_schema = InventoryItemSchema()
+shopping_orders_schema = ShoppingOrderSchema(many=True)
+shopping_order_schema = ShoppingOrderSchema()
 material_forecast_schema = MaterialForecastSchema(many=True)
 material_schema = MaterialSchema(many=True)
 uom_schema = UOMSchema(many=True)
@@ -188,25 +196,25 @@ def showFoodFacts():
 def showShoppingList():
     # TODO: If member of a group filter by group and not by creator
     # TODO: Querying for the different plans and inventories really necessary?
+    # TODO: Handle multiple inventories and shopping orders
     meals = Meal.query.filter_by(
         owner_id=login_session['user_id']).all()
     diet_plan = DietPlan.query.filter_by(
         id=login_session['default_diet_plan_id']).first()
     inventory = Inventory.query.filter_by(
         id=login_session['default_inventory_id']).first()
-    consumption_plan = ConsumptionPlan.query.filter_by(
-        id=login_session['default_consumption_plan_id']).first()
+    shopping_order = ShoppingOrder.query.filter_by(
+        status=1).first()
 
-    logging.info('diet_plan = %s' % login_session['default_diet_plan_id'])
+    logging.info('Diet Plan = %s' % login_session['default_diet_plan_id'])
     logging.info('Inventory = %s' % login_session['default_inventory_id'])
-    logging.info('consumption_plan = %s' % login_session['default_consumption_plan_id'])
 
     return render_template(
         "shoppinglist.html",
         meals=meals,
         diet_plan=diet_plan,
         inventory=inventory,
-        consumption_plan=consumption_plan,
+        shopping_order=shopping_order,
         getIngredients=getIngredients,
         loginSession=login_session,  # TODO: is that necessary to pass it to the client?
         g_api_key=app.config['GOOGLE_API_KEY'])
@@ -974,6 +982,101 @@ def api_v1_inventory(inventory_id):
                 'Can not delete item because item was not found'), 400)
             response.headers['Content-Type'] = 'application/json'
             return response
+
+
+# TODO: Finalize endpoint
+@app.route('/api/v1/shopping_order/<int:shopping_order_id>', methods=['GET', 'DELETE', 'PUT'])
+@app.route('/api/v1/shopping_order', methods=['GET', 'POST'])
+def api_v1_shopping_order(shopping_order_id=None):
+    shopping_orders = []
+
+    if request.method == 'GET':
+
+        status = request.args.get('status')
+
+        # TODO: add creator_id=login_session['user_id']
+        if shopping_order_id is not None:
+            shopping_orders = ShoppingOrder.query.filter_by(
+                shopping_order_id=shopping_order_id).first()
+            result = shopping_order_schema.dump(shopping_orders).data
+        elif status:
+            shopping_orders = ShoppingOrder.query.filter_by(
+                status=status).first()
+            result = shopping_order_schema.dump(shopping_orders).data
+        else:
+            shopping_orders = ShoppingOrder.query.all()
+            result = shopping_orders_schema.dump(shopping_orders).data
+
+        if shopping_orders:
+            return jsonify({'shopping_orders': result})
+        else:
+            response = make_response(json.dumps(
+                'Resource not found'), 404)
+            response.headers['Content-Type'] = 'application/json'
+            return response
+
+    if request.method == 'POST':
+
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = shopping_order_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        type = data['type']
+        status = data['status']
+        plan_date_start = data['plan_date_start']
+        plan_date_end = data['plan_date_end']
+
+        # Validations
+        if (not type):
+            message = 'api_v1_shopping_order: POST | Missing field: type.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not status):
+            message = 'api_v1_shopping_order: POST | Missing field: status.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not plan_date_start):
+            message = 'api_v1_shopping_order: POST | Missing field: plan_date_start.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        elif (not plan_date_end):
+            message = 'api_v1_shopping_order: POST | Missing field: plan_date_end.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        # Step 1: Create a shopping order
+        shopping_order = ShoppingOrder(
+            type=type,
+            status=status,
+            plan_date_start=plan_date_start,
+            plan_date_end=plan_date_end,
+            creator_id=login_session['user_id']
+            )
+        session.add(shopping_order)
+        session.commit()
+
+        result = shopping_order_schema.dump(shopping_order).data
+        return jsonify({'shopping_order': result})
+
 
 
 def analyze_ingredient(ingredient_text, **kwargs):
