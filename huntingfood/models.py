@@ -434,9 +434,8 @@ class ShoppingOrder(db.Model):
     __tablename__ = 'shopping_orders'
     id = db.Column(db.Integer, primary_key=True)
     type = db.Column(db.SmallInteger, nullable=False)  # 1: shopping list, 2: purchase order
-    plan_date_start = db.Column(db.DateTime(timezone=True), nullable=True)
-    plan_date_end = db.Column(db.DateTime(timezone=True), nullable=True)
-    status = db.Column(db.SmallInteger, nullable=True)  # 0: closed, 1: open
+    plan_forecast_days = db.Column(db.SmallInteger, nullable=False)
+    status = db.Column(db.SmallInteger, nullable=False, default=1)  # 0: closed, 1: open
     closed = db.Column(db.DateTime(timezone=True), nullable=True)
     place_id = db.Column(db.Integer, db.ForeignKey('places.id'), nullable=True)
     receipt_photo = db.Column(db.String, nullable=True)
@@ -457,7 +456,7 @@ class ShoppingOrderItem(db.Model):
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
     shopping_order_id = db.Column(db.Integer, db.ForeignKey('shopping_orders.id'))
-    title = db.Column(db.String(80), nullable=True)
+    title = db.Column(db.String(80), nullable=True)  # TODO: obsolete
     uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     quantity_required = db.Column(db.Float, default=0, nullable=True)
     quantity_purchased = db.Column(db.Float, default=0, nullable=True)
@@ -514,6 +513,7 @@ class DietPlanItem(db.Model):
 
     dietplan = db.relationship("DietPlan")
     meal = db.relationship("Meal", back_populates="diet_plans")
+    material = db.relationship("Material")
 
     @property
     def serialize(self):
@@ -664,6 +664,11 @@ class MaterialSchema(ma.ModelSchema):
             'standard_uom_id')
 
 
+class DietPlanItemSchema(ma.ModelSchema):
+    class Meta:
+        model = DietPlanItem
+
+
 class MaterialForecastSchema(ma.ModelSchema):
     class Meta:
         model = MaterialForecast
@@ -682,12 +687,17 @@ class ShoppingOrderSchema(ma.ModelSchema):
                                          many=True,
                                          only=[
                                             'id',
-                                            'shopping_order_id',
+                                            'inventory_id',
+                                            'material',
+                                            'shopping_order',
+                                            'uom_stock_id',
                                             'quantity_required',
                                             'quantity_purchased',
                                             'in_basket',
-                                            'quantity',
-                                            'quantity_uom'])
+                                            'in_basket_time',
+                                            'in_basket_geo_lat',
+                                            'in_basket_geo_lon',
+                                            'sort_order'])
 
 
 class InventoryItemSchema(ma.ModelSchema):
@@ -707,9 +717,14 @@ class InventoryItemSchema(ma.ModelSchema):
                                          many=True,
                                          only=[
                                             'id',
-                                            'shopping_order_id',
+                                            'inventory_id',
+                                            'material',
+                                            'shopping_order',
+                                            'uom_stock_id',
                                             'quantity_required',
                                             'quantity_purchased',
                                             'in_basket',
-                                            'quantity',
-                                            'quantity_uom'])
+                                            'in_basket_time',
+                                            'in_basket_geo_lat',
+                                            'in_basket_geo_lon',
+                                            'sort_order'])

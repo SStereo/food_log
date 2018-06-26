@@ -1,4 +1,7 @@
 'use strict';
+
+const default_forecast_days = 7;
+
 // Returns the ISO week of the date.
 // source: https://weeknumber.net/how-to/javascript
 var DateGetWeek = function(d) {
@@ -209,10 +212,20 @@ var dpViewModel = function() {
   // adds a diet plan item into a day within the timeGrid
   self.addDietPlanItem = function(data, event) {
 
-    console.log('addDietPlanItem: plan_date = ' + data.date() + ')');
+    console.log('addDietPlanItem: plan_date = ' + data.date());
 
     var plan_date = new Date(data.date());
-    console.log(' var plan_date = ' + plan_date);
+
+    var object = {
+      'id': null,
+      'dietplan' : dp_id,
+      'meal' : data.meal_id_select2add(),
+      'plan_date' : plan_date.toJSON(),
+      'portions' : self.userSettings().default_portions(),
+      'consumed' : null,
+      'material' : null
+    }
+
     $.ajax({
       type: 'POST',
       url: url_api_dietplan,
@@ -221,21 +234,16 @@ var dpViewModel = function() {
         'X-CSRFTOKEN' : csrf_token
       },
       dataType: 'json',
-      data: {
-        'diet_plan_id' : dp_id,
-        'meal_id' : data.meal_id_select2add(),
-        'plan_date' : plan_date.toJSON(),
-        'portions' : self.userSettings().default_portions()
-      },
+      data: JSON.stringify(object),
       success: function(response) {
 
         // turn the json string into a javascript object
         var parsed = response['diet_plan_item']
 
         // for each iterable item create a new DietPlanItem observable
-        parsed.forEach( function(item) {
-          data.dietPlanItems.push( new DietPlanItem(item) );
-        });
+        // parsed.forEach( function(item) {
+          data.dietPlanItems.push( new DietPlanItem(parsed) );
+        //});
       }
     });
 
@@ -286,23 +294,27 @@ var dpViewModel = function() {
 function saveDietPlanItem(newValue) {
   console.log('saveDietPlanItem: plan_date = ' + this.plan_date());
 
-  var plan_date = new Date(this.plan_date())
+  var plan_date = new Date(this.plan_date());
+
+  var object = {
+          'dietplan' : dp_id,
+          'id' : this.id(),
+          'meal' : this.meal_id(),
+          'plan_date' : plan_date.toJSON(),
+          'portions' : this.portions(),
+          'consumed' : this.consumed(),
+          'material' : null
+        }
 
   $.ajax({
     type: 'PUT',
     url: url_api_dietplan,
-    dataType: 'json',
-    data: {
-      'id' : this.id(),
-      'diet_plan_id' : dp_id,
-      'meal_id' : this.meal_id(),
-      'plan_date' : plan_date.toJSON(),
-      'consumed' : this.consumed(),
-      'portions' : this.portions()
-    },
+    contentType: 'application/json; charset=utf-8',
     headers: {
       'X-CSRFTOKEN' : csrf_token
     },
+    dataType: 'json',
+    data: JSON.stringify(object),
     success: function(response) {
       //TODO: undo changes in case of failure
       console.log('saveDietPlanItem: success');
@@ -522,21 +534,70 @@ function saveInventoryItem(newValue) {
   }
 }
 
+
+function saveShoppingOrder(newValue) {
+
+  console.log('saveShoppingOrder');
+
+  var object = {
+    'id': this.id(),
+    'type': this.type(),
+    'status': this.status(),
+    'plan_forecast_days': Number(this.planForecastDays()),  // TODO: find a better place to catch this
+    'closed': null,
+    'place_id': null,
+    'receipt_photo': null
+  }
+
+  // prevent updates in modal screens on a copy of the object
+  // where the id is not available
+  if (this.id()) {
+    $.ajax({
+      type: 'PUT',
+      url: url_api_shopping_order + '/' + this.id(),
+      contentType: 'application/json; charset=utf-8',
+      headers: {
+        'X-CSRFTOKEN' : csrf_token
+      },
+      dataType: 'json',
+      data: JSON.stringify(object),
+      success: function(response) {
+        var parsed = response['shopping_order']
+
+        // TODO: should the response fed back into the observable?
+        // disabled for now to avoid loops:
+        // currentShoppingOrder( new ShoppingOrder(parsed) );
+
+        console.log('saveShoppingOrder: success');
+      }
+    });
+  }
+}
+
 var invViewModel = function() {
   var self = this;
-  this.inventoryItems = ko.observableArray([]);
-  const default_forecast_days = 7;
+  self.inventoryItems = ko.observableArray([]);
+
+  // Define a temporary shopping order while the real one is retrieved from
+  // the backend or newly created (asynchronously)
+  var data = {
+    'type': 1,
+    'plan_forecast_days': default_forecast_days
+  };
+  self.currentShoppingOrder = ko.observable( new ShoppingOrder(data) );
+
+
+  // Define planing period based on today
   const default_plan_date_end = '2028-06-03T22:00:00+00:00'
-  this.planForecastDays = ko.observable(default_forecast_days);
+  // self.planForecastDays = ko.observable(default_forecast_days);
+  var now = new Date();
+  var plan_date_start = new Date(now.getFullYear(),now.getMonth(), now.getDate(), 0, 0, 0, 0); // returns current date in UTC
+  plan_date_start.setHours(0,0,0,0);
 
-  // Shopping Order
-  self.shoppingOrders = ko.observableArray([]);
-  self.currentShoppingOrder = ko.observable();
-
-  self.plan_date_start = ko.observable( new Date() );
+  self.plan_date_start = ko.observable( plan_date_start );
   self.plan_date_end = ko.computed( function() {
     var dateTo = new Date(self.plan_date_start()); //new Date();
-    dateTo.setDate(dateTo.getDate() + parseInt(self.planForecastDays()));
+    dateTo.setDate(dateTo.getDate() + parseInt(self.currentShoppingOrder().planForecastDays()));
     return dateTo;
   } );
 
@@ -661,7 +722,7 @@ var invViewModel = function() {
   };
 
   // Loads all shopping orders and creates a new one if all are closed
-  self.GetShoppingOrder = function() {
+  self.loadShoppingOrder = function() {
 
     console.log('Get open shopping order ...');
     $.ajax({
@@ -674,12 +735,21 @@ var invViewModel = function() {
       success: function(response) {
         var parsed = response['shopping_orders']
         parsed.forEach( function(item) {
-          self.shoppingOrders.push( new ShoppingOrder(item) );
+          self.currentShoppingOrder( new ShoppingOrder(item) );
+          console.log('currentShoppingOrder set! ForeCastDays = ' + self.currentShoppingOrder().planForecastDays());
         });
       },
       statusCode: {
         404: function(response) {
-          self.addShoppingOrder({type: 1});
+          // TODO: Consider not create object here but in the invVM by
+          // subscribing to the creation of the object there
+          // (self.currentShoppingOrder)
+          self.addShoppingOrder(
+            {
+            'type': 1,
+            'plan_forecast_days': default_forecast_days
+            }
+          );
         }
       },
       error: function(response) {
@@ -688,20 +758,19 @@ var invViewModel = function() {
     });
   };
 
+  // creates a new shopping order object
+  // in case the previous get call failed retrieving an open order
   self.addShoppingOrder = function(data) {
     console.log('addShoppingOrder: type = ' + data.type + ')');
 
-    var plan_date_start = new Date(self.plan_date_start());
-    var plan_date_end = new Date(self.plan_date_end());
-
     var object = {
+      'id': null,
       'type': data.type,
       'status': 1,
-      'plan_date_start': plan_date_start.toJSON(),
-      'plan_date_end': plan_date_end.toJSON(),
-      'closed': false,
-      'place_id': '',
-      'receipt_photo': ''
+      'plan_forecast_days': data.plan_forecast_days,
+      'closed': null,
+      'place_id': null,
+      'receipt_photo': null
     }
 
     $.ajax({
@@ -714,12 +783,9 @@ var invViewModel = function() {
       dataType: 'json',
       data: JSON.stringify(object),
       success: function(response) {
-
-        // turn the json string into a javascript object
         var parsed = response['shopping_order']
-
         parsed.forEach( function(item) {
-          self.shoppingOrders.push( new ShoppingOrder(item) );
+          self.currentShoppingOrder( new ShoppingOrder(item) );
         });
       }
     });
@@ -1109,7 +1175,7 @@ var invViewModel = function() {
   };
 
   self.loadUnitsOfMeasure();
-  self.GetShoppingOrder();
+  self.loadShoppingOrder();
   self.loadInventoryItems();
 
 }
@@ -1389,6 +1455,44 @@ var InventoryItem = function(data) {
     };
   }, this);
 
+  this.orderItem = function(data, event) {
+    if (this.currentShoppingOrderItem() == null) {
+      var shoppingOrderId = invVM.currentShoppingOrder().id;
+      // adding shopping order id to the data object
+      var input = Object.assign(data, {'shopping_order_id': shoppingOrderId});
+      addShoppingOrderItem(input);
+    } else {
+      if (this.currentShoppingOrderItem().in_basket() == true) {
+        this.currentShoppingOrderItem().in_basket(false);
+      } else {
+        this.currentShoppingOrderItem().in_basket(true);
+      }
+      saveShoppingOrderItem(this.currentShoppingOrderItem());
+    }
+  };
+
+  // TODO: is referencing another viewmodel invVM really the right thing to
+  // retrieve values from there?
+  this.shoppingOrderItems = ko.observableArray(ko.utils.arrayMap(data.shopping_order_items, function(item) {
+    return new ShoppingOrderItem(item);
+  }));
+
+  this.currentShoppingOrderItem = ko.observable();
+
+  this.shoppingOrderItems().forEach( function(item) {
+    if (item.shopping_order_id() == invVM.currentShoppingOrder().id()) {
+      this.currentShoppingOrderItem( new ShoppingOrderItem(item) );
+    }
+  }, this);
+
+  this.orderCheck = ko.computed(function() {
+    if (this.currentShoppingOrderItem() == null) {
+      return 'nope';
+    } else {
+      return this.currentShoppingOrderItem().in_basket_time();
+    }
+  }, this);
+
 }
 
 var MaterialForecast = function(data) {
@@ -1411,9 +1515,29 @@ var UnitOfMeasure = function(data) {
 
 var ShoppingOrder = function(data) {
   this.id = ko.observable(data.id);
-  this.plan_date_start = ko.observable(data.plan_date_start);
-  this.plan_date_end = ko.observable(data.plan_date_end);
+  this.type = ko.observable(data.type);
+  this.planForecastDays = ko.observable(data.plan_forecast_days)
+  this.planForecastDays.subscribe(saveShoppingOrder, this);
+
+/*
+  this.planForecastDays = ko.computed({
+    read: function() {
+      var planDateStart = new Date(invVM.plan_date_start());
+      var planDateEnd = new Date(invVM.plan_date_end());
+      var timeDiff = Math.abs(planDateEnd.getTime() - planDateStart.getTime());
+      var diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return diffDays;
+    },
+    write: function (value) {
+      var dateTo = new Date(invVM.plan_date_start());
+      dateTo.setDate(dateTo.getDate() + parseInt(value));
+      invVM.plan_date_end(dateTo);
+    },
+    owner: this
+  });
+*/
   this.status = ko.observable(data.status);
+  this.status.subscribe(saveShoppingOrder, this);
   this.shopping_order_items = ko.observableArray(ko.utils.arrayMap(data.items, function(forecast) {
     return new ShoppingOrderItem(forecast);
   }));
@@ -1422,7 +1546,8 @@ var ShoppingOrder = function(data) {
 var ShoppingOrderItem = function(data) {
   this.id = ko.observable(data.id);
   this.inventory_id = ko.observable(data.inventory_id);
-  this.material_id = ko.observable(data.material_id);
+  this.material_id = ko.observable(data.material);
+  this.shopping_order_id = ko.observable(data.shopping_order);
   this.quantity_required = ko.observable(data.quantity_required);
   this.quantity_purchased = ko.observable(data.quantity_purchased);
   this.in_basket = ko.observable(data.in_basket);

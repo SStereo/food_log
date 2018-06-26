@@ -49,7 +49,8 @@ from huntingfood.models import \
     MaterialSchema, \
     UOMSchema, \
     ShoppingOrderSchema, \
-    ShoppingOrderItemSchema
+    ShoppingOrderItemSchema, \
+    DietPlanItemSchema
 from marshmallow import ValidationError
 
 # Set Logging level
@@ -66,8 +67,12 @@ db.session.commit()
 # Create Marshmallow schema dumpers
 inventory_items_schema = InventoryItemSchema(many=True)
 inventory_item_schema = InventoryItemSchema()
+diet_plan_items_schema = DietPlanItemSchema(many=True)
+diet_plan_item_schema = DietPlanItemSchema()
 shopping_orders_schema = ShoppingOrderSchema(many=True)
 shopping_order_schema = ShoppingOrderSchema()
+shopping_order_items_schema = ShoppingOrderItemSchema(many=True)
+shopping_order_item_schema = ShoppingOrderItemSchema()
 material_forecast_schema = MaterialForecastSchema(many=True)
 material_schema = MaterialSchema(many=True)
 uom_schema = UOMSchema(many=True)
@@ -576,10 +581,27 @@ def api_v1_dietplan(diet_plan_id):
         return jsonify(diet_plan_items=[i.serialize for i in dp_items])
 
     if request.method == 'POST':
-        plan_date = dateutil.parser.parse(request.form.get('plan_date'))
-        meal_id = request.form.get('meal_id')
-        consumed = tools.str_to_bool(request.form.get('consumed'))
-        portions = tools.str_to_numeric(request.form.get('portions'))
+
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = diet_plan_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        # TODO: Improve to avoid dict are created during schema.load and an
+        # object is created instead
+        # https://github.com/marshmallow-code/marshmallow-sqlalchemy/issues/47
+        # plan_date = data.plan_date
+        # meal_id = data.meal.id
+        # portions = data.portions
+        # material_id = data.material.id if data.material else None
+        # consumed = data.consumed
+
+        plan_date = data['plan_date']
+        meal_id = data['meal'].id
+        portions = data['portions']
 
         # Validations
         if (not portions):
@@ -599,7 +621,7 @@ def api_v1_dietplan(diet_plan_id):
             return response
 
         if (not meal_id):
-            message = 'api_v1_dietplan: POST | Missing field: meal_id.'
+            message = 'api_v1_dietplan: POST | Missing field: meal.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
@@ -611,7 +633,6 @@ def api_v1_dietplan(diet_plan_id):
             diet_plan_id=diet_plan_id,
             plan_date=plan_date,
             meal_id=meal_id,
-            consumed=consumed,
             portions=portions
             )
         session.add(diet_plan_item)
@@ -619,44 +640,82 @@ def api_v1_dietplan(diet_plan_id):
 
         updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
 
-        # Step 6: Return Response
-        dp_item = DietPlanItem.query.filter_by(
-            id=diet_plan_item.id).all()
-        return jsonify(diet_plan_item=[i.serialize for i in dp_item])
+        # Step 2: Return Response
+        result = diet_plan_item_schema.dump(diet_plan_item).data
+        return jsonify({'diet_plan_item': result})
 
     if request.method == 'PUT':
-        plan_date = dateutil.parser.parse(request.form.get('plan_date'))
-        meal_id = request.form.get('meal_id')
-        id = request.form.get('id')
-        consumed = request.form.get('consumed')
-        portions = request.form.get('portions')
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = diet_plan_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        id = data.id
+        plan_date = data.plan_date
+        meal_id = data.meal.id
+        portions = data.portions
+        material_id = data.material.id if data.material else None
+        consumed = data.consumed
+
+        print('id = ' + str(id))
 
         diet_plan_item = DietPlanItem.query.filter_by(id=id).one_or_none()
+
+        if (not diet_plan_item):
+            message = 'api_v1_dietplan: PUT | Diet Plan Item not found.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
         dp_plan_date = diet_plan_item.plan_date
-
         if (plan_date != dp_plan_date):
+            message = 'api_v1_dietplan: PUT | Change not allowed for field: plan_date.'
             response = make_response(json.dumps(
-                'Can not change item because it is not allowed to change the plan_date'), 400)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
             return response
 
-        if (id) and (diet_plan_item):
-            diet_plan_item.meal_id = meal_id
-            diet_plan_item.consumed = tools.str_to_bool(consumed)
-            diet_plan_item.portions = tools.str_to_numeric(portions)
-            session.commit()
-
-            updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
-
+        # Validations
+        if (not portions):
+            message = 'api_v1_dietplan: PUT | Missing field: portions.'
             response = make_response(json.dumps(
-                'Item successfully updated'), 200)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
             return response
-        else:
+
+        if (not plan_date):
+            message = 'api_v1_dietplan: PUT | Missing field: plan_date.'
             response = make_response(json.dumps(
-                'Can not change item because item was not found'), 400)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
             return response
+
+        if (not meal_id):
+            message = 'api_v1_dietplan: PUT | Missing field: meal.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        diet_plan_item.meal_id = meal_id
+        diet_plan_item.consumed = consumed
+        diet_plan_item.portions = portions
+        diet_plan_item.material_id = material_id
+        session.commit()
+
+        updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
+
+        result = diet_plan_item_schema.dump(diet_plan_item).data
+        return jsonify({'diet_plan_item': result})
 
     if request.method == 'DELETE':
         id = request.form.get('id')
@@ -960,7 +1019,6 @@ def api_v1_inventory(inventory_id):
                 delete(synchronize_session=False)
             session.commit()
 
-
         inventory_items = InventoryItem.query.filter_by(
             id=inventory_item.id).all()
         result = inventory_items_schema.dump(inventory_items).data
@@ -984,7 +1042,6 @@ def api_v1_inventory(inventory_id):
             return response
 
 
-# TODO: Finalize endpoint
 @app.route('/api/v1/shopping_order/<int:shopping_order_id>', methods=['GET', 'DELETE', 'PUT'])
 @app.route('/api/v1/shopping_order', methods=['GET', 'POST'])
 def api_v1_shopping_order(shopping_order_id=None):
@@ -1001,8 +1058,8 @@ def api_v1_shopping_order(shopping_order_id=None):
             result = shopping_order_schema.dump(shopping_orders).data
         elif status:
             shopping_orders = ShoppingOrder.query.filter_by(
-                status=status).first()
-            result = shopping_order_schema.dump(shopping_orders).data
+                status=status).all()
+            result = shopping_orders_schema.dump(shopping_orders).data
         else:
             shopping_orders = ShoppingOrder.query.all()
             result = shopping_orders_schema.dump(shopping_orders).data
@@ -1027,10 +1084,67 @@ def api_v1_shopping_order(shopping_order_id=None):
 
         type = data['type']
         status = data['status']
-        plan_date_start = data['plan_date_start']
-        plan_date_end = data['plan_date_end']
+        plan_forecast_days = data['plan_forecast_days']
 
         # Validations
+        if (not type):
+            message = 'api_v1_shopping_order: POST | Missing field: type.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+        elif (not status):
+            message = 'api_v1_shopping_order: POST | Missing field: status.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+        elif (not plan_forecast_days):
+            message = 'api_v1_shopping_order: POST | Missing field: plan_forecast_days.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        # Step 1: Create a shopping order
+        shopping_order = ShoppingOrder(
+            type=type,
+            status=status,
+            plan_forecast_days=plan_forecast_days,
+            creator_id=login_session['user_id']
+            )
+        session.add(shopping_order)
+        session.commit()
+
+        result = shopping_order_schema.dump(shopping_order).data
+        return jsonify({'shopping_order': result})
+
+    if request.method == 'PUT':
+
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = shopping_order_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        type = data.type
+        status = data.status
+        plan_forecast_days = data.plan_forecast_days
+
+        # Validations
+        if (not shopping_order_id):
+            message = 'api_v1_shopping_order: POST | Missing field: shopping_order_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
         if (not type):
             message = 'api_v1_shopping_order: POST | Missing field: type.'
             response = make_response(json.dumps(
@@ -1047,36 +1161,160 @@ def api_v1_shopping_order(shopping_order_id=None):
             logging.warning(message)
             return response
 
-        if (not plan_date_start):
-            message = 'api_v1_shopping_order: POST | Missing field: plan_date_start.'
+        if (not plan_forecast_days):
+            message = 'api_v1_shopping_order: POST | Missing field: plan_forecast_days.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
             logging.warning(message)
             return response
 
-        elif (not plan_date_end):
-            message = 'api_v1_shopping_order: POST | Missing field: plan_date_end.'
+        # TODO: Create a consistent behaviour for querying the db, with or without try?
+        shopping_order = ShoppingOrder.query.filter_by(id=shopping_order_id).one_or_none()
+        if (not shopping_order):
+            message = 'api_v1_shopping_order: PUT | No shopping order found.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
             logging.warning(message)
             return response
 
-        # Step 1: Create a shopping order
-        shopping_order = ShoppingOrder(
-            type=type,
-            status=status,
-            plan_date_start=plan_date_start,
-            plan_date_end=plan_date_end,
-            creator_id=login_session['user_id']
-            )
-        session.add(shopping_order)
+        shopping_order.type = type
+        shopping_order.status = status
+        shopping_order.plan_forecast_days = plan_forecast_days
+
         session.commit()
 
         result = shopping_order_schema.dump(shopping_order).data
         return jsonify({'shopping_order': result})
 
+
+@app.route('/api/v1/shopping_order_item/<int:shopping_order_item_id>', methods=['GET', 'DELETE', 'PUT'])
+@app.route('/api/v1/shopping_order_item', methods=['POST'])
+def api_v1_shopping_order_item(shopping_order_item_id=None):
+    shopping_order_items = []
+
+    if request.method == 'POST':
+
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = shopping_order_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        id = data['id'] if 'id' in data.keys() else None
+        material_id = data['material'].id
+        shopping_order_id = data['shopping_order'].id
+        quantity_purchased = data['quantity_purchased']
+        in_basket = data['in_basket']
+        in_basket_time = data['in_basket_time']
+        in_basket_geo_lon = data['in_basket_geo_lon']
+        in_basket_geo_lat = data['in_basket_geo_lat']
+
+        # Validations
+        if (id):
+            shopping_order_item = ShoppingOrderItem.query.filter_by(id=shopping_order_id).one_or_none()
+            if shopping_order_item:
+                message = 'api_v1_shopping_order_item: POST | Object already exist.'
+                response = make_response(json.dumps(
+                    message), 400)
+                response.headers['Content-Type'] = 'application/json'
+                logging.warning(message)
+                return response
+
+        if (not material_id):
+            message = 'api_v1_shopping_order_item: POST | Missing field: material_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+        elif (not shopping_order_id):
+            message = 'api_v1_shopping_order_item: POST | Missing field: shopping_order_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        # TODO: Validate if item already exists (material, inventory combination, plan_date)
+        # DO WE NEED TO RELATE SHOPPING ORDER ITEM to a INVENTORY ITEM via id directly?
+
+        # Step 1: Create a shopping order
+        shopping_order_item = ShoppingOrderItem(
+            inventory_id=login_session['default_inventory_id'],
+            material_id=material_id,
+            shopping_order_id=shopping_order_id,
+            quantity_purchased=quantity_purchased,
+            in_basket=in_basket,
+            in_basket_time=in_basket_time,
+            in_basket_geo_lon=in_basket_geo_lon,
+            in_basket_geo_lat=in_basket_geo_lat,
+            )
+        session.add(shopping_order_item)
+        session.commit()
+
+        result = shopping_order_item_schema.dump(shopping_order_item).data
+        return jsonify({'shopping_order_item': result})
+
+    if request.method == 'PUT':
+
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = shopping_order_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        id = shopping_order_item_id
+        material_id = data.id
+        shopping_order_id = data.shopping_order.id
+        quantity_purchased = data.quantity_purchased
+        in_basket = data.in_basket
+        in_basket_time = data.in_basket_time
+        in_basket_geo_lon = data.in_basket_geo_lon
+        in_basket_geo_lat = data.in_basket_geo_lat
+
+        # Validations
+        if (not material_id):
+            message = 'api_v1_shopping_order_item: PUT | Missing field: material_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+        elif (not shopping_order_id):
+            message = 'api_v1_shopping_order_item: PUT | Missing field: shopping_order_id.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        # TODO: Create a consistent behaviour for querying the db, with or without try?
+        shopping_order_item = ShoppingOrderItem.query.filter_by(id=id).one_or_none()
+        if (not shopping_order_item):
+            message = 'api_v1_shopping_order_item: PUT | Shopping order item not found.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        shopping_order_item.material_id = material_id
+        shopping_order_item.quantity_purchased = quantity_purchased
+        shopping_order_item.in_basket = in_basket
+        shopping_order_item.in_basket_time = in_basket_time
+        shopping_order_item.in_basket_geo_lon = in_basket_geo_lon
+        shopping_order_item.in_basket_geo_lat = in_basket_geo_lat
+
+        session.commit()
+
+        result = shopping_order_item_schema.dump(shopping_order_item).data
+        return jsonify({'shopping_order_item': result})
 
 
 def analyze_ingredient(ingredient_text, **kwargs):

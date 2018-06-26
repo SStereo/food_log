@@ -99,13 +99,10 @@
           <!-- Date Picker Start -->
           <div class="input-group">
             <div class="form-group">
-              <label for="formControlRange" data-bind="text: planForecastDays() + ' days'"></label>
-              <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: planForecastDays">
+              <label for="formControlRange" data-bind="text: $root.currentShoppingOrder().planForecastDays()"></label>
+              <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: $root.currentShoppingOrder().planForecastDays">
             </div>
-            <!-- <input type="text" class="datepicker" data-bind="value: plan_date_start"> -->
-            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">
-
-            </p>
+            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">n/a</p>
           </div>
           <!-- Date Picker End -->
           <form data-bind="submit: addInventoryItem">
@@ -329,13 +326,10 @@
           <!-- Date Picker Start -->
           <div class="input-group">
             <div class="form-group">
-              <label for="formControlRange" data-bind="text: planForecastDays() + ' days'"></label>
-              <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: planForecastDays">
+              <label for="formControlRange" data-bind="text: $root.currentShoppingOrder().planForecastDays()"></label>
+              <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: $root.currentShoppingOrder().planForecastDays">
             </div>
-            <!-- <input type="text" class="datepicker" data-bind="value: plan_date_start"> -->
-            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">
-
-            </p>
+            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">n/a</p>
           </div>
           <!-- Date Picker End -->
           <form data-bind="submit: addInventoryItem">
@@ -365,15 +359,17 @@
               <tr>
                 <th scope="Status"><i class="fas fa-question-circle"></i></th>
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
-                <th scope="Bedarf"><i class="fas fa-utensils"></i></th>
+                <!-- <th scope="MengeGekauft">test</th> -->
+                <th scope="Bedarf"><i class="fas fa-shopping-basket"></i></th>
 
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredShoppingItems">
               <tr class="inv-list" data-bind="css: statusClass">
-                <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
-                <td class="px-1"><button class="inv-btn-title btn btn-secondary px-1" data-bind="text: title() + ' (' + uom_base() + ')', click: $root.EditItem3"></button></td>
                 <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
+                <td class="px-1" data-bind="text: title() + ' (' + uom_base() + ')'"></td>
+                <!-- <td class="px-1" data-bind="text: orderCheck()"></td> -->
+                <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="click: orderItem"><i class="far fa-square"></i></button></td>
               </tr>
             </tbody>
           </table>
@@ -394,6 +390,7 @@
   var url_api_dietplan = "{{ url_for('api_v1_dietplan', diet_plan_id = diet_plan.id ) }}";
   var url_api_inventory = "{{ url_for('api_v1_inventory', inventory_id = inventory.id ) }}";
   var url_api_shopping_order = "{{ url_for('api_v1_shopping_order') }}";
+  var url_api_shopping_order_item = "{{ url_for('api_v1_shopping_order_item') }}";
   var url_api_users = "{{ url_for('api_v1_users') }}";
   var url_api_uom = "{{ url_for('api_v1_uom') }}";
   var url_api_materials = "{{ url_for('api_v1_materials') }}";
@@ -409,6 +406,7 @@
 <script type=text/javascript src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
 <script type=text/javascript src="{{ url_for('node_static', filename='knockout-jqautocomplete/build/knockout-jqAutocomplete.js') }}"></script>
 <script type=text/javascript src="{{ url_for('static', filename='js/shoppinglist.js') }}"></script>
+<script type=text/javascript src="{{ url_for('static', filename='js/connections.js') }}"></script>
 <script type=text/javascript src="{{ url_for('node_static', filename='director/build/director.js') }}"></script>
 <script>
   $(function () {
