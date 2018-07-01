@@ -359,7 +359,7 @@
               <tr>
                 <th scope="Status"><i class="fas fa-question-circle"></i></th>
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
-                <!-- <th scope="MengeGekauft">test</th> -->
+                <th scope="MengeGekauft">Menge</th>
                 <th scope="Bedarf"><i class="fas fa-shopping-basket"></i></th>
 
               </tr>
@@ -368,8 +368,9 @@
               <tr class="inv-list" data-bind="css: statusClass">
                 <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
                 <td class="px-1" data-bind="text: title() + ' (' + uom_base() + ')'"></td>
-                <!-- <td class="px-1" data-bind="text: orderCheck()"></td> -->
-                <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="click: orderItem"><i class="far fa-square"></i></button></td>
+                <td class="px-1"><input type="text" class="form-control" id="quantity_purchased" placeholder="0"
+                       data-bind="textInput: $data.currentShoppingOrderItem().quantity_purchased_formatted"></td>
+                <td class="px-1"><button class="btn btn-primary px-1" data-bind="click: toggleInBasket, text: in_basket_class"></button></td>
               </tr>
             </tbody>
           </table>

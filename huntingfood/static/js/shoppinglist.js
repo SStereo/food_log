@@ -1182,6 +1182,7 @@ var invViewModel = function() {
 
 var InventoryItem = function(data) {
 
+  var defaults;
   var formatter;
   var parser;
   formatter = localSetting.numberFormatter();
@@ -1455,19 +1456,11 @@ var InventoryItem = function(data) {
     };
   }, this);
 
-  this.orderItem = function(data, event) {
-    if (this.currentShoppingOrderItem() == null) {
-      var shoppingOrderId = invVM.currentShoppingOrder().id;
-      // adding shopping order id to the data object
-      var input = Object.assign(data, {'shopping_order_id': shoppingOrderId});
-      addShoppingOrderItem(input);
+  this.toggleInBasket = function() {
+    if (this.currentShoppingOrderItem().in_basket() == true) {
+      this.currentShoppingOrderItem().in_basket(false);
     } else {
-      if (this.currentShoppingOrderItem().in_basket() == true) {
-        this.currentShoppingOrderItem().in_basket(false);
-      } else {
-        this.currentShoppingOrderItem().in_basket(true);
-      }
-      saveShoppingOrderItem(this.currentShoppingOrderItem());
+      this.currentShoppingOrderItem().in_basket(true);
     }
   };
 
@@ -1477,20 +1470,57 @@ var InventoryItem = function(data) {
     return new ShoppingOrderItem(item);
   }));
 
-  this.currentShoppingOrderItem = ko.observable();
+  // DEFAULT values for shopping order items
+  defaults = {
+    'quantity_purchased': this.plannedQuantityTotal(),
+    'material': this.material_id(),
+    'shopping_order': invVM.currentShoppingOrder().id(),
+    'in_basket': false
+  }
+  this.currentShoppingOrderItem = ko.observable( new ShoppingOrderItem(defaults) );
 
   this.shoppingOrderItems().forEach( function(item) {
     if (item.shopping_order_id() == invVM.currentShoppingOrder().id()) {
-      this.currentShoppingOrderItem( new ShoppingOrderItem(item) );
+      // TODO: There must be a better way of doing that
+      console.log('loading existing shopping order items ...');
+      data = {
+        'id': item.id(),
+        'inventory_id': item.inventory_id(),
+        'material': item.material_id(),
+        'shopping_order': item.shopping_order_id(),
+        'quantity_required': item.quantity_required(),
+        'quantity_purchased': item.quantity_purchased(),
+        'in_basket': item.in_basket(),
+        'in_basket_time': item.in_basket_time(),
+        'in_basket_geo_lon': item.in_basket_geo_lon(),
+        'in_basket_geo_lat': item.in_basket_geo_lat()
+      }
+      this.currentShoppingOrderItem( new ShoppingOrderItem(data) );
     }
   }, this);
 
+  // TODO: test function is obsolete
   this.orderCheck = ko.computed(function() {
     if (this.currentShoppingOrderItem() == null) {
       return 'nope';
     } else {
       return this.currentShoppingOrderItem().in_basket_time();
     }
+  }, this);
+
+  // TODO: obsolete?
+  this.in_basket_class = ko.computed(function() {
+    if (this.currentShoppingOrderItem() == null) {
+      return 'nein'
+    } else {
+      console.log('shopping order in basket = ' + this.currentShoppingOrderItem().in_basket());
+      if (this.currentShoppingOrderItem().in_basket() == true) {
+        console.log('return checked class');
+        return 'ja';
+      } else {
+        return 'nein';
+      }
+    };
   }, this);
 
 }
@@ -1518,24 +1548,6 @@ var ShoppingOrder = function(data) {
   this.type = ko.observable(data.type);
   this.planForecastDays = ko.observable(data.plan_forecast_days)
   this.planForecastDays.subscribe(saveShoppingOrder, this);
-
-/*
-  this.planForecastDays = ko.computed({
-    read: function() {
-      var planDateStart = new Date(invVM.plan_date_start());
-      var planDateEnd = new Date(invVM.plan_date_end());
-      var timeDiff = Math.abs(planDateEnd.getTime() - planDateStart.getTime());
-      var diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
-      return diffDays;
-    },
-    write: function (value) {
-      var dateTo = new Date(invVM.plan_date_start());
-      dateTo.setDate(dateTo.getDate() + parseInt(value));
-      invVM.plan_date_end(dateTo);
-    },
-    owner: this
-  });
-*/
   this.status = ko.observable(data.status);
   this.status.subscribe(saveShoppingOrder, this);
   this.shopping_order_items = ko.observableArray(ko.utils.arrayMap(data.items, function(forecast) {
@@ -1544,16 +1556,58 @@ var ShoppingOrder = function(data) {
 }
 
 var ShoppingOrderItem = function(data) {
+
+  var formatter;
+  var parser;
+  formatter = localSetting.numberFormatter();
+  parser = localSetting.numberParser();
+
+  // Determines if items needs to be created or just updated
+  this.saveData = function(newValue) {
+
+    console.log('SAVE DATA');
+    console.log('id = ' + this.id());
+    console.log('material = ' + this.material_id());
+    console.log('shopping order = ' + this.shopping_order_id());
+    console.log('in_basket = ' + this.in_basket());
+    console.log('quantity_purchased = ' + this.quantity_purchased());
+
+    if (this.id() == null) {
+      addShoppingOrderItem(this);
+    } else {
+      saveShoppingOrderItem(this);
+    }
+  }
+
   this.id = ko.observable(data.id);
   this.inventory_id = ko.observable(data.inventory_id);
   this.material_id = ko.observable(data.material);
   this.shopping_order_id = ko.observable(data.shopping_order);
   this.quantity_required = ko.observable(data.quantity_required);
   this.quantity_purchased = ko.observable(data.quantity_purchased);
+  this.quantity_purchased.subscribe(this.saveData, this);
+  this.quantity_purchased_formatted = ko.pureComputed({
+        read: function () {
+          if (this.quantity_purchased() != null && typeof this.quantity_purchased() === 'number') {
+            return formatter(this.quantity_purchased());
+          }
+        },
+        write: function (value) {
+            if (value != null && typeof value === 'string') {
+              value = parser(value);
+              if (!isNaN(value)) {
+                this.quantity_purchased(value)
+              }
+            }
+        },
+        owner: this
+    });
   this.in_basket = ko.observable(data.in_basket);
+  this.in_basket.subscribe(this.saveData, this);
   this.in_basket_time = ko.observable(data.in_basket_time);
   this.in_basket_geo_lon = ko.observable(data.in_basket_geo_lon);
   this.in_basket_geo_lat = ko.observable(data.in_basket_geo_lat);
+
 }
 
 var dpVM = new dpViewModel();

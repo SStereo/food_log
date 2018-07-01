@@ -9,8 +9,8 @@ function addShoppingOrderItem(data) {
     'id': null,
     'material' : data.material_id(),
     'shopping_order' : data.shopping_order_id(),
-    'quantity_purchased': 0,
-    'in_basket' : true,
+    'quantity_purchased': data.quantity_purchased(),
+    'in_basket' : data.in_basket(),
     'in_basket_time': now.toJSON(),
     'in_basket_geo_lat': null,
     'in_basket_geo_lon': null
@@ -28,8 +28,8 @@ function addShoppingOrderItem(data) {
     success: function(response) {
 
       var parsed = response['shopping_order_item']
-      data.currentShoppingOrderItem( new ShoppingOrderItem(parsed) );
-      // console.log(data.shoppingOrderItem().in_basket_time());
+      data.id( parsed.id );
+      console.log('new item created with id = ' + parsed.id);
     }
   });
 }
@@ -39,14 +39,27 @@ function saveShoppingOrderItem(data) {
 
   console.log('saveShoppingOrderItem');
 
+  var url = '';
+  var method = '';
+  var returnObject = null;
+
   // TODO: timestamp should be moved to backend functionality
   var now = new Date();
+
+  // Handle both cases. One this function is called by the subscribe method
+  // and this gets filled or via direct function call where newValue can
+  // contain a full observable.
+  //  if (!ko.isObservable(newValue)) {
+  //  var data = this;
+  //  } else {
+  //  var data = newValue();
+  //  }
 
   var object = {
     'id': data.id(),
     'material' : data.material_id(),
     'shopping_order' : data.shopping_order_id(),
-    'quantity_purchased': 0,
+    'quantity_purchased': data.quantity_purchased(),
     'in_basket' : data.in_basket(),
     'in_basket_time': now.toJSON(),
     'in_basket_geo_lat': null,
@@ -63,10 +76,8 @@ function saveShoppingOrderItem(data) {
     dataType: 'json',
     data: JSON.stringify(object),
     success: function(response) {
-
       var parsed = response['shopping_order_item']
-      data( new ShoppingOrderItem(parsed) );
-      // console.log(data.shoppingOrderItem().in_basket_time());
+
     }
   });
 }

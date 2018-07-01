@@ -1270,7 +1270,7 @@ def api_v1_shopping_order_item(shopping_order_item_id=None):
             return jsonify(err.messages), 422
 
         id = shopping_order_item_id
-        material_id = data.id
+        material_id = data.material.id
         shopping_order_id = data.shopping_order.id
         quantity_purchased = data.quantity_purchased
         in_basket = data.in_basket
