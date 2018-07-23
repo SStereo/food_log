@@ -114,10 +114,10 @@
             <!-- jqAutoComplete Knockout plugin END -->
 
             <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
-            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
+            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
 
             <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
-            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
+            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
 
             <button type="submit" class="btn btn-primary">Hinzufügen</button>
 
@@ -133,10 +133,8 @@
                 <th scope="Status"><i class="fas fa-question-circle"></i></th>
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
                 <th scope="Bestand"><i class="fas fa-warehouse"></i></th>
-                <th scope="Other"><i class="fas fa-hand-holding"></i></th>
-                <th scope="Periodic"><i class="fas fa-redo"></i></th>
+                <th scope="Periodic"><i class="fas fa-hand-holding"></i></th>
                 <th scope="Bedarf"><i class="fas fa-utensils"></i></th>
-                <th scope="Total"><i class="fas fa-equals"></i></th>
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredInventoryItems">
@@ -144,10 +142,8 @@
                 <td class="px-1"><button class="inv-btn-tgl toggle btn btn-primary px-1" data-bind="text: statusText, click: $root.toogleStatus"></button></td>
                 <td class="px-1"><button class="inv-btn-title btn btn-secondary px-1" data-bind="text: title() + ' (' + uom_base() + ')', click: $root.EditItem3"></button></td>
                 <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: quantity_base_formatted(), click: $root.EditItem2"></button></td>
-                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityOther_formatted(), click: $root.EditItem4"></button></td>
-                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityPeriodic_formatted(), click: $root.EditItem"></button></td>
+                <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityTotal_formatted(), click: $root.EditItem"></button></td>
                 <td class="px-1" data-bind="text: plannedQuantity_formatted()"></td>
-                <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
               </tr>
             </tbody>
           </table>
@@ -159,18 +155,31 @@
             <div class="modal-dialog" role="document">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h3>Regelmässiger Bedarf</h3>
+                  <h3>Bedarf</h3>
                   <a class="close" data-dismiss="modal">×</a>
                 </div>
                 <div class="modal-body">
+
                   <div class="form-group">
-                    <label for="cpTypeInput">Zeitraum für regelmässiger Verbrauch?</label>
+                    <label for="plannedQuantity">Bedarf durch Speiseplan?</label>
+                    <input type="text" class="form-control" id="plannedQuantity"
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().plannedQuantity_formatted" readonly>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="cpTypeInput">regelmässiger Bedarf Typ?</label>
                     <select class="custom-select" data-bind="options: $root.cpTypes, optionsText: 'TextDE', optionsValue: 'id', value: ItemBeingEdited() && ItemBeingEdited().cp_type"></select>
                   </div>
                   <div class="form-group">
-                    <label for="cpQuantityInput">Anzahl Einheiten pro Zeitraum?</label>
+                    <label for="cpQuantityInput">Wieviel Einheiten (Verbrauchseinheit)?</label>
                     <input type="text" class="form-control" id="cpQuantityInput"
                            data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().cp_quantity_formatted">
+                  </div>
+
+                  <div class="form-group">
+                    <label for="OPQuantityInput">Zusätzlicher (einmaliger) Bedarf?</label>
+                    <input type="text" class="form-control" id="OPQuantityInput" placeholder="0"
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().op_quantity_formatted">
                   </div>
                   <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
                   <div class="alert alert-danger" style="margin: 20px 0 0">
@@ -207,7 +216,7 @@
                            data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_stock_formatted">
                   </div>
                   <div class="form-group">
-                    <label for="QuantityBaseInput">Bestand (Basiseinheit)</label>
+                    <label for="QuantityBaseInput">Bestand (Verbrauchseinheit)</label>
                     <input type="text" class="form-control" id="QuantityBaseInput" placeholder="0"
                            data-bind="textInput: ItemBeingEdited2() && ItemBeingEdited2().quantity_base_formatted">
                   </div>
@@ -248,8 +257,8 @@
                   </div>
 
                   <div class="form-group">
-                    <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
-                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: ItemBeingEdited3() && ItemBeingEdited3().uom_stock"></select>
+                    <label class="mx-2 text-left" for="newInvItemStockUnit">Lagereinheit?</label>
+                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: ItemBeingEdited3() && ItemBeingEdited3().uom_stock"></select>
                   </div>
 
                   <div class="form-group">
@@ -259,8 +268,8 @@
                   </div>
 
                   <div class="form-group">
-                    <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
-                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: ItemBeingEdited3() && ItemBeingEdited3().uom_base"></select>
+                    <label class="mx-2 text-left" for="newInvItemBaseUnit">Verbrauchseinheit?</label>
+                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: ItemBeingEdited3() && ItemBeingEdited3().uom_base"></select>
                   </div>
 
                   <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
@@ -294,7 +303,7 @@
                 </div>
                 <div class="modal-body">
                   <div class="form-group">
-                    <label for="OPQuantityInput">Bedarf (Basiseinheit)</label>
+                    <label for="OPQuantityInput">Bedarf (Verbrauchseinheit)</label>
                     <input type="text" class="form-control" id="OPQuantityInput" placeholder="0"
                            data-bind="textInput: ItemBeingEdited4() && ItemBeingEdited4().op_quantity_formatted">
                   </div>
@@ -340,11 +349,11 @@
                    placeholder="Neue Zutat/Gegenstand" autofocus />
             <!-- jqAutoComplete Knockout plugin END -->
 
-            <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
-            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
+            <label class="mx-2 text-left" for="newInvItemStockUnit">Lagereinheit?</label>
+            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
 
-            <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
-            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longEN', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
+            <label class="mx-2 text-left" for="newInvItemBaseUnit">Verbrauchseinheit?</label>
+            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
 
             <button type="submit" class="btn btn-primary">Hinzufügen</button>
 

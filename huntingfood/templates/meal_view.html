@@ -25,13 +25,10 @@
 {% endblock %}
 
 {% block body %}
-<main class="text-center py-5">
-  <div style="height: 35px">
-
-  </div>
+<main class="text-center">
 
   <!--Card Regular-->
-  <div class="card mx-auto mt-1 card-cascade">
+  <div class="card mx-auto mt-1">
 
       <!--Card image-->
       <div class="view overlay hm-white-slight">
@@ -48,41 +45,19 @@
           <h4 class="card-title"><strong>{{ meal.title }}</strong></h4>
 
           <p class="card-text">{{ meal.description }}</p>
-          {% if meal.calories: %}
-            <p class='card-text'>{{ meal.calories }} kcal</p>
+
+          {% if meal.portions: %}
+            <p class='card-text'><small class="text-muted">{% if meal.calories: %} {{ meal.calories }} kcal | {% endif %}{{ meal.portions }} Portionen</small>
           {% endif %}
 
-          <!--Facebook-->
-          <a type="button" class="btn-floating btn-small btn-fb"><i class="fa fa-facebook"></i></a>
-          <!--Twitter-->
-          <a type="button" class="btn-floating btn-small btn-tw"><i class="fa fa-twitter"></i></a>
-          <!--Google +-->
-          <a type="button" class="btn-floating btn-small btn-dribbble"><i class="fa fa-dribbble"></i></a>
-
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Quantity</th>
-                <th>Ingredient</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% set items = getIngredients(meal.id) %}
-              {% if items %}
-                {% for i in items %}
-              <tr>
-                <td>
-                  {{ '%g'%i.quantity }} {{ i.uom.shortDE }}
-                </td>
-                <td>
-                  <p>{{ i.title }}</p>
-                  <small class="text-muted">({{ i.material.food_main_group.titleEN }})</small>
-                </td>
-              </tr>
-                {% endfor %}
-              {% endif %}
-            </tbody>
-          </table>
+          {% set items = getIngredients(meal.id) %}
+          {% if items %}
+            <ul class="list-group list-group-flush">
+              {% for i in items %}
+              <li class="list-group-item">{{ '%g'%i.quantity }} {{ i.uom.shortDE }} {{ i.title }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
 
       </div>
       <!--/.Card content-->

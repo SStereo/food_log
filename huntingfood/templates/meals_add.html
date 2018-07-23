@@ -15,6 +15,13 @@
             <label class="custom-file-label" for="customFile">Choose file</label>
           </div>
 
+          <div class="view overlay hm-white-slight">
+              <img src="#" class="img-fluid" id="previewImage" alt="">
+              <a>
+                  <div class="mask"></div>
+              </a>
+          </div>
+
           <div class="md-form">
             <!--<label for="title">Title</label>-->
             <input class="form-control" type="text" id="title" name="title" placeholder="Title">
@@ -58,4 +65,26 @@
     <!--/.Card content-->
   </div>
 </main>
+{% endblock %}
+
+{% block script %}
+<script>
+  function readURL(input) {
+
+    if (input.files && input.files[0]) {
+      var reader = new FileReader();
+
+      reader.onload = function(e) {
+        $('#previewImage').attr('src', e.target.result);
+      }
+
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  $("#customFile").change(function() {
+    readURL(this);
+  });
+
+</script>
 {% endblock %}

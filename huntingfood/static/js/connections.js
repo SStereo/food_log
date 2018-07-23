@@ -1,8 +1,6 @@
 // adds a diet plan item into a day within the timeGrid
 function addShoppingOrderItem(data) {
-
   console.log('addShoppingOrderItem');
-
   var now = new Date();
 
   var object = {
@@ -26,7 +24,6 @@ function addShoppingOrderItem(data) {
     dataType: 'json',
     data: JSON.stringify(object),
     success: function(response) {
-
       var parsed = response['shopping_order_item']
       data.id( parsed.id );
       console.log('new item created with id = ' + parsed.id);
@@ -36,9 +33,7 @@ function addShoppingOrderItem(data) {
 
 
 function saveShoppingOrderItem(data) {
-
   console.log('saveShoppingOrderItem');
-
   var url = '';
   var method = '';
   var returnObject = null;

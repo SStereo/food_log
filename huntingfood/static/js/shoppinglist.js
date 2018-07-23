@@ -100,19 +100,14 @@ var dpViewModel = function() {
     const week_range_max = 3;
     const num_days = 7;
 
-    console.log('now (UTC) = ' + now.toUTCString());
-    console.log('today (local) = ' + today);
-    console.log('today (UTC) = ' + today.toJSON());
-
     // Determine date of first day of the current week
     var today_weekday = (today.getDay() + 6) % 7; // monday is fist not sunday
     d.setDate(today.getDate() - today_weekday);
-    console.log('today.getDate() = ' + today.getDate());
-    console.log('d = ' + d);
+
     // Make first week the default selected one
     self.weekSelected(0);  // TODO: Find a better way for filtering
 
-    // ++++++ Generate Week Objects +++++
+    // START: Generate Week Objects
     var d2 = new Date(d.getTime());
     for (var i = 0; i < week_range_max; i++) {
       date_range = [];
@@ -128,15 +123,9 @@ var dpViewModel = function() {
       d3.setDate(d3.getDate() - 1);
       for (var y = 0; y < num_days; y++) {
         d3.setDate(d3.getDate() + 1);
-        console.log('Days of Week = ' + d3);
-
-        // TODO: Why a string?
-        // d_string = d3.getFullYear() + '-' + (d3.getMonth() + 1) + '-' + d3.getDate();
-        // date_range.push(d_string);
         date_range.push(d3.toJSON());
       }
 
-      console.log('d2.getTime() = ' + d2.getTime())
       // Create a new GridWeek object with initial meta data (item)
       item = {
         week_number: DateGetWeek(d2),
@@ -153,9 +142,8 @@ var dpViewModel = function() {
         var grid_day = new GridDay(item);
         grid_week.grid_days.push( grid_day )
       })
-
     }
-    // +++++++++++++++++++++++
+    // END: Generate Week Objects
   }
 
   self.loadDietPlanItems = function() {
@@ -236,14 +224,9 @@ var dpViewModel = function() {
       dataType: 'json',
       data: JSON.stringify(object),
       success: function(response) {
-
         // turn the json string into a javascript object
         var parsed = response['diet_plan_item']
-
-        // for each iterable item create a new DietPlanItem observable
-        // parsed.forEach( function(item) {
-          data.dietPlanItems.push( new DietPlanItem(parsed) );
-        //});
+        data.dietPlanItems.push( new DietPlanItem(parsed) );
       }
     });
 
@@ -255,7 +238,6 @@ var dpViewModel = function() {
       return item.id() == meal_id();
     });
     if (m) {
-      console.log('getMealImageURL(' + meal_id() + ') = '  + m.image());
       return m.image();
     } else {
       return ''
@@ -610,12 +592,9 @@ var invViewModel = function() {
   this.newInventoryItemBaseUnit = ko.observable();
   this.newInventoryItemStockUnit = ko.observable();
   self.showControls = ko.computed( function() {
-    console.log('title = ' + self.newInventoryItemTitle());
     if (self.newInventoryItemTitle() === undefined) {
-      console.log('hide control');
       return 'hide-control';
     } else {
-      console.log('show control');
       return 'show-control';
     }
   });
@@ -697,7 +676,7 @@ var invViewModel = function() {
   // Loads unit of measures from Rest API
   self.loadUnitsOfMeasure = function() {
     self.unitsOfMeasure.removeAll();
-    console.log('Loading units of measures ...');
+    console.log('loadUnitsOfMeasure ...');
     $.ajax({
       type: 'GET',
       url: url_api_uom,
@@ -724,7 +703,7 @@ var invViewModel = function() {
   // Loads all shopping orders and creates a new one if all are closed
   self.loadShoppingOrder = function() {
 
-    console.log('Get open shopping order ...');
+    console.log('loadShoppingOrder ...');
     $.ajax({
       type: 'GET',
       url: url_api_shopping_order,
@@ -736,7 +715,6 @@ var invViewModel = function() {
         var parsed = response['shopping_orders']
         parsed.forEach( function(item) {
           self.currentShoppingOrder( new ShoppingOrder(item) );
-          console.log('currentShoppingOrder set! ForeCastDays = ' + self.currentShoppingOrder().planForecastDays());
         });
       },
       statusCode: {
@@ -916,13 +894,35 @@ var invViewModel = function() {
     }
 
     var currentItem = ko.utils.unwrapObservable(item);
-    var currentQuantityBase = ko.utils.unwrapObservable(currentItem.quantity_base);
-    var currentTitle = ko.utils.unwrapObservable(currentItem.title);
-    var currentReOrderLevel = ko.utils.unwrapObservable(currentItem.re_order_level);
+    var cp_type = ko.utils.unwrapObservable(currentItem.cp_type);
+    var cp_quantity = ko.utils.unwrapObservable(currentItem.cp_quantity);
+    var cp_period = ko.utils.unwrapObservable(currentItem.cp_period);
+    var cp_weekday = ko.utils.unwrapObservable(currentItem.cp_weekday);
+    var cp_day_in_month = ko.utils.unwrapObservable(currentItem.cp_day_in_month);
+    var cp_plan_date_start = ko.utils.unwrapObservable(currentItem.cp_plan_date_start);
+    var cp_plan_date_end = ko.utils.unwrapObservable(currentItem.cp_plan_date_end);
+    var op_quantity = ko.utils.unwrapObservable(currentItem.op_quantity);
+    var op_plan_date_start = ko.utils.unwrapObservable(currentItem.op_plan_date_start);
+    var op_plan_date_end = ko.utils.unwrapObservable(currentItem.op_plan_date_end);
+    var op_quantity_formatted = ko.utils.unwrapObservable(currentItem.op_quantity_formatted);
 
     self.ValidationErrors.removeAll(); // Clear out any previous errors
 
-    // add checks
+    if (op_quantity === null) {
+      self.ValidationErrors.push('Zusätzlicher Bedarf muss 0 oder größer sein.');
+    } else { // Just some arbitrary checks here...
+        if (op_quantity < 0) {
+          self.ValidationErrors.push('Zusätzlicher Bedarf muss 0 oder größer sein.');
+        }
+    }
+
+    if (cp_quantity === null) {
+      self.ValidationErrors.push('Regelmässiger Bedarf muss 0 oder größer sein.');
+    } else { // Just some arbitrary checks here...
+        if (cp_quantity < 0) {
+          self.ValidationErrors.push('Regelmässiger Bedarf muss 0 oder größer sein.');
+        }
+    }
 
     return self.ValidationErrors().length <= 0;
   };
@@ -1004,7 +1004,7 @@ var invViewModel = function() {
     if (op_quantity_formatted === null) {
       self.ValidationErrors.push('Bedarf muss 0 oder größer sein.');
     } else { // Just some arbitrary checks here...
-        if (quantityBase < 0) {
+        if (op_quantity_formatted < 0) {
           self.ValidationErrors.push('Bedarf muss 0 oder größer sein.');
         }
     }
@@ -1019,11 +1019,14 @@ var invViewModel = function() {
     var today = new Date(now.getFullYear(),now.getMonth(), now.getDate(), 0, 0, 0, 0); // returns current date in UTC
     var data = {
       'cp_type': item.cp_type(),
-      'cp_quantity': item.cp_quantity(),
       'cp_period': item.cp_period(),
       'cp_quantity': item.cp_quantity(),
       'cp_plan_date_start': today,
-      'cp_plan_date_end': default_plan_date_end
+      'cp_plan_date_end': default_plan_date_end,
+      'op_plan_date_start': today,
+      'op_plan_date_end': default_plan_date_end,
+      'op_quantity': item.op_quantity(),
+      'forecasts': item.forecasts()
     };
 
     self.ItemBeingEdited(new InventoryItem(data));
@@ -1084,6 +1087,9 @@ var invViewModel = function() {
     var cp_day_in_month = ko.utils.unwrapObservable(updatedItem.cp_day_in_month);
     var cp_plan_date_start = ko.utils.unwrapObservable(updatedItem.cp_plan_date_start);
     var cp_plan_date_end = ko.utils.unwrapObservable(updatedItem.cp_plan_date_end);
+    var op_plan_date_start = ko.utils.unwrapObservable(updatedItem.op_plan_date_start);
+    var op_plan_date_end = ko.utils.unwrapObservable(updatedItem.op_plan_date_end);
+    var op_quantity = ko.utils.unwrapObservable(updatedItem.op_quantity);
 
     if (self.OriginalItemInstance() === undefined) {
       return false;
@@ -1097,6 +1103,9 @@ var invViewModel = function() {
       self.OriginalItemInstance().cp_day_in_month(cp_day_in_month);
       self.OriginalItemInstance().cp_plan_date_start(cp_plan_date_start);
       self.OriginalItemInstance().cp_plan_date_end(cp_plan_date_end);
+      self.OriginalItemInstance().op_plan_date_start(op_plan_date_start);
+      self.OriginalItemInstance().op_plan_date_end(op_plan_date_end);
+      self.OriginalItemInstance().op_quantity(op_quantity);
       self.OriginalItemInstance().suspend_backend_update(false);
     }
 
@@ -1154,7 +1163,7 @@ var invViewModel = function() {
   // Save the changes back to the original instance in the collection.
   self.SaveItem4 = function() {
     var updatedItem = ko.utils.unwrapObservable(self.ItemBeingEdited4);
-    if (!self.ValidateInventoryItem2(updatedItem)) {
+    if (!self.ValidateInventoryItem4(updatedItem)) {
       return false;
     }
     var op_plan_date_start = ko.utils.unwrapObservable(updatedItem.op_plan_date_start);
@@ -1482,7 +1491,6 @@ var InventoryItem = function(data) {
   this.shoppingOrderItems().forEach( function(item) {
     if (item.shopping_order_id() == invVM.currentShoppingOrder().id()) {
       // TODO: There must be a better way of doing that
-      console.log('loading existing shopping order items ...');
       data = {
         'id': item.id(),
         'inventory_id': item.inventory_id(),
@@ -1513,9 +1521,7 @@ var InventoryItem = function(data) {
     if (this.currentShoppingOrderItem() == null) {
       return 'nein'
     } else {
-      console.log('shopping order in basket = ' + this.currentShoppingOrderItem().in_basket());
       if (this.currentShoppingOrderItem().in_basket() == true) {
-        console.log('return checked class');
         return 'ja';
       } else {
         return 'nein';
