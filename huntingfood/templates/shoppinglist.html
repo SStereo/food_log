@@ -105,19 +105,13 @@
             <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">n/a</p>
           </div>
           <!-- Date Picker End -->
-          <form data-bind="submit: addInventoryItem">
+          <form data-bind="submit: newInventoryItem">
 
             <!-- jqAutoComplete Knockout plugin START -->
             <input class="text-center new-inv"
                    data-bind="jqAuto: { value: newInventoryItemTitle, source: $root.loadMaterials, inputProp: 'title', labelProp: 'title', valueProp: 'id' }, valueUpdate: 'afterkeydown', enterKey: addInventoryItem"
                    placeholder="Neue Zutat/Gegenstand" autofocus />
             <!-- jqAutoComplete Knockout plugin END -->
-
-            <label class="mx-2 text-left" for="newInvItemStockUnit">Verbrauchseinheit?</label>
-            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
-
-            <label class="mx-2 text-left" for="newInvItemBaseUnit">Einheit beim Kaufen?</label>
-            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
 
             <button type="submit" class="btn btn-primary">Hinzufügen</button>
 
@@ -134,7 +128,6 @@
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
                 <th scope="Bestand"><i class="fas fa-warehouse"></i></th>
                 <th scope="Periodic"><i class="fas fa-hand-holding"></i></th>
-                <th scope="Bedarf"><i class="fas fa-utensils"></i></th>
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredInventoryItems">
@@ -143,7 +136,6 @@
                 <td class="px-1"><button class="inv-btn-title btn btn-secondary px-1" data-bind="text: title() + ' (' + uom_base() + ')', click: $root.EditItem3"></button></td>
                 <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: quantity_base_formatted(), click: $root.EditItem2"></button></td>
                 <td class="px-1"><button class="inv-btn btn btn-secondary px-1" data-bind="text: plannedQuantityTotal_formatted(), click: $root.EditItem"></button></td>
-                <td class="px-1" data-bind="text: plannedQuantity_formatted()"></td>
               </tr>
             </tbody>
           </table>
@@ -163,7 +155,7 @@
                   <div class="form-group">
                     <label for="plannedQuantity">Bedarf durch Speiseplan?</label>
                     <input type="text" class="form-control" id="plannedQuantity"
-                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().plannedQuantity_formatted" readonly>
+                           data-bind="textInput: ItemBeingEdited() && ItemBeingEdited().plannedQuantity_nc_formatted" readonly>
                   </div>
 
                   <div class="form-group">
@@ -291,6 +283,58 @@
         </div>
         <!-- Modal view END -->
 
+        <!-- Modal: New Item START -->
+        <div data-bind="modal: ItemBeingAdded" class="fade" role="dialog" tabindex="-1">
+          <form data-bind="submit: $root.CreateItem">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h3>Neuer Gegenstand</h3>
+                  <a class="close" data-dismiss="modal">×</a>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <label for="TitleInput">Bezeichnung</label>
+                    <input type="text" class="form-control" id="TitleInput" placeholder="title of item .."
+                           data-bind="textInput: ItemBeingAdded() && ItemBeingAdded().title">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="mx-2 text-left" for="newInvItemStockUnit">Lagereinheit?</label>
+                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: ItemBeingAdded() && ItemBeingAdded().uom_stock"></select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="CFactorInput">Wieviel Verbrauchseinheiten sind in einer Einkaufseinheit?</label>
+                    <input type="text" class="form-control" id="CFactorInput" placeholder="title of item .."
+                           data-bind="textInput: ItemBeingAdded() && ItemBeingAdded().quantity_conversion_factor_formatted">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="mx-2 text-left" for="newInvItemBaseUnit">Verbrauchseinheit?</label>
+                    <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: ItemBeingAdded() && ItemBeingAdded().uom_base"></select>
+                  </div>
+
+                  <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
+                  <div class="alert alert-danger" style="margin: 20px 0 0">
+                    Please correct the following errors:
+                    <ul data-bind="foreach: { data: ValidationErrors, as: 'errorMessage' }">
+                      <li data-bind="text: errorMessage"></li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <!-- Modal view END -->
+
+
         <!-- Modal: Forecast Other -->
         <div data-bind="modal: ItemBeingEdited4" class="fade" role="dialog" tabindex="-1">
           <form data-bind="submit: $root.SaveItem4">
@@ -341,7 +385,7 @@
             <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">n/a</p>
           </div>
           <!-- Date Picker End -->
-          <form data-bind="submit: addInventoryItem">
+          <form data-bind="submit: newInventoryItem">
 
             <!-- jqAutoComplete Knockout plugin START -->
             <input class="text-center new-inv"

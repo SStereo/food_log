@@ -608,6 +608,7 @@ var invViewModel = function() {
   ]);
 
   // Required for modal: The instance of the item currently being edited.
+  self.ItemBeingAdded = ko.observable();
   self.ItemBeingEdited = ko.observable();
   self.ItemBeingEdited2 = ko.observable();
   self.ItemBeingEdited3 = ko.observable();
@@ -836,53 +837,36 @@ var invViewModel = function() {
 
   };
 
+
   // adds a inventory item
-  self.addInventoryItem = function(data, event) {
+  self.newInventoryItem = function(data, event) {
 
     var title = self.newInventoryItemTitle();
-    var uom_base_id = self.newInventoryItemBaseUnit();
-    var uom_stock_id = self.newInventoryItemStockUnit();
+    // var uom_base_id = self.newInventoryItemBaseUnit();
+    // var uom_stock_id = self.newInventoryItemStockUnit();
     if (title) {
       if (isNaN(title)) {
         var material_id = null;
         title = title.trim();
+        // Opens modal window to add more values
+        self.AddItem(title);
+        // TODO: add return here and fix the flow
       } else {
         var material_id = title;
         var title = '';
+
+        console.log('material_id = ' + material_id);
+
+        var data = {
+          'id': null,
+          'title': title,
+          'material': material_id
+        };
+
+        var object = new InventoryItem(data);
+        addInventoryItem(object);
       }
-      console.log('addInventoryItem');
 
-      var object = {
-        'id': null,
-        'quantity_base': 0,
-        'quantity_conversion_factor': 200,
-        'quantity_stock': 0,
-        'title': title,
-        'uom_base': uom_base_id,
-        'uom_stock': uom_stock_id,
-        'material': material_id
-      }
-
-      $.ajax({
-        type: 'POST',
-        url: url_api_inventory,
-        contentType: 'application/json; charset=utf-8',
-        headers: {
-          'X-CSRFTOKEN' : csrf_token
-        },
-        dataType: 'json',
-        data: JSON.stringify(object),
-        success: function(response) {
-
-          // turn the json string into a javascript object
-          var parsed = response['inventory_items']
-
-          // for each iterable item create a new DietPlanItem observable
-          parsed.forEach( function(item) {
-            self.inventoryItems.push( new InventoryItem(item) );
-          });
-        }
-      });
     }
     self.newInventoryItemTitle('');
   };
@@ -1012,6 +996,16 @@ var invViewModel = function() {
     return self.ValidationErrors().length <= 0;
   };
 
+  // Required for modal: Add item in the modal window
+  self.AddItem = function(title) {
+    var data = {
+      'title': title
+    };
+
+    self.ItemBeingAdded(new InventoryItem(data));
+  };
+
+
   // Required for modal: Edit item in the modal window
   self.EditItem = function(item) {
     self.OriginalItemInstance(item);
@@ -1026,7 +1020,7 @@ var invViewModel = function() {
       'op_plan_date_start': today,
       'op_plan_date_end': default_plan_date_end,
       'op_quantity': item.op_quantity(),
-      'forecasts': item.forecasts()
+      'plannedQuantity_nc': item.plannedQuantity()
     };
 
     self.ItemBeingEdited(new InventoryItem(data));
@@ -1181,6 +1175,29 @@ var invViewModel = function() {
     }
     self.ItemBeingEdited4(undefined);
     self.OriginalItemInstance(undefined);
+  };
+
+
+  self.CreateItem = function() {
+    var addedItem = ko.utils.unwrapObservable(self.ItemBeingAdded);
+
+    if (!self.ValidateInventoryItem3(addedItem)) {
+      return false;
+    }
+
+    var data = {
+      'id': null,
+      'material': null,
+      'title': ko.utils.unwrapObservable(addedItem.title),
+      'uom_base': ko.utils.unwrapObservable(addedItem.uom_base),
+      'uom_stock': ko.utils.unwrapObservable(addedItem.uom_stock),
+      'quantity_conversion_factor': ko.utils.unwrapObservable(addedItem.quantity_conversion_factor),
+    };
+
+    var object = new InventoryItem(data);
+    addInventoryItem(object);
+
+    self.ItemBeingAdded(undefined);
   };
 
   self.loadUnitsOfMeasure();
@@ -1385,6 +1402,16 @@ var InventoryItem = function(data) {
   this.plannedQuantity_formatted = ko.pureComputed( function() {
     if (this.plannedQuantity() != null && typeof this.plannedQuantity() === 'number') {
       return formatter(this.plannedQuantity());
+    }
+  }, this);
+
+  // TODO: This is a workaround to be able to create a copy of an inventory item
+  // as part of a modal dialog without copying all forecasts to have the diet plan
+  // driven quantity displayed. nc = non computed
+  this.plannedQuantity_nc = ko.observable(data.plannedQuantity_nc);
+  this.plannedQuantity_nc_formatted = ko.pureComputed( function() {
+    if (this.plannedQuantity_nc() != null && typeof this.plannedQuantity_nc() === 'number') {
+      return formatter(this.plannedQuantity_nc());
     }
   }, this);
 

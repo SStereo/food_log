@@ -221,10 +221,10 @@ class Material(db.Model):
     title = db.Column(db.String(160), nullable=True)
     language_code = db.Column(db.String(8), nullable=False)
     titleEN = db.Column(db.String(160), nullable=True)
-    standard_uom_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)
     uom_base_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=False)  # Physical, e.g. g (Sugar)
     uom_stock_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)  # One updated on an inventory, updated here for future inventories
     uom_issue_id = db.Column(db.String(5), db.ForeignKey('units_of_measures.uom'), nullable=True)  # tbsp (4 table spoons of sugar)
+    default_base_units_per_stock_unit = db.Column(db.Float, nullable=True, default = 1)
     bls_code = db.Column(db.String(7), nullable=True)
     ndb_code = db.Column(db.String(7), nullable=True)
     ndb_title = db.Column(db.String(160), nullable=True)
@@ -248,14 +248,13 @@ class Material(db.Model):
     referencedIn = db.relationship("Ingredient")
     referencedInventoryItem = db.relationship("InventoryItem", back_populates="material")
     referencedMaterialForecast = db.relationship("MaterialForecast", back_populates="material")
-    standard_uom = db.relationship("UOM", foreign_keys=[standard_uom_id])
     base_uom = db.relationship("UOM", foreign_keys=[uom_base_id])
     stock_uom = db.relationship("UOM", foreign_keys=[uom_stock_id])
     issue_uom = db.relationship("UOM", foreign_keys=[uom_issue_id])
 
 
 # Converts issue units like table spoons ore cups into base units like grams
-class MaterialUnits:
+class MaterialUnits(db.Model):
     __tablename__ = 'material_units'
     id = db.Column(
         db.Integer,
@@ -661,7 +660,7 @@ class MaterialSchema(ma.ModelSchema):
             'private',
             'titleEN',
             'title',
-            'standard_uom_id')
+            'uom_base_id')
 
 
 class DietPlanItemSchema(ma.ModelSchema):
@@ -672,7 +671,6 @@ class DietPlanItemSchema(ma.ModelSchema):
 class MaterialForecastSchema(ma.ModelSchema):
     class Meta:
         model = MaterialForecast
-
 
 
 class ShoppingOrderItemSchema(ma.ModelSchema):

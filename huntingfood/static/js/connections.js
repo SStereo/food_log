@@ -1,4 +1,40 @@
-// adds a diet plan item into a day within the timeGrid
+function addInventoryItem(data) {
+  console.log('addInventoryItem');
+
+  var object = {
+    'id': null,
+    'title': data.title(),
+    'uom_base': data.uom_base(),
+    'uom_stock': data.uom_stock(),
+    'material': data.material_id(),
+    'quantity_base': data.quantity_base(),
+    'quantity_conversion_factor': data.quantity_conversion_factor(),
+    'quantity_stock': data.quantity_stock()
+  }
+
+  $.ajax({
+    type: 'POST',
+    url: url_api_inventory,
+    contentType: 'application/json; charset=utf-8',
+    headers: {
+      'X-CSRFTOKEN' : csrf_token
+    },
+    dataType: 'json',
+    data: JSON.stringify(object),
+    success: function(response) {
+
+      // turn the json string into a javascript object
+      var parsed = response['inventory_items']
+
+      // for each iterable item create a new InventoryItem observable
+      parsed.forEach( function(item) {
+        invVM.inventoryItems.push( new InventoryItem(item) );
+      });
+    }
+  });
+}
+
+
 function addShoppingOrderItem(data) {
   console.log('addShoppingOrderItem');
   var now = new Date();

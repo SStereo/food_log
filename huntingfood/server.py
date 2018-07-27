@@ -22,7 +22,7 @@ from flask import session as login_session  # a dictionary to store information
 # National Nutrient Database - United States Department of Agriculture
 from huntingfood import ndb
 
-#from datetime import datetime
+# from datetime import datetime
 import datetime
 
 # Required to convert time zone aware date strings from Json into a date object
@@ -61,8 +61,8 @@ pp = pprint.PrettyPrinter(indent=1)
 # TODO: not really required but just to ease the migration to flask-sqlalchemy
 session = db.session
 
-db.create_all()
-db.session.commit()
+# db.create_all()
+# db.session.commit()
 
 # Create Marshmallow schema dumpers
 inventory_items_schema = InventoryItemSchema(many=True)
@@ -770,33 +770,15 @@ def api_v1_inventory(inventory_id):
         except ValidationError as err:
             return jsonify(err.messages), 422
 
+        # TODO: If the client does not send the field in the json file
+        # it will lead into a key error when reading the dict, fix this overall
+        # perhaps validations in marshmallow is the answer
         title = data['title']
-        quantity_base = data['quantity_base']
-        quantity_stock = data['quantity_stock']
-        quantity_conversion_factor = data['quantity_conversion_factor']
-        uom_base = data['uom_base'].uom
-        uom_stock = data['uom_stock'].uom
         material_id = data['material'].id if data['material'] else None
 
         # Validations
-        if (not uom_base):
-            message = 'api_v1_dietplan: POST | Missing field: uom_base.'
-            response = make_response(json.dumps(
-                message), 400)
-            response.headers['Content-Type'] = 'application/json'
-            logging.warning(message)
-            return response
-
-        if (not uom_stock):
-            message = 'api_v1_dietplan: POST | Missing field: uom_stock.'
-            response = make_response(json.dumps(
-                message), 400)
-            response.headers['Content-Type'] = 'application/json'
-            logging.warning(message)
-            return response
-
         if (not title) and (not material_id):
-            message = 'api_v1_dietplan: POST | Missing field: title.'
+            message = 'api_v1_inventory: POST | Missing field: title.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
@@ -804,20 +786,42 @@ def api_v1_inventory(inventory_id):
             return response
 
         elif (title) and (not material_id):
-            message = 'api_v1_dietplan: POST | No existing material. Creating new material ...'
+            uom_base = data['uom_base'].uom
+            uom_stock = data['uom_stock'].uom
+            quantity_conversion_factor = data['quantity_conversion_factor']
+
+            if (not uom_base):
+                message = 'api_v1_inventory: POST | Missing field: uom_base.'
+                response = make_response(json.dumps(
+                    message), 400)
+                response.headers['Content-Type'] = 'application/json'
+                logging.warning(message)
+                return response
+            if (not uom_stock):
+                message = 'api_v1_inventory: POST | Missing field: uom_stock.'
+                response = make_response(json.dumps(
+                    message), 400)
+                response.headers['Content-Type'] = 'application/json'
+                logging.warning(message)
+                return response
+
+            message = 'api_v1_inventory: POST | No existing material. Creating new material ...'
             logging.info(message)
             material = createMaterial(title, login_session['language'], uom_base)
             material_id = material.id
 
         elif (not title) and (material_id):
-            message = 'api_v1_dietplan: POST | Existing material.'
+            message = 'api_v1_inventory: POST | Existing material.'
             logging.info(message)
             material = Material.query.filter_by(id=material_id).one_or_none()
             # Use title from existing material
             if (material):
                 title = material.title
+                uom_base = material.uom_base_id
+                uom_stock = material.uom_stock_id
+                quantity_conversion_factor = material.default_base_units_per_stock_unit
             else:
-                message = 'api_v1_dietplan: POST | Material with id %s not found.' % material_id
+                message = 'api_v1_inventory: POST | Material with id %s not found.' % material_id
                 response = make_response(json.dumps(
                     message), 400)
                 response.headers['Content-Type'] = 'application/json'
@@ -832,8 +836,6 @@ def api_v1_inventory(inventory_id):
             material_id=material_id,
             uom_stock_id=uom_stock,
             uom_base_id=uom_base,
-            quantity_base=quantity_base,
-            quantity_stock=quantity_stock,
             quantity_conversion_factor=quantity_conversion_factor,
             )
         session.add(inventory_item)
@@ -891,7 +893,7 @@ def api_v1_inventory(inventory_id):
             return response
 
         if (not material_id):
-            message = 'api_v1_dietplan: PUT | Missing field: material_id.'
+            message = 'api_v1_inventory: PUT | Missing field: material_id.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
@@ -901,7 +903,7 @@ def api_v1_inventory(inventory_id):
         # TODO: Create a consistent behaviour for querying the db, with or without try?
         inventory_item = InventoryItem.query.filter_by(id=id).one_or_none()
         if (not inventory_item):
-            message = 'api_v1_dietplan: PUT | No inventory item found.'
+            message = 'api_v1_inventory: PUT | No inventory item found.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
