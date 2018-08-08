@@ -289,9 +289,9 @@ class MaterialForecast(db.Model):
     type = db.Column(
         db.SmallInteger,
         nullable=False)
-    # 0 = planned demand (dietplan)
-    # 1 = periodic consumption
-    # 2 = other demand
+    # 0 = diet plan
+    # 1 = consumption plan (periodic)
+    # 2 = other plan (one time demand)
     plan_date_start = db.Column(
         db.DateTime(timezone=True),
         nullable=True)

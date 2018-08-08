@@ -53,6 +53,14 @@ from huntingfood.models import \
     DietPlanItemSchema
 from marshmallow import ValidationError
 
+
+# CONSTANTS
+INV_ITEM_CP_TYPE_NONE = 0
+INV_ITEM_CP_TYPE_DAILY = 1
+MAT_FORECAST_TYPE_CP = 1
+MAT_FORECAST_TYPE_OP = 2
+
+
 # Set Logging level
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -578,7 +586,8 @@ def api_v1_dietplan(diet_plan_id):
         else:
             dp_items = DietPlanItem.query.filter_by(
                 diet_plan_id=diet_plan_id).all()
-        return jsonify(diet_plan_items=[i.serialize for i in dp_items])
+        result = diet_plan_items_schema.dump(dp_items).data
+        return jsonify({'diet_plan_items': result})
 
     if request.method == 'POST':
 
@@ -638,7 +647,7 @@ def api_v1_dietplan(diet_plan_id):
         session.add(diet_plan_item)
         session.commit()
 
-        updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
+        update_material_forecast_dp(diet_plan_id, login_session['default_inventory_id'], plan_date)
 
         # Step 2: Return Response
         result = diet_plan_item_schema.dump(diet_plan_item).data
@@ -712,36 +721,44 @@ def api_v1_dietplan(diet_plan_id):
         diet_plan_item.material_id = material_id
         session.commit()
 
-        updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
+        update_material_forecast_dp(diet_plan_id, login_session['default_inventory_id'], plan_date)
 
         result = diet_plan_item_schema.dump(diet_plan_item).data
         return jsonify({'diet_plan_item': result})
 
     if request.method == 'DELETE':
-        id = request.form.get('id')
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = diet_plan_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        id = data.id
         diet_plan_item = DietPlanItem.query.filter_by(id=id).one_or_none()
 
         if (not id):
-            message = 'Missing dietplan item id in request'
+            message = 'api_v1_dietplan: DELETE | Missing field: id'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
-            logging.info(message)
+            logging.warning(message)
             return response
 
         if (not diet_plan_item):
-            message = 'Can not find dietplan with id = %s' % id
+            message = 'api_v1_dietplan: DELETE | dietplan item with id = %s does not exist' % id
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
-            logging.info(message)
+            logging.warning(message)
             return response
 
         plan_date = diet_plan_item.plan_date
         session.delete(diet_plan_item)
         session.commit()
 
-        updateMaterialForecast(diet_plan_id, login_session['default_inventory_id'], plan_date)
+        update_material_forecast_dp(diet_plan_id, login_session['default_inventory_id'], plan_date)
 
         message = 'Item with id = %s successfully deleted' % id
         response = make_response(json.dumps(
@@ -900,6 +917,14 @@ def api_v1_inventory(inventory_id):
             logging.warning(message)
             return response
 
+        if (cp_type > INV_ITEM_CP_TYPE_NONE) and (cp_quantity is None):
+            message = 'api_v1_inventory: PUT | Missing field: cp_quantity.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
         # TODO: Create a consistent behaviour for querying the db, with or without try?
         inventory_item = InventoryItem.query.filter_by(id=id).one_or_none()
         if (not inventory_item):
@@ -948,99 +973,47 @@ def api_v1_inventory(inventory_id):
         session.commit()
         logging.info('Inventory Item %s successfully updated' % inventory_item.id)
 
-        # Step 2: re-create material forecasts for regular consumption
-        if (cp_type is not None) and (cp_quantity is not None):
-            if (cp_changed):
-                logging.info('Delete consumption forecast due to change ...')
-                forecasts = db.session.query(MaterialForecast).\
-                    filter(MaterialForecast.inventory_id == inventory_id).\
-                    filter(MaterialForecast.material_id == material_id).\
-                    filter(MaterialForecast.type == 1).\
-                    delete(synchronize_session=False)
-                session.commit()
-                # Step 2.2: Retrieve standard uom from material
-                # TODO: Find a better way instead of running a query
-                try:
-                    material = Material.query.\
-                        select_from(Material).\
-                        filter(Material.id == material_id).first()
-                except NoRecordsError:
-                    logging.info('No records found')
-                except exc.SQLAlchemyError:
-                    logging.exception('Some problem occurred')
+        # Step 2: update material forecasts if changed
+        if (cp_changed):
+            update_material_forecast_cp(inventory_item)
 
-                logging.info('Base uom from material = ' +
-                             material.uom_base_id)
+        if (op_changed):
+            update_material_forecast_op(inventory_item)
 
-                if (cp_type == 1):
-                    logging.info('Create new forecasts for daily consumption ...')
-                    plan_date_start = cp_plan_date_start
-                    # TODO: Wire up plan_date_end to the front end
-                    plan_date_end = plan_date_start + datetime.timedelta(days=3650)
-                    new_forecast = MaterialForecast(
-                                inventory_id=login_session['default_inventory_id'],
-                                material_id=material_id,
-                                type=1,
-                                plan_date_start=plan_date_start,
-                                plan_date_end=plan_date_end,
-                                quantity_per_day=cp_quantity,
-                                quantity_uom=material.uom_base_id)
-                    session.add(new_forecast)
-                    session.commit()
-
-        # Step 2.2: re-create material forecasts for other consumption
-        # TODO: Should we delete all forecasts of type 2 because there could
-        # be many ones per date period?
-        if (op_quantity is not None):
-            if (op_changed):
-                logging.info('Delete other forecast due to change ...')
-                forecasts = db.session.query(MaterialForecast).\
-                    filter(MaterialForecast.inventory_id == inventory_id).\
-                    filter(MaterialForecast.material_id == material_id).\
-                    filter(MaterialForecast.type == 2).\
-                    delete(synchronize_session=False)
-                session.commit()
-
-                logging.info('Create new forecast for other consumption ...')
-                new_forecast = MaterialForecast(
-                            inventory_id=login_session['default_inventory_id'],
-                            material_id=material_id,
-                            type=2,
-                            plan_date_start=op_plan_date_start,
-                            plan_date_end=op_plan_date_end,
-                            quantity=op_quantity,
-                            quantity_uom=uom_base)
-                session.add(new_forecast)
-                session.commit()
-        elif (op_quantity is None):
-            logging.info('Delete forecast ...')
-            forecasts = db.session.query(MaterialForecast).\
-                filter(MaterialForecast.inventory_id == inventory_id).\
-                filter(MaterialForecast.material_id == material_id).\
-                filter(MaterialForecast.type == 2).\
-                delete(synchronize_session=False)
-            session.commit()
-
+        # Step 3: return modified items
         inventory_items = InventoryItem.query.filter_by(
             id=inventory_item.id).all()
         result = inventory_items_schema.dump(inventory_items).data
         return jsonify({'inventory_items': result})
 
     if request.method == 'DELETE':
-        id = request.form.get('id')
+        json_data = request.get_json()
+        if not json_data:
+            return jsonify({'message': 'No input data provided'}), 400
+        try:
+            data, errors = inventory_item_schema.load(json_data)
+        except ValidationError as err:
+            return jsonify(err.messages), 422
+
+        id = data['id']
+
         inventory_item = InventoryItem.query.filter_by(id=id).one_or_none()
 
         if (id) and (inventory_item):
             session.delete(inventory_item)
             session.commit()
+            message = 'api_v1_dietplan: DELETE | Item successfully deleted'
             response = make_response(json.dumps(
-                'Item successfully deleted'), 200)
+                message), 200)
             response.headers['Content-Type'] = 'application/json'
+            logging.info(message)
             return response
         else:
+            message = 'api_v1_dietplan: DELETE | Can not delete item because item was not found'
             response = make_response(json.dumps(
-                'Can not delete item because item was not found'), 400)
+                message), 400)
             response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
             return response
 
 
@@ -1431,7 +1404,8 @@ def allowed_file(filename):
 # TODO: Improve:
 # 1) Running this in the database using joints, group by and sum
 # 2) Create def for creation of inventory so there is only one point where inventories are created
-def updateMaterialForecast(diet_plan_id, inventory_id, plan_date):
+# 3) Combine with regular and other consumption updates
+def update_material_forecast_dp(inventory_id, diet_plan_id, plan_date):
 
     # Step 1: Delete all forecasts for the given plan date and inventory
     # TODO: It assumes that diet plan entries are allways only one day long
@@ -1562,6 +1536,67 @@ def updateMaterialForecast(diet_plan_id, inventory_id, plan_date):
             )
             session.add(new_material_forecast)
         session.commit()
+
+
+# TODO: Combine with op function
+def update_material_forecast_cp(inventory_item):
+
+    # Step 1: Delete existing forecast
+    logging.info('Delete consumption forecast due to change ...')
+    forecasts = db.session.query(MaterialForecast).\
+        filter(MaterialForecast.inventory_id == inventory_item.inventory_id).\
+        filter(MaterialForecast.material_id == inventory_item.material_id).\
+        filter(MaterialForecast.type == MAT_FORECAST_TYPE_CP).\
+        delete(synchronize_session=False)
+    session.commit()
+
+    if (inventory_item.cp_type == INV_ITEM_CP_TYPE_DAILY):
+
+        logging.info('Create new forecasts for daily consumption ...')
+        plan_date_start = inventory_item.cp_plan_date_start
+        # TODO: Wire up plan_date_end to the front end
+        plan_date_end = plan_date_start + datetime.timedelta(days=3650)
+        new_forecast = MaterialForecast(
+                    inventory_id=inventory_item.inventory_id,
+                    material_id=inventory_item.material_id,
+                    type=MAT_FORECAST_TYPE_CP,
+                    plan_date_start=plan_date_start,
+                    plan_date_end=plan_date_end,
+                    quantity_per_day=inventory_item.cp_quantity,
+                    quantity_uom=inventory_item.uom_base_id)
+        session.add(new_forecast)
+        session.commit()
+
+    if (inventory_item.cp_type == INV_ITEM_CP_TYPE_NONE):
+        logging.info('Forecast for consumption plan has been deleted.')
+
+
+def update_material_forecast_op(inventory_item):
+
+    logging.info('Delete other forecast due to change ...')
+    forecasts = db.session.query(MaterialForecast).\
+        filter(MaterialForecast.inventory_id == inventory_item.inventory_id).\
+        filter(MaterialForecast.material_id == inventory_item.material_id).\
+        filter(MaterialForecast.type == MAT_FORECAST_TYPE_OP).\
+        delete(synchronize_session=False)
+    session.commit()
+
+    if (inventory_item.op_quantity > 0):
+
+        logging.info('Create new forecast for other consumption ...')
+        new_forecast = MaterialForecast(
+                    inventory_id=inventory_item.inventory_id,
+                    material_id=inventory_item.material_id,
+                    type=MAT_FORECAST_TYPE_OP,
+                    plan_date_start=inventory_item.op_plan_date_start,
+                    plan_date_end=inventory_item.op_plan_date_end,
+                    quantity=inventory_item.op_quantity,
+                    quantity_uom=inventory_item.uom_base_id)
+        session.add(new_forecast)
+        session.commit()
+
+    else:
+        logging.info('Forecast for other consumption has been deleted.')
 
 
 class Error(Exception):

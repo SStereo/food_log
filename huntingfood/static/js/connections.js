@@ -34,6 +34,32 @@ function addInventoryItem(data) {
   });
 }
 
+function deleteInventoryItem(data) {
+  console.log('deleteInventoryItem');
+
+  var object = {
+    'forecasts': {},
+    'id': data.id(),
+    'inventory': inv_id,
+    'material': data.material_id(),
+    'title': data.title()
+  }
+
+  $.ajax({
+    type: 'DELETE',
+    url: url_api_inventory,
+    contentType: 'application/json; charset=utf-8',
+    headers: {
+      'X-CSRFTOKEN' : csrf_token
+    },
+    dataType: 'json',
+    data: JSON.stringify(object),
+    success: function(response) {
+      invVM.inventoryItems.remove(data);
+    }
+  });
+}
+
 
 function addShoppingOrderItem(data) {
   console.log('addShoppingOrderItem');

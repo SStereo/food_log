@@ -178,19 +178,22 @@ var dpViewModel = function() {
 
     var plan_date = new Date(data.plan_date())
 
+    var object = {
+      'id': data.id(),
+      'dietplan': dp_id,
+      'meal': data.meal_id(),
+      'plan_date': plan_date.toJSON()
+    }
+
     $.ajax({
       type: 'DELETE',
       url: url_api_dietplan,
-      dataType: 'json',
-      data: {
-        'id' : data.id(),
-        'diet_plan_id' : dp_id,
-        'meal_id' : data.meal_id(),
-        'plan_date' : plan_date.toJSON()
-      },
+      contentType: 'application/json; charset=utf-8',
       headers: {
         'X-CSRFTOKEN' : csrf_token
       },
+      dataType: 'json',
+      data: JSON.stringify(object),
       success: function(response) {
         parent.dietPlanItems.remove(data);
       }
@@ -275,7 +278,6 @@ var dpViewModel = function() {
 // TODO: this is the only CRUD function sitting outside of the ViewModel -> fix
 function saveDietPlanItem(newValue) {
   console.log('saveDietPlanItem: plan_date = ' + this.plan_date());
-
   var plan_date = new Date(this.plan_date());
 
   var object = {
@@ -344,8 +346,8 @@ var GridDay = function(data) {
 
 var DietPlanItem = function(data) {
   this.id = ko.observable(data.id);
-  this.diet_plan_id = ko.observable(data.diet_plan_id);
-  this.meal_id = ko.observable(data.meal_id);
+  this.diet_plan_id = ko.observable(data.dietplan);
+  this.meal_id = ko.observable(data.meal);
   this.meal_id.subscribe(saveDietPlanItem, this);
   this.plan_date = ko.observable(data.plan_date);
   this.plan_date.subscribe(saveDietPlanItem, this);
@@ -1198,6 +1200,17 @@ var invViewModel = function() {
     addInventoryItem(object);
 
     self.ItemBeingAdded(undefined);
+  };
+
+  self.DeleteItem = function() {
+
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      deleteInventoryItem(self.OriginalItemInstance());
+    }
+    self.ItemBeingEdited3(undefined);
+    self.OriginalItemInstance(undefined);
   };
 
   self.loadUnitsOfMeasure();
