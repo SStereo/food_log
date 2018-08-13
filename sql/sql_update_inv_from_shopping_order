@@ -1,0 +1,13 @@
+Update query
+------------
+UPDATE inventory_items
+SET quantity_base = quantity_base + shopping_order_items.quantity_purchased
+FROM shopping_order_items
+WHERE shopping_order_items.material_id = inventory_items.material_id AND shopping_order_id = 41
+
+Validation query
+----------------
+SELECT shopping_order_items.id, shopping_order_items.inventory_id, shopping_order_items.material_id, in_basket, quantity_purchased, inventory_items.quantity_stock, inventory_items.quantity_base FROM public.shopping_order_items
+INNER JOIN inventory_items ON shopping_order_items.material_id = inventory_items.material_id
+WHERE shopping_order_id = 18
+ORDER BY id ASC

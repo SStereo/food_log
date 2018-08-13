@@ -106,15 +106,12 @@
           </div>
           <!-- Date Picker End -->
           <form data-bind="submit: newInventoryItem">
-
             <!-- jqAutoComplete Knockout plugin START -->
             <input class="text-center new-inv"
                    data-bind="jqAuto: { value: newInventoryItemTitle, source: $root.loadMaterials, inputProp: 'title', labelProp: 'title', valueProp: 'id' }, valueUpdate: 'afterkeydown', enterKey: addInventoryItem"
                    placeholder="Neue Zutat/Gegenstand" autofocus />
             <!-- jqAutoComplete Knockout plugin END -->
-
             <button type="submit" class="btn btn-primary">Hinzufügen</button>
-
           </form>
 
 
@@ -127,7 +124,7 @@
                 <th scope="Status"><i class="fas fa-question-circle"></i></th>
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
                 <th scope="Bestand"><i class="fas fa-warehouse"></i></th>
-                <th scope="Periodic"><i class="fas fa-hand-holding"></i></th>
+                <th scope="Bedarf"><i class="fas fa-hand-holding"></i></th>
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredInventoryItems">
@@ -383,45 +380,35 @@
               <label for="formControlRange" data-bind="text: $root.currentShoppingOrder().planForecastDays()"></label>
               <input type="range" min="1" max="28" class="form-control-range" id="formControlRange" data-bind="value: $root.currentShoppingOrder().planForecastDays">
             </div>
-            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">n/a</p>
+            <p data-bind="text: moment(plan_date_end()).format('DD.MM.YY')">n/a</p>&nbsp;
+            <p data-bind="text: '(id=' + $root.currentShoppingOrder().id() + ')'"></p>
           </div>
           <!-- Date Picker End -->
           <form data-bind="submit: newInventoryItem">
-
             <!-- jqAutoComplete Knockout plugin START -->
             <input class="text-center new-inv"
                    data-bind="jqAuto: { value: newInventoryItemTitle, source: $root.loadMaterials, inputProp: 'title', labelProp: 'title', valueProp: 'id' }, valueUpdate: 'afterkeydown', enterKey: addInventoryItem"
                    placeholder="Neue Zutat/Gegenstand" autofocus />
             <!-- jqAutoComplete Knockout plugin END -->
-
-            <label class="mx-2 text-left" for="newInvItemStockUnit">Lagereinheit?</label>
-            <select class="custom-select" data-bind="css: showControls, options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemBaseUnit"></select>
-
-            <label class="mx-2 text-left" for="newInvItemBaseUnit">Verbrauchseinheit?</label>
-            <select class="custom-select" data-bind="options: unitsOfMeasure, optionsText: 'longDE', optionsValue: 'uom', value: $root.newInventoryItemStockUnit"></select>
-
             <button type="submit" class="btn btn-primary">Hinzufügen</button>
-
+            <button type="button" class="btn btn-success" data-bind="click: $root.EditShoppingOrder">Einkauf abschliessen</button>
           </form>
-
-
         </header>
 
         <section data-bind="visible: inventoryItems().length">
           <table class="table px-0">
             <thead>
               <tr>
-                <th scope="Status"><i class="fas fa-question-circle"></i></th>
                 <th scope="Eintrag"><i class="fas fa-list-alt"></i></th>
+                <th scope="Bedarf"><i class="fas fa-hand-holding"></i></th>
                 <th scope="MengeGekauft">Menge</th>
-                <th scope="Bedarf"><i class="fas fa-shopping-basket"></i></th>
-
+                <th scope="Basket"><i class="fas fa-shopping-basket"></i></th>
               </tr>
             </thead>
             <tbody data-bind="foreach: filteredShoppingItems">
               <tr class="inv-list" data-bind="css: statusClass">
-                <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
                 <td class="px-1" data-bind="text: title() + ' (' + uom_base() + ')'"></td>
+                <td class="px-1" data-bind="text: plannedQuantityTotal_formatted()"></td>
                 <td class="px-1"><input type="text" class="form-control" id="quantity_purchased" placeholder="0"
                        data-bind="textInput: $data.currentShoppingOrderItem().quantity_purchased_formatted"></td>
                 <td class="px-1"><button class="btn btn-primary px-1" data-bind="click: toggleInBasket, text: in_basket_class"></button></td>
@@ -429,6 +416,42 @@
             </tbody>
           </table>
         </section>
+
+        <!-- Modal: Forecast Other -->
+        <div data-bind="modal: ShoppingOrderBeingEdited" class="fade" role="dialog" tabindex="-1">
+          <form data-bind="submit: $root.SaveShoppingOrder">
+            <div class="modal-dialog" role="document">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h3>Einkauf abschliessen</h3>
+                  <a class="close" data-dismiss="modal">×</a>
+                </div>
+                <div class="modal-body">
+                  <div class="form-group">
+                    <div class="custom-file">
+                      <input type="file" class="custom-file-input" id="customFile" data-bind="textInput: ShoppingOrderBeingEdited() && ShoppingOrderBeingEdited().receiptPhoto">
+                      <label class="custom-file-label" for="customFile">Quittung auswählen</label>
+                    </div>
+                  </div>
+                  <!-- ko if: ValidationErrors() && ValidationErrors().length > 0 -->
+                  <div class="alert alert-danger" style="margin: 20px 0 0">
+                    Please correct the following errors:
+                    <ul data-bind="foreach: { data: ValidationErrors, as: 'errorMessage' }">
+                      <li data-bind="text: errorMessage"></li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+                <div class="modal-footer">
+                  <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Einkauf abschliessen</button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <!-- Modal view END -->
+
       </div>
     </div>
   <!-- </div> -->

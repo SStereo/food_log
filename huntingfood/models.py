@@ -434,7 +434,7 @@ class ShoppingOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     type = db.Column(db.SmallInteger, nullable=False)  # 1: shopping list, 2: purchase order
     plan_forecast_days = db.Column(db.SmallInteger, nullable=False)
-    status = db.Column(db.SmallInteger, nullable=False, default=1)  # 0: closed, 1: open
+    status = db.Column(db.SmallInteger, nullable=False, default=1)  # 1: open, 2: closed
     closed = db.Column(db.DateTime(timezone=True), nullable=True)
     place_id = db.Column(db.Integer, db.ForeignKey('places.id'), nullable=True)
     receipt_photo = db.Column(db.String, nullable=True)
@@ -711,18 +711,3 @@ class InventoryItemSchema(ma.ModelSchema):
                                 'quantity_per_day',
                                 'quantity',
                                 'quantity_uom'])
-    shopping_order_items = fields.Nested(ShoppingOrderItemSchema,
-                                         many=True,
-                                         only=[
-                                            'id',
-                                            'inventory_id',
-                                            'material',
-                                            'shopping_order',
-                                            'uom_stock_id',
-                                            'quantity_required',
-                                            'quantity_purchased',
-                                            'in_basket',
-                                            'in_basket_time',
-                                            'in_basket_geo_lat',
-                                            'in_basket_geo_lon',
-                                            'sort_order'])

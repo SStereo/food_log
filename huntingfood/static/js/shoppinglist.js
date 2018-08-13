@@ -518,10 +518,14 @@ function saveInventoryItem(newValue) {
   }
 }
 
-
 function saveShoppingOrder(newValue) {
 
-  console.log('saveShoppingOrder');
+  if (this.suspend_backend_update()) {
+    console.log('saveShoppingOrder: suspended');
+    return false;
+  } else {
+    console.log('saveShoppingOrder');
+  }
 
   var object = {
     'id': this.id(),
@@ -551,8 +555,13 @@ function saveShoppingOrder(newValue) {
         // TODO: should the response fed back into the observable?
         // disabled for now to avoid loops:
         // currentShoppingOrder( new ShoppingOrder(parsed) );
-
         console.log('saveShoppingOrder: success');
+
+        // in case the shopping order is closed a new open one should be loaded
+        // or created
+        //if (parsed.state = 2) {
+          //invVM.loadShoppingOrder()
+        //}
       }
     });
   }
@@ -570,14 +579,11 @@ var invViewModel = function() {
   };
   self.currentShoppingOrder = ko.observable( new ShoppingOrder(data) );
 
-
   // Define planing period based on today
   const default_plan_date_end = '2028-06-03T22:00:00+00:00'
-  // self.planForecastDays = ko.observable(default_forecast_days);
   var now = new Date();
   var plan_date_start = new Date(now.getFullYear(),now.getMonth(), now.getDate(), 0, 0, 0, 0); // returns current date in UTC
   plan_date_start.setHours(0,0,0,0);
-
   self.plan_date_start = ko.observable( plan_date_start );
   self.plan_date_end = ko.computed( function() {
     var dateTo = new Date(self.plan_date_start()); //new Date();
@@ -591,15 +597,6 @@ var invViewModel = function() {
 
   // store the new Inventory value being entered
 	this.newInventoryItemTitle = ko.observable();
-  this.newInventoryItemBaseUnit = ko.observable();
-  this.newInventoryItemStockUnit = ko.observable();
-  self.showControls = ko.computed( function() {
-    if (self.newInventoryItemTitle() === undefined) {
-      return 'hide-control';
-    } else {
-      return 'show-control';
-    }
-  });
 
   this.cpTypes = ko.observableArray([
     {'id': 0, 'TextDE': 'nein'},
@@ -615,7 +612,7 @@ var invViewModel = function() {
   self.ItemBeingEdited2 = ko.observable();
   self.ItemBeingEdited3 = ko.observable();
   self.ItemBeingEdited4 = ko.observable();
-
+  self.ShoppingOrderBeingEdited = ko.observable();
 
   // Required for modal: Used to keep a reference back to the original user record being edited
   self.OriginalItemInstance = ko.observable();
@@ -706,6 +703,8 @@ var invViewModel = function() {
   // Loads all shopping orders and creates a new one if all are closed
   self.loadShoppingOrder = function() {
 
+    var defaults;
+
     console.log('loadShoppingOrder ...');
     $.ajax({
       type: 'GET',
@@ -716,8 +715,31 @@ var invViewModel = function() {
       },
       success: function(response) {
         var parsed = response['shopping_orders']
-        parsed.forEach( function(item) {
-          self.currentShoppingOrder( new ShoppingOrder(item) );
+        parsed.forEach( function(order) {
+          self.currentShoppingOrder( new ShoppingOrder(order) );
+          // TODO: update shopping order items on the inventory items
+          console.log('DEBUG: success. self.currentShoppingOrder.id() = ' + self.currentShoppingOrder().id());
+          self.inventoryItems().forEach( function(element) {
+            console.log('DEBUG: element.material_id() = ' + element.material_id());
+            defaults = {
+              'quantity_purchased': element.plannedQuantityTotal(),
+              'material': element.material_id(),
+              'shopping_order': self.currentShoppingOrder().id(),
+              'in_basket': false
+            }
+            element.currentShoppingOrderItem(new ShoppingOrderItem(defaults));
+
+            order.shopping_order_items.forEach( function(item) {
+              console.log('DEBUG: item.material = ' + item.material);
+              console.log('DEBUG: element.material_id() = ' + element.material_id());
+              console.log('DEBUG: item.inventory_id = ' + item.inventory_id);
+              console.log('DEBUG: element.inventory_id() = ' + element.inventory_id());
+              if ((item.material == element.material_id()) && (item.inventory_id == element.inventory_id())) {
+                console.log('DEBUG: updating shopping order item within inventory item');
+                element.currentShoppingOrderItem( new ShoppingOrderItem(item) );
+              }
+            });
+          });
         });
       },
       statusCode: {
@@ -742,7 +764,9 @@ var invViewModel = function() {
   // creates a new shopping order object
   // in case the previous get call failed retrieving an open order
   self.addShoppingOrder = function(data) {
-    console.log('addShoppingOrder: type = ' + data.type + ')');
+    console.log('addShoppingOrder: type = ' + data.type);
+
+    var defaults;
 
     var object = {
       'id': null,
@@ -765,9 +789,23 @@ var invViewModel = function() {
       data: JSON.stringify(object),
       success: function(response) {
         var parsed = response['shopping_order']
-        parsed.forEach( function(item) {
-          self.currentShoppingOrder( new ShoppingOrder(item) );
+        self.currentShoppingOrder( new ShoppingOrder(parsed) );
+        // TODO: update shopping order items on the inventory items
+
+        // Delete existing shopping order items and replace with defaults
+        // TODO: Find a better way instead of defining objects (defaults) that
+        // do not exist in the backend
+        self.inventoryItems().forEach( function(element) {
+          defaults = {
+            'quantity_purchased': element.plannedQuantityTotal(),
+            'material': element.material_id(),
+            'shopping_order': self.currentShoppingOrder().id(),
+            'in_basket': false
+          }
+          element.currentShoppingOrderItem(new ShoppingOrderItem(defaults));
         });
+
+
       }
     });
   };
@@ -785,6 +823,10 @@ var invViewModel = function() {
         parsed.forEach( function(item) {
           self.inventoryItems.push( new InventoryItem(item) );
         });
+
+        // after loading the inventory item, the shopping order with its items
+        // must be loaded
+        self.loadShoppingOrder();
       }
     });
   };
@@ -993,6 +1035,23 @@ var invViewModel = function() {
         if (op_quantity_formatted < 0) {
           self.ValidationErrors.push('Bedarf muss 0 oder größer sein.');
         }
+    }
+
+    return self.ValidationErrors().length <= 0;
+  };
+
+  self.ValidateShoppingOrder = function(item) {
+    if (!item) {
+      return false;
+    }
+
+    var currentItem = ko.utils.unwrapObservable(item);
+    var receiptPhoto = ko.utils.unwrapObservable(currentItem.receipt_photo);
+
+    self.ValidationErrors.removeAll(); // Clear out any previous errors
+
+    if (receiptPhoto === null) {
+      self.ValidationErrors.push('Bitte lade die Quittung hoch');
     }
 
     return self.ValidationErrors().length <= 0;
@@ -1213,8 +1272,46 @@ var invViewModel = function() {
     self.OriginalItemInstance(undefined);
   };
 
+  self.EditShoppingOrder = function() {
+    self.OriginalItemInstance(self.currentShoppingOrder());
+
+    var data = {
+      'id': self.currentShoppingOrder().id(),
+      'type' : self.currentShoppingOrder().type(),
+      'status': self.currentShoppingOrder().status(),
+      'plan_forecast_days' : self.currentShoppingOrder().planForecastDays(),
+      'receipt_photo' : self.currentShoppingOrder().receiptPhoto(),
+    };
+
+    self.ShoppingOrderBeingEdited(new ShoppingOrder(data));
+  };
+
+  self.SaveShoppingOrder = function() {
+    console.log('DEBUG: SaveShoppingOrder');
+    console.log('DEBUG: self.currentShoppingOrder().receiptPhoto = ' + self.currentShoppingOrder().receiptPhoto());
+    console.log('DEBUG: self.currentShoppingOrder().planForecastDays = ' + self.currentShoppingOrder().planForecastDays());
+    console.log('DEBUG: self.OriginalItemInstance().planForecastDays = ' + self.OriginalItemInstance().planForecastDays());
+    var updatedItem = ko.utils.unwrapObservable(self.ShoppingOrderBeingEdited);
+    if (!self.ValidateShoppingOrder(updatedItem)) {
+      return false;
+    }
+    var receiptPhoto = ko.utils.unwrapObservable(updatedItem.receipt_photo);
+
+    if (self.OriginalItemInstance() === undefined) {
+      return false;
+    } else {
+      self.OriginalItemInstance().suspend_backend_update(true);
+      self.OriginalItemInstance().receiptPhoto(receiptPhoto);
+      // Close the shopping order
+      self.OriginalItemInstance().status(2);
+      self.OriginalItemInstance().suspend_backend_update(false);
+      self.addShoppingOrder( {'type': 1, 'plan_forecast_days': default_forecast_days} );
+    }
+    self.ShoppingOrderBeingEdited(undefined);
+    self.OriginalItemInstance(undefined);
+  };
+
   self.loadUnitsOfMeasure();
-  self.loadShoppingOrder();
   self.loadInventoryItems();
 
 }
@@ -1228,7 +1325,7 @@ var InventoryItem = function(data) {
   parser = localSetting.numberParser();
 
   this.id = ko.observable(data.id);
-  this.inventory_id = ko.observable(data.inventory_id);
+  this.inventory_id = ko.observable(data.inventory);
 
   this.material_id = ko.observable(data.material);
   this.material_id.subscribe(saveInventoryItem, this);
@@ -1513,12 +1610,6 @@ var InventoryItem = function(data) {
     }
   };
 
-  // TODO: is referencing another viewmodel invVM really the right thing to
-  // retrieve values from there?
-  this.shoppingOrderItems = ko.observableArray(ko.utils.arrayMap(data.shopping_order_items, function(item) {
-    return new ShoppingOrderItem(item);
-  }));
-
   // DEFAULT values for shopping order items
   defaults = {
     'quantity_purchased': this.plannedQuantityTotal(),
@@ -1527,25 +1618,6 @@ var InventoryItem = function(data) {
     'in_basket': false
   }
   this.currentShoppingOrderItem = ko.observable( new ShoppingOrderItem(defaults) );
-
-  this.shoppingOrderItems().forEach( function(item) {
-    if (item.shopping_order_id() == invVM.currentShoppingOrder().id()) {
-      // TODO: There must be a better way of doing that
-      data = {
-        'id': item.id(),
-        'inventory_id': item.inventory_id(),
-        'material': item.material_id(),
-        'shopping_order': item.shopping_order_id(),
-        'quantity_required': item.quantity_required(),
-        'quantity_purchased': item.quantity_purchased(),
-        'in_basket': item.in_basket(),
-        'in_basket_time': item.in_basket_time(),
-        'in_basket_geo_lon': item.in_basket_geo_lon(),
-        'in_basket_geo_lat': item.in_basket_geo_lat()
-      }
-      this.currentShoppingOrderItem( new ShoppingOrderItem(data) );
-    }
-  }, this);
 
   // TODO: test function is obsolete
   this.orderCheck = ko.computed(function() {
@@ -1596,9 +1668,13 @@ var ShoppingOrder = function(data) {
   this.planForecastDays.subscribe(saveShoppingOrder, this);
   this.status = ko.observable(data.status);
   this.status.subscribe(saveShoppingOrder, this);
+  this.receiptPhoto = ko.observable(data.receipt_photo);
+  this.receiptPhoto.subscribe(saveShoppingOrder, this);
   this.shopping_order_items = ko.observableArray(ko.utils.arrayMap(data.items, function(forecast) {
     return new ShoppingOrderItem(forecast);
   }));
+  this.suspend_backend_update = ko.observable(false);
+  this.suspend_backend_update.subscribe(saveShoppingOrder, this);
 }
 
 var ShoppingOrderItem = function(data) {

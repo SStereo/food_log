@@ -254,36 +254,6 @@ def all_shopping_items_handler():
         return jsonify(inventory_items=[i.serialize for i in inventory_items])
 
 
-# TODO: obsolete
-@app.route('/shoppinglist/item', methods=['GET', 'DELETE', 'PUT'])
-def shopping_item_handlerDELETE():
-
-    inventory_items = []
-
-    id = request.form.get('id')
-    inventory_item = InventoryItem.query.filter_by(id=id).one()
-
-    if request.method == 'GET':
-        inventory_items.append(inventory_item)
-        return jsonify(inventory_items=[i.serialize for i in inventory_items])
-
-    elif request.method == 'DELETE':
-        session.delete(inventory_item)
-        session.commit()
-        return "item deleted"
-
-    elif request.method == 'PUT':
-        title = request.args.get('title')
-        level = request.args.get('level')
-        if title:
-            inventory_item.title = title
-        if level:
-            inventory_item.level = level
-        session.commit()
-        inventory_items.append(inventory_item)
-        return jsonify(inventory_items=[i.serialize for i in inventory_items])
-
-
 @app.route('/shoppinglist/map/places', methods=['GET', 'POST'])
 def map_places_handler():
 
@@ -414,8 +384,8 @@ def showMeal(meal_id):
 
 def createMaterial(title_local_lang, local_lang_code, uom_base_id):
 
+    # Step 1: Translate from local language to EN
     if (local_lang_code != 'en'):
-        # Translate user language to en
         translation = translate_client.translate(
             title_local_lang, source_language=local_lang_code)
         title_EN = translation['translatedText']
@@ -447,8 +417,6 @@ def createFoodviaNDB(keyword,
                      keyword_local_language,
                      local_language_code,
                      base_uom):
-    # Account Email: mailboxsoeren@gmail.com
-    # Account ID: 738eae59-c15d-4b89-a621-bcd7182a51e2
 
     if app.config['NDB_KEY']:
         n = ndb.NDB(app.config['NDB_KEY'])
@@ -469,7 +437,7 @@ def createFoodviaNDB(keyword,
             # Create Food
             name_truncated_80 = (i.get_name()[:75] + '..') if len(i.get_name()) > 75 else i.get_name()
             logging.info('Create Material (len %s): %s' % (len(name_truncated_80), name_truncated_80))
-            food = Material.query.filter_by(titleEN=i.get_name()).first()
+            food = Material.query.filter_by(titleEN=keyword).first()
             if not food:
                 food = Material(
                     ndb_title=name_truncated_80,
@@ -651,7 +619,7 @@ def api_v1_dietplan(diet_plan_id):
 
         # Step 2: Return Response
         result = diet_plan_item_schema.dump(diet_plan_item).data
-        return jsonify({'diet_plan_item': result})
+        return jsonify({'diet_plan_item': result}), 201
 
     if request.method == 'PUT':
         json_data = request.get_json()
@@ -760,9 +728,9 @@ def api_v1_dietplan(diet_plan_id):
 
         update_material_forecast_dp(diet_plan_id, login_session['default_inventory_id'], plan_date)
 
-        message = 'Item with id = %s successfully deleted' % id
+        message = 'api_v1_dietplan: DELETE | Item successfully deleted'
         response = make_response(json.dumps(
-            message), 200)
+            message), 204)
         response.headers['Content-Type'] = 'application/json'
         logging.info(message)
         return response
@@ -802,6 +770,7 @@ def api_v1_inventory(inventory_id):
             logging.warning(message)
             return response
 
+        # New Material
         elif (title) and (not material_id):
             uom_base = data['uom_base'].uom
             uom_stock = data['uom_stock'].uom
@@ -827,16 +796,27 @@ def api_v1_inventory(inventory_id):
             material = createMaterial(title, login_session['language'], uom_base)
             material_id = material.id
 
+        # Existing Material
         elif (not title) and (material_id):
             message = 'api_v1_inventory: POST | Existing material.'
             logging.info(message)
             material = Material.query.filter_by(id=material_id).one_or_none()
+            inventory_item = InventoryItem.query.filter_by(
+                material_id=material_id,
+                inventory_id=inventory_id).one_or_none()
             # Use title from existing material
             if (material):
                 title = material.title
                 uom_base = material.uom_base_id
                 uom_stock = material.uom_stock_id
                 quantity_conversion_factor = material.default_base_units_per_stock_unit
+                if (inventory_item):
+                    message = 'api_v1_inventory: POST | Inventory Item relating to material %s does already exist.' % material_id
+                    response = make_response(json.dumps(
+                        message), 200)
+                    response.headers['Content-Type'] = 'application/json'
+                    logging.info(message)
+                    return response
             else:
                 message = 'api_v1_inventory: POST | Material with id %s not found.' % material_id
                 response = make_response(json.dumps(
@@ -858,10 +838,8 @@ def api_v1_inventory(inventory_id):
         session.add(inventory_item)
         session.commit()
 
-        inventory_items = InventoryItem.query.filter_by(
-            id=inventory_item.id).all()
-        result = inventory_items_schema.dump(inventory_items).data
-        return jsonify({'inventory_items': result})
+        result = inventory_item_schema.dump(inventory_item).data
+        return jsonify({'inventory_item': result}), 201
 
     if request.method == 'PUT':
 
@@ -902,7 +880,7 @@ def api_v1_inventory(inventory_id):
 
         # Validations
         if (not id):
-            message = 'api_v1_dietplan: PUT | Missing field: id.'
+            message = 'api_v1_inventory: PUT | Missing field: id.'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
@@ -1002,14 +980,14 @@ def api_v1_inventory(inventory_id):
         if (id) and (inventory_item):
             session.delete(inventory_item)
             session.commit()
-            message = 'api_v1_dietplan: DELETE | Item successfully deleted'
+            message = 'api_v1_inventory: DELETE | Item successfully deleted'
             response = make_response(json.dumps(
-                message), 200)
+                message), 204)
             response.headers['Content-Type'] = 'application/json'
             logging.info(message)
             return response
         else:
-            message = 'api_v1_dietplan: DELETE | Can not delete item because item was not found'
+            message = 'api_v1_inventory: DELETE | Can not delete item because item was not found'
             response = make_response(json.dumps(
                 message), 400)
             response.headers['Content-Type'] = 'application/json'
@@ -1095,7 +1073,7 @@ def api_v1_shopping_order(shopping_order_id=None):
         session.commit()
 
         result = shopping_order_schema.dump(shopping_order).data
-        return jsonify({'shopping_order': result})
+        return jsonify({'shopping_order': result}), 201
 
     if request.method == 'PUT':
 
@@ -1107,9 +1085,7 @@ def api_v1_shopping_order(shopping_order_id=None):
         except ValidationError as err:
             return jsonify(err.messages), 422
 
-        type = data.type
-        status = data.status
-        plan_forecast_days = data.plan_forecast_days
+        shopping_order = data
 
         # Validations
         if (not shopping_order_id):
@@ -1120,32 +1096,10 @@ def api_v1_shopping_order(shopping_order_id=None):
             logging.warning(message)
             return response
 
-        if (not type):
-            message = 'api_v1_shopping_order: POST | Missing field: type.'
-            response = make_response(json.dumps(
-                message), 400)
-            response.headers['Content-Type'] = 'application/json'
-            logging.warning(message)
-            return response
+        # TODO: Identify if the given id is valid and an existing object was found or not
+        # otherwise marshmallow is creating a new object which we do not want.
+        # https://github.com/marshmallow-code/marshmallow-sqlalchemy/issues/50
 
-        if (not status):
-            message = 'api_v1_shopping_order: POST | Missing field: status.'
-            response = make_response(json.dumps(
-                message), 400)
-            response.headers['Content-Type'] = 'application/json'
-            logging.warning(message)
-            return response
-
-        if (not plan_forecast_days):
-            message = 'api_v1_shopping_order: POST | Missing field: plan_forecast_days.'
-            response = make_response(json.dumps(
-                message), 400)
-            response.headers['Content-Type'] = 'application/json'
-            logging.warning(message)
-            return response
-
-        # TODO: Create a consistent behaviour for querying the db, with or without try?
-        shopping_order = ShoppingOrder.query.filter_by(id=shopping_order_id).one_or_none()
         if (not shopping_order):
             message = 'api_v1_shopping_order: PUT | No shopping order found.'
             response = make_response(json.dumps(
@@ -1154,9 +1108,38 @@ def api_v1_shopping_order(shopping_order_id=None):
             logging.warning(message)
             return response
 
-        shopping_order.type = type
-        shopping_order.status = status
-        shopping_order.plan_forecast_days = plan_forecast_days
+        if (not shopping_order.type):
+            message = 'api_v1_shopping_order: POST | Missing field: type.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not shopping_order.status):
+            message = 'api_v1_shopping_order: POST | Missing field: status.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        if (not shopping_order.plan_forecast_days):
+            message = 'api_v1_shopping_order: POST | Missing field: plan_forecast_days.'
+            response = make_response(json.dumps(
+                message), 400)
+            response.headers['Content-Type'] = 'application/json'
+            logging.warning(message)
+            return response
+
+        # In case of a status change from 1 to 2 (closing order)
+        if (shopping_order.status == 2) and (shopping_order.closed is None):
+            shopping_order.closed = datetime.datetime.utcnow()
+
+            # Update quantities on inventory items with the purchased quantity
+            for inv, item in session.query(InventoryItem, ShoppingOrderItem).filter(InventoryItem.material_id == ShoppingOrderItem.material_id).filter(ShoppingOrderItem.shopping_order_id == shopping_order_id).all():
+                inv.quantity_base = inv.quantity_base + item.quantity_purchased
+                session.add(inv)
 
         session.commit()
 
@@ -1232,7 +1215,7 @@ def api_v1_shopping_order_item(shopping_order_item_id=None):
         session.commit()
 
         result = shopping_order_item_schema.dump(shopping_order_item).data
-        return jsonify({'shopping_order_item': result})
+        return jsonify({'shopping_order_item': result}), 201
 
     if request.method == 'PUT':
 
@@ -1421,7 +1404,6 @@ def update_material_forecast_dp(inventory_id, diet_plan_id, plan_date):
     except exc.SQLAlchemyError:
         logging.exception('Some problem occurred during deletion of MaterialForecasts')
 
-    # session.delete(forecasts)
     session.commit()
 
     # Step 2: Determine all meals in a dietplan for a plan date
@@ -1515,7 +1497,6 @@ def update_material_forecast_dp(inventory_id, diet_plan_id, plan_date):
             # the all material list
             for m in materials:
                 if (m.Material.id == row.Material.id):
-                    logging.info('remove material from array')
                     materials.remove(m)
 
         session.commit()

@@ -1,3 +1,5 @@
+
+
 function addInventoryItem(data) {
   console.log('addInventoryItem');
 
@@ -22,14 +24,8 @@ function addInventoryItem(data) {
     dataType: 'json',
     data: JSON.stringify(object),
     success: function(response) {
-
-      // turn the json string into a javascript object
-      var parsed = response['inventory_items']
-
-      // for each iterable item create a new InventoryItem observable
-      parsed.forEach( function(item) {
-        invVM.inventoryItems.push( new InventoryItem(item) );
-      });
+      var parsed = response['inventory_item']
+      invVM.inventoryItems.push( new InventoryItem(parsed) );
     }
   });
 }
