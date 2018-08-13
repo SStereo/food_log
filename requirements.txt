@@ -16,3 +16,4 @@ flask-wtf
 marshmallow-sqlalchemy
 flask-marshmallow
 python-dateutil
+oauth2client
