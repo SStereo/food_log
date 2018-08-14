@@ -13,7 +13,7 @@
 
     <!-- STATIC folder version -->
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('node_static', filename='bootstrap/dist/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('node_static', filename='bootstrap-datepicker/dist/css/bootstrap-datepicker3.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/jquery-ui.min.css') }}" rel="stylesheet">
 
@@ -105,9 +105,9 @@
 
     <!-- SCRIPTS -->
 
-    <script type=text/javascript src="{{ url_for('static', filename='js/jquery-3.2.1.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='js/popper.js') }}"></script>
-    <script type=text/javascript src="{{ url_for('static', filename='js/bootstrap.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='jquery/dist/jquery.min.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='popper.js/dist/umd/popper.min.js') }}"></script>
+    <script type=text/javascript src="{{ url_for('node_static', filename='bootstrap/dist/js/bootstrap.min.js') }}"></script>
     <script type=text/javascript src="{{ url_for('node_static', filename='bootstrap-datepicker/dist/js/bootstrap-datepicker.js') }}"></script>
     <script type=text/javascript src="{{ url_for('node_static', filename='moment/moment.js') }}"></script>
     <!-- Globalization libraries
