@@ -132,11 +132,15 @@ class UserGroup(db.Model):
 
 class UOM(db.Model):
     __tablename__ = 'units_of_measures'
-    uom = db.Column(db.String(length=5, convert_unicode=True), primary_key=True)
+    uom = db.Column(db.String(length=5, convert_unicode=True), primary_key=True, index=True)
     longEN = db.Column(db.String(80), nullable=True)
     shortDE = db.Column(db.String(5), nullable=True)
     longDE = db.Column(db.String(80), nullable=True)
     type = db.Column(db.String(1), nullable=True)  # 1 = ingredients only, 2 = both, 3 = nutrients only
+    is_kitchen_uom = db.Column(db.Boolean, unique=False, default=False)
+    is_stock_uom = db.Column(db.Boolean, unique=False, default=False)
+    is_base_uom = db.Column(db.Boolean, unique=False, default=False)
+    is_nutrient_uom = db.Column(db.Boolean, unique=False, default=False)
     created = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 
@@ -215,7 +219,7 @@ class FoodSubGroup(db.Model):
 
 class Material(db.Model):
     __tablename__ = 'materials'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, index=True)
     private = db.Column(db.Boolean, unique = False, default = False)  # user specific food that is not refered to a NDB or similar
     user_group_id = db.Column(db.Integer, db.ForeignKey('user_groups.id'), nullable=True)  # only required for private food items, for example home made foods
     title = db.Column(db.String(160), nullable=True)
@@ -281,11 +285,13 @@ class MaterialForecast(db.Model):
         primary_key=True)
     inventory_id = db.Column(
         db.Integer,
-        db.ForeignKey('inventories.id'))
+        db.ForeignKey('inventories.id'),
+        index=True)
     material_id = db.Column(
         db.Integer,
         db.ForeignKey('materials.id'),
-        nullable=True, index=True)
+        nullable=True,
+        index=True)
     type = db.Column(
         db.SmallInteger,
         nullable=False)
@@ -367,7 +373,7 @@ class Inventory(db.Model):
 class InventoryItem(db.Model):
     __tablename__ = 'inventory_items'
     id = db.Column(db.Integer, primary_key=True)  # TODO: Each item is per definition a SKU (Stock keeping unit), consider renaming
-    inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'))
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventories.id'), index=True)
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=True, index=True)
     titleEN = db.Column(db.String(160), nullable=True)
     title = db.Column(db.String(160), nullable=True)
@@ -412,20 +418,6 @@ class InventoryItem(db.Model):
     material = db.relationship("Material")
     uom_base = db.relationship("UOM", foreign_keys=[uom_base_id])
     uom_stock = db.relationship("UOM", foreign_keys=[uom_stock_id])
-
-    @property
-    def serialize(self):
-        return {
-            'id': self.id,
-            'inventory_id': self.inventory_id,
-            'titleEN': self.titleEN,
-            'title': self.title,
-            'material_id': self.material_id,
-            'level': self.level,
-            'ignore_forecast': self.ignore_forecast,
-            're_order_level': self.re_order_level,
-            're_order_quantity': self.re_order_quantity
-        }
 
 
 # The shopping list or order with access to a group

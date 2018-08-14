@@ -1,12 +1,12 @@
-Flask
+flask
 sqlalchemy
 psycopg2
-google
+requests
 google-api-python-client
 google-oauth
 google-auth-oauthlib
 google-auth-httplib2
-google-cloud
+google-cloud-translate
 google-cloud-language
 passlib
 flask-httpauth
@@ -17,3 +17,4 @@ marshmallow-sqlalchemy
 flask-marshmallow
 python-dateutil
 oauth2client
+grpcio

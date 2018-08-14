@@ -594,11 +594,22 @@ var invViewModel = function() {
   // Reference Data
   self.materials = ko.observableArray([]);
   self.unitsOfMeasure = ko.observableArray([]);
+  self.unitsOfMeasureStock = ko.computed( function() {
+    return self.unitsOfMeasure().filter(function (item) {
+      return item.isStockUOM();
+    });
+  });
+  self.unitsOfMeasureBase = ko.computed( function() {
+    return self.unitsOfMeasure().filter(function (item) {
+      return item.isBaseUOM();
+    });
+  });
+
 
   // store the new Inventory value being entered
-	this.newInventoryItemTitle = ko.observable();
+	self.newInventoryItemTitle = ko.observable();
 
-  this.cpTypes = ko.observableArray([
+  self.cpTypes = ko.observableArray([
     {'id': 0, 'TextDE': 'nein'},
     {'id': 1, 'TextDE': 'täglich'},
     {'id': 2, 'TextDE': 'einmal pro Woche'},
@@ -617,60 +628,67 @@ var invViewModel = function() {
   // Required for modal: Used to keep a reference back to the original user record being edited
   self.OriginalItemInstance = ko.observable();
 
-  this.ValidationErrors = ko.observableArray([]);
+  self.ValidationErrors = ko.observableArray([]);
 
-  this.filterInventory = ko.observable('all');
-  this.filterShoppingList = ko.observable('1 || 2');
+  self.filterInventory = ko.observable('all');
+  self.filterShoppingList = ko.observable('1 || 2');
 
-  this.filteredInventoryItems = ko.computed(function () {
-			switch (self.filterInventory()) {
-			case '0':
-				return self.inventoryItems().filter(function (item) {
-					return item.status() == 0;
-				});
-			case '1':
-				return self.inventoryItems().filter(function (item) {
-					return item.status() == 1;
-				});
-      case '2':
-				return self.inventoryItems().filter(function (item) {
-					return item.status() == 2;
-				});
-      case '3':
-        return self.inventoryItems().filter(function (item) {
-          return item.status() == 3;
-        });
-			default:
-				return self.inventoryItems();
-			}
-		});
-
-    this.filteredShoppingItems = ko.computed(function () {
-  			switch (self.filterShoppingList()) {
-  			case '0':
-  				return self.inventoryItems().filter(function (item) {
-  					return item.status() == 0;
-  				});
-  			case '1':
-  				return self.inventoryItems().filter(function (item) {
-  					return item.status() == 1;
-  				});
+  self.filteredInventoryItems = ko.computed(function () {
+    if (self.newInventoryItemTitle()) {
+      console.log('filtering the list by ' + self.newInventoryItemTitle());
+      return self.inventoryItems().filter(function (item) {
+        return item.material_id() == self.newInventoryItemTitle();
+      });
+    } else {
+      switch (self.filterInventory()) {
+    		case '0':
+    			return self.inventoryItems().filter(function (item) {
+    				return item.status() == 0;
+    			});
+    		case '1':
+    			return self.inventoryItems().filter(function (item) {
+    				return item.status() == 1;
+    			});
         case '2':
-  				return self.inventoryItems().filter(function (item) {
-  					return item.status() == 2;
-  				});
+    			return self.inventoryItems().filter(function (item) {
+    				return item.status() == 2;
+    			});
         case '3':
           return self.inventoryItems().filter(function (item) {
             return item.status() == 3;
           });
-        case '1 || 2':
-          return self.inventoryItems().filter(function (item) {
-            return (item.status() == 1 || item.status() == 2);
-          });
-  			default:
-  				return self.inventoryItems();
-  			}
-  		});
+    		default:
+    			return self.inventoryItems();
+  		}
+    }
+	});
+
+  this.filteredShoppingItems = ko.computed(function () {
+		switch (self.filterShoppingList()) {
+		case '0':
+			return self.inventoryItems().filter(function (item) {
+				return item.status() == 0;
+			});
+		case '1':
+			return self.inventoryItems().filter(function (item) {
+				return item.status() == 1;
+			});
+    case '2':
+			return self.inventoryItems().filter(function (item) {
+				return item.status() == 2;
+			});
+    case '3':
+      return self.inventoryItems().filter(function (item) {
+        return item.status() == 3;
+      });
+    case '1 || 2':
+      return self.inventoryItems().filter(function (item) {
+        return (item.status() == 1 || item.status() == 2);
+      });
+		default:
+			return self.inventoryItems();
+		}
+	});
 
 
   // Loads unit of measures from Rest API
@@ -691,6 +709,7 @@ var invViewModel = function() {
   };
 
   self.loadMaterials = function(searchTerm, callback) {
+
     $.ajax({
       dataType: 'json',
       url: url_api_materials,
@@ -718,9 +737,7 @@ var invViewModel = function() {
         parsed.forEach( function(order) {
           self.currentShoppingOrder( new ShoppingOrder(order) );
           // TODO: update shopping order items on the inventory items
-          console.log('DEBUG: success. self.currentShoppingOrder.id() = ' + self.currentShoppingOrder().id());
           self.inventoryItems().forEach( function(element) {
-            console.log('DEBUG: element.material_id() = ' + element.material_id());
             defaults = {
               'quantity_purchased': element.plannedQuantityTotal(),
               'material': element.material_id(),
@@ -730,12 +747,7 @@ var invViewModel = function() {
             element.currentShoppingOrderItem(new ShoppingOrderItem(defaults));
 
             order.shopping_order_items.forEach( function(item) {
-              console.log('DEBUG: item.material = ' + item.material);
-              console.log('DEBUG: element.material_id() = ' + element.material_id());
-              console.log('DEBUG: item.inventory_id = ' + item.inventory_id);
-              console.log('DEBUG: element.inventory_id() = ' + element.inventory_id());
               if ((item.material == element.material_id()) && (item.inventory_id == element.inventory_id())) {
-                console.log('DEBUG: updating shopping order item within inventory item');
                 element.currentShoppingOrderItem( new ShoppingOrderItem(item) );
               }
             });
@@ -886,8 +898,6 @@ var invViewModel = function() {
   self.newInventoryItem = function(data, event) {
 
     var title = self.newInventoryItemTitle();
-    // var uom_base_id = self.newInventoryItemBaseUnit();
-    // var uom_stock_id = self.newInventoryItemStockUnit();
     if (title) {
       if (isNaN(title)) {
         var material_id = null;
@@ -1287,10 +1297,6 @@ var invViewModel = function() {
   };
 
   self.SaveShoppingOrder = function() {
-    console.log('DEBUG: SaveShoppingOrder');
-    console.log('DEBUG: self.currentShoppingOrder().receiptPhoto = ' + self.currentShoppingOrder().receiptPhoto());
-    console.log('DEBUG: self.currentShoppingOrder().planForecastDays = ' + self.currentShoppingOrder().planForecastDays());
-    console.log('DEBUG: self.OriginalItemInstance().planForecastDays = ' + self.OriginalItemInstance().planForecastDays());
     var updatedItem = ko.utils.unwrapObservable(self.ShoppingOrderBeingEdited);
     if (!self.ValidateShoppingOrder(updatedItem)) {
       return false;
@@ -1659,6 +1665,10 @@ var UnitOfMeasure = function(data) {
   this.longDE = ko.observable(data.longDE);
   this.longEN = ko.observable(data.longEN);
   this.shortDE = ko.observable(data.shortDE);
+  this.isBaseUOM = ko.observable(data.is_base_uom);
+  this.isKitchenUOM = ko.observable(data.is_kitchen_uom);
+  this.isNutrientUOM = ko.observable(data.is_nutrient_uom);
+  this.isStockUOM = ko.observable(data.is_stock_uom);
 }
 
 var ShoppingOrder = function(data) {
